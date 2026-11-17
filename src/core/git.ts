@@ -41,8 +41,12 @@ export interface GitSelection {
   scope: GitScope;
 }
 
-export interface GitComparison { id: string; selection: GitSelection }
-export const gitComparisonKey = (selection: GitSelection) => JSON.stringify([selection.target.connectionId ?? '', selection.target.cwd, selection.path, selection.scope]);
+export interface GitComparison {
+  id: string;
+  selection: GitSelection;
+}
+export const gitComparisonKey = (selection: GitSelection) =>
+  JSON.stringify([selection.target.connectionId ?? '', selection.target.cwd, selection.path, selection.scope]);
 export interface GitWorktree {
   path: string;
   head: string;
@@ -53,5 +57,21 @@ export interface GitWorktree {
   prunable: string | null;
 }
 
-export interface GitReference { name: string; shortName: string; hash: string; kind: 'branch' | 'remote' | 'tag' }
-export type GitReferenceAction = 'switchBranch' | 'createBranch' | 'renameBranch' | 'deleteBranch' | 'merge' | 'rebase' | 'abortMerge' | 'abortRebase' | 'continueRebase' | 'createTag' | 'deleteTag';
+export interface GitReference {
+  name: string;
+  shortName: string;
+  hash: string;
+  kind: 'branch' | 'remote' | 'tag';
+}
+export type GitReferenceAction =
+  | 'switchBranch'
+  | 'createBranch'
+  | 'renameBranch'
+  | 'deleteBranch'
+  | 'merge'
+  | 'rebase'
+  | 'abortMerge'
+  | 'abortRebase'
+  | 'continueRebase'
+  | 'createTag'
+  | 'deleteTag';

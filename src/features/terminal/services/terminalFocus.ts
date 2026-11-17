@@ -3,8 +3,13 @@ import { getExecutingTerm } from '../hooks/useTerminalSession';
 import { terminalDebug } from './terminalDebug';
 
 function available(element: HTMLElement | null): element is HTMLElement {
-  return !!element && element.getClientRects().length > 0 && !element.closest('[inert]')
-    && !element.matches(':disabled') && getComputedStyle(element).visibility !== 'hidden';
+  return (
+    !!element &&
+    element.getClientRects().length > 0 &&
+    !element.closest('[inert]') &&
+    !element.matches(':disabled') &&
+    getComputedStyle(element).visibility !== 'hidden'
+  );
 }
 
 /** Focus the active input after React reveals a session, before the next paint. */
@@ -20,7 +25,10 @@ export function focusSessionInput(paneId: string): void {
   const pane = document.querySelector<HTMLElement>(`[data-testid="pane-${paneId}"]`);
   if (!available(pane)) return;
   const secret = pane.querySelector<HTMLInputElement>('.ssh-auth-response');
-  if (available(secret)) { secret.focus({ preventScroll: true }); return; }
+  if (available(secret)) {
+    secret.focus({ preventScroll: true });
+    return;
+  }
   const scene = useTerminalStore.getState().scenes[paneId] ?? 'classic';
   const input = pane.querySelector<HTMLTextAreaElement>('[data-terminal-input]');
   if (scene !== 'altScreen' && useTerminalStore.getState().keyboardTarget === 'input' && available(input)) {

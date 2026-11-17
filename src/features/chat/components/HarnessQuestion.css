@@ -1,2 +1,13 @@
-.harness-question-choice { display: flex; align-items: flex-start; gap: 8px; padding: 8px; background: var(--hover); border-radius: var(--radius-inner); cursor: pointer; }
-.harness-question-choice span { min-width: 0; overflow-wrap: anywhere; }
+.harness-question-choice {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 8px;
+  background: var(--hover);
+  border-radius: var(--radius-inner);
+  cursor: pointer;
+}
+.harness-question-choice span {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}

@@ -1,4 +1,8 @@
-import { writeText as writeNativeClipboardText, readText as readNativeClipboardText, readImage } from '@tauri-apps/plugin-clipboard-manager';
+import {
+  writeText as writeNativeClipboardText,
+  readText as readNativeClipboardText,
+  readImage,
+} from '@tauri-apps/plugin-clipboard-manager';
 import { invoke } from '@platform/diagnostics';
 
 /** Write text through the native clipboard when running inside Tauri. */
@@ -24,12 +28,11 @@ export async function writeClipboardText(text: string): Promise<void> {
 
   const focused = document.activeElement;
   const selection = window.getSelection();
-  const ranges = selection
-    ? Array.from({ length: selection.rangeCount }, (_, i) => selection.getRangeAt(i).cloneRange())
-    : [];
-  const inputSelection = focused instanceof HTMLInputElement || focused instanceof HTMLTextAreaElement
-    ? { start: focused.selectionStart, end: focused.selectionEnd, direction: focused.selectionDirection }
-    : null;
+  const ranges = selection ? Array.from({ length: selection.rangeCount }, (_, i) => selection.getRangeAt(i).cloneRange()) : [];
+  const inputSelection =
+    focused instanceof HTMLInputElement || focused instanceof HTMLTextAreaElement
+      ? { start: focused.selectionStart, end: focused.selectionEnd, direction: focused.selectionDirection }
+      : null;
   const input = document.createElement('textarea');
   input.value = text;
   input.tabIndex = -1;
@@ -41,8 +44,11 @@ export async function writeClipboardText(text: string): Promise<void> {
   } finally {
     input.remove();
     if (focused instanceof HTMLElement && focused.isConnected) focused.focus({ preventScroll: true });
-    if (inputSelection?.start != null && inputSelection.end != null
-      && (focused instanceof HTMLInputElement || focused instanceof HTMLTextAreaElement)) {
+    if (
+      inputSelection?.start != null &&
+      inputSelection.end != null &&
+      (focused instanceof HTMLInputElement || focused instanceof HTMLTextAreaElement)
+    ) {
       focused.setSelectionRange(inputSelection.start, inputSelection.end, inputSelection.direction ?? undefined);
     }
     if (selection) {
@@ -95,7 +101,7 @@ export async function hasClipboardImage(): Promise<boolean> {
   }
   try {
     const items = await navigator.clipboard?.read();
-    return items?.some(item => item.types.some(type => type.startsWith('image/'))) ?? false;
+    return items?.some((item) => item.types.some((type) => type.startsWith('image/'))) ?? false;
   } catch {
     return false;
   }

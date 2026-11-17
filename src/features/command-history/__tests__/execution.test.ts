@@ -9,11 +9,22 @@ vi.mock('@platform/pty', () => ({ ptyWrite: vi.fn().mockResolvedValue(undefined)
 vi.mock('@features/terminal/hooks/useTerminalSession', () => ({ setPendingTerminalCommand: vi.fn(), getExecutingTerm: vi.fn() }));
 vi.mock('@features/terminal/services/terminalFocus', () => ({ focusSessionInput: vi.fn() }));
 vi.mock('@features/terminal/services/terminalStartup', () => ({ waitForTerminalStartup: vi.fn().mockResolvedValue('sid') }));
-const context: ExecutionContext = { target: 'local', root: '/app', scope: 'scope', cwd: '/app', paneId: 'one', spec: { id: 'one', kind: 'local', shellType: 'bash', cwd: '/app' } };
+const context: ExecutionContext = {
+  target: 'local',
+  root: '/app',
+  scope: 'scope',
+  cwd: '/app',
+  paneId: 'one',
+  spec: { id: 'one', kind: 'local', shellType: 'bash', cwd: '/app' },
+};
 const item: CommandItem = { id: 'command', name: 'Build', command: 'npm run build', cwd: '/app', shell: 'bash' };
 beforeEach(() => {
   vi.clearAllMocks();
-  useSessionStore.setState({ tabs: [{ id: 'tab', kind: 'session', title: '', layout: { type: 'leaf', terminal: context.spec } }], activeId: 'tab', terminalCwds: { one: '/app' } });
+  useSessionStore.setState({
+    tabs: [{ id: 'tab', kind: 'session', title: '', layout: { type: 'leaf', terminal: context.spec } }],
+    activeId: 'tab',
+    terminalCwds: { one: '/app' },
+  });
   useTerminalStore.setState({ sessions: { one: 'sid' }, startupStates: { one: 'ready' }, scenes: { one: 'blockList' } });
   useBlockStore.setState({ byTab: {} });
   useInputStore.setState({ byPane: {} });
@@ -35,10 +46,26 @@ it('runs in the captured terminal even after focus moves', async () => {
   expect(ptyWrite).toHaveBeenCalledWith('sid', 'npm run build\n');
 });
 it('reuses the connected SSH terminal without creating a new session', async () => {
-  const remote = { ...context, paneId: 'remote-pane', target: JSON.stringify(['ssh', 'example.test', 22, 'dev']),
-    spec: { id: 'remote-pane', kind: 'ssh' as const, cwd: '/app', ssh: { name: 'Remote', host: 'example.test', user: 'dev', connectionId: 'saved-remote' } } };
-  useSessionStore.setState({ tabs: [{ id: 'tab', kind: 'session', title: 'Remote', layout: { type: 'leaf', terminal: remote.spec } }], terminalCwds: { 'remote-pane': '/app' } });
-  useTerminalStore.setState({ sessions: { 'remote-pane': 'remote-session' }, startupStates: { 'remote-pane': 'ready' }, scenes: { 'remote-pane': 'blockList' } });
+  const remote = {
+    ...context,
+    paneId: 'remote-pane',
+    target: JSON.stringify(['ssh', 'example.test', 22, 'dev']),
+    spec: {
+      id: 'remote-pane',
+      kind: 'ssh' as const,
+      cwd: '/app',
+      ssh: { name: 'Remote', host: 'example.test', user: 'dev', connectionId: 'saved-remote' },
+    },
+  };
+  useSessionStore.setState({
+    tabs: [{ id: 'tab', kind: 'session', title: 'Remote', layout: { type: 'leaf', terminal: remote.spec } }],
+    terminalCwds: { 'remote-pane': '/app' },
+  });
+  useTerminalStore.setState({
+    sessions: { 'remote-pane': 'remote-session' },
+    startupStates: { 'remote-pane': 'ready' },
+    scenes: { 'remote-pane': 'blockList' },
+  });
   const addTab = vi.spyOn(useSessionStore.getState(), 'addTab');
   const remoteItem = { ...item, shell: 'posix' };
   await runHistoryCommand(remote, remoteItem, 'current');

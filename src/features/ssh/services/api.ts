@@ -57,17 +57,45 @@ export function validateSshConnection(c: Partial<SshConnection>): string | null 
   if (!c.host || !c.host.trim()) return t('Enter a host IP or domain.');
   if (c.host.startsWith('-') || /\s/.test(c.host)) return t('The host cannot contain spaces or start with a dash.');
   if (c.user?.startsWith('-') || /\s/.test(c.user ?? '')) return t('The account cannot contain spaces or start with a dash.');
-  if (c.serverAliveInterval !== undefined && (!Number.isInteger(c.serverAliveInterval) || c.serverAliveInterval < 0 || c.serverAliveInterval > 3600)) return t('Keepalive must be an integer from 0 to 3600 seconds.');
-  if (c.jumpConnectionId && (c.jumpConnectionId === c.id || !/^[\w-]{1,128}$/.test(c.jumpConnectionId))) return t('Choose a different saved connection as the jump host.');
-  if (c.jumpConnectionId && c.jumpHost && c.jumpHost.toLowerCase() !== 'none') return t('Choose a saved jump connection or enter jump addresses, not both.');
+  if (
+    c.serverAliveInterval !== undefined &&
+    (!Number.isInteger(c.serverAliveInterval) || c.serverAliveInterval < 0 || c.serverAliveInterval > 3600)
+  )
+    return t('Keepalive must be an integer from 0 to 3600 seconds.');
+  if (c.jumpConnectionId && (c.jumpConnectionId === c.id || !/^[\w-]{1,128}$/.test(c.jumpConnectionId)))
+    return t('Choose a different saved connection as the jump host.');
+  if (c.jumpConnectionId && c.jumpHost && c.jumpHost.toLowerCase() !== 'none')
+    return t('Choose a saved jump connection or enter jump addresses, not both.');
   if (c.jumpHost && (c.jumpHost.length > 2048 || c.jumpHost.split(',').length > 8)) return t('Up to 8 jump hosts are supported.');
   if (c.jumpConnectionId && c.proxyId && c.proxyId !== 'none') return t('Configure the proxy on the first jump connection.');
-  if (c.jumpHost && !c.jumpHost.split(',').every(value => /^(?:[\w.-]+@)?(?:\[[0-9a-fA-F:]+\]|[\w.][\w.-]*)(?::[0-9]{1,5})?$/.test(value) && Number(value.match(/:(\d+)$/)?.[1] ?? 22) > 0 && Number(value.match(/:(\d+)$/)?.[1] ?? 22) <= 65535)) return t('Use user@host:port for jump hosts, separated by commas.');
+  if (
+    c.jumpHost &&
+    !c.jumpHost
+      .split(',')
+      .every(
+        (value) =>
+          /^(?:[\w.-]+@)?(?:\[[0-9a-fA-F:]+\]|[\w.][\w.-]*)(?::[0-9]{1,5})?$/.test(value) &&
+          Number(value.match(/:(\d+)$/)?.[1] ?? 22) > 0 &&
+          Number(value.match(/:(\d+)$/)?.[1] ?? 22) <= 65535,
+      )
+  )
+    return t('Use user@host:port for jump hosts, separated by commas.');
   if (/[\r\n\0]/.test(c.identityFile ?? '')) return t('The private key path cannot contain control characters.');
-  if ([c.notes, c.aiNotes].some(value => new TextEncoder().encode(value ?? '').length > 16384)) return t('Host notes must not exceed 16,384 bytes.');
+  if ([c.notes, c.aiNotes].some((value) => new TextEncoder().encode(value ?? '').length > 16384))
+    return t('Host notes must not exceed 16,384 bytes.');
   const variables = Object.entries(c.environment ?? {});
-  if (variables.length > 64 || variables.reduce((total, [name, value]) => total + new TextEncoder().encode(name + value).length, 0) > 32768
-    || variables.some(([name, value]) => !/^[A-Za-z_][A-Za-z0-9_]*$/.test(name) || name.length > 128 || new TextEncoder().encode(value).length > 8192 || /[\r\n\0]/.test(value))) return t('Invalid environment variable name, value or size.');
+  if (
+    variables.length > 64 ||
+    variables.reduce((total, [name, value]) => total + new TextEncoder().encode(name + value).length, 0) > 32768 ||
+    variables.some(
+      ([name, value]) =>
+        !/^[A-Za-z_][A-Za-z0-9_]*$/.test(name) ||
+        name.length > 128 ||
+        new TextEncoder().encode(value).length > 8192 ||
+        /[\r\n\0]/.test(value),
+    )
+  )
+    return t('Invalid environment variable name, value or size.');
   for (const [specs, pattern, label] of [
     [c.localForwards, STATIC_FORWARD, 'Local forward'],
     [c.remoteForwards, STATIC_FORWARD, 'Remote forward'],
@@ -76,16 +104,15 @@ export function validateSshConnection(c: Partial<SshConnection>): string | null 
     for (const spec of specs ?? []) {
       const match = spec.match(pattern);
       const ports = match?.slice(1) ?? [];
-      if (!match || !ports.every(part => Number(part) >= 1 && Number(part) <= 65535)) {
-        return t('Invalid {{kind}} specification (example: {{example}})', { kind: t(label), example: pattern === DYNAMIC_FORWARD ? '1080' : '8080:localhost:80' });
+      if (!match || !ports.every((part) => Number(part) >= 1 && Number(part) <= 65535)) {
+        return t('Invalid {{kind}} specification (example: {{example}})', {
+          kind: t(label),
+          example: pattern === DYNAMIC_FORWARD ? '1080' : '8080:localhost:80',
+        });
       }
     }
   }
-  if (
-    c.port !== undefined &&
-    c.port !== null &&
-    (!Number.isInteger(c.port) || c.port < 1 || c.port > 65535)
-  ) {
+  if (c.port !== undefined && c.port !== null && (!Number.isInteger(c.port) || c.port < 1 || c.port > 65535)) {
     return t('Port must be an integer from 1 to 65535.');
   }
   return null;
@@ -122,21 +149,29 @@ export interface SshTestResult {
 /** Non-secret connection options shared by SSH backend commands. */
 export function sshConnectionOptions(target: SshOptions): SshOptions {
   return {
-    identityFile: target.identityFile, jumpHost: target.jumpHost, jumpConnectionId: target.jumpConnectionId,
-    serverAliveInterval: target.serverAliveInterval, shellIntegration: target.shellIntegration,
-    localForwards: target.localForwards, remoteForwards: target.remoteForwards,
-    dynamicForwards: target.dynamicForwards, proxyId: target.proxyId, environment: target.environment,
+    identityFile: target.identityFile,
+    jumpHost: target.jumpHost,
+    jumpConnectionId: target.jumpConnectionId,
+    serverAliveInterval: target.serverAliveInterval,
+    shellIntegration: target.shellIntegration,
+    localForwards: target.localForwards,
+    remoteForwards: target.remoteForwards,
+    dynamicForwards: target.dynamicForwards,
+    proxyId: target.proxyId,
+    environment: target.environment,
     authenticationMode: target.authenticationMode,
   };
 }
 
 /** Tests a connection (explicit parameters, so the form can test before saving). */
-export function sshTest(target: {
-  host: string;
-  port?: number;
-  user: string;
-  password?: string;
-} & SshOptions): Promise<SshTestResult> {
+export function sshTest(
+  target: {
+    host: string;
+    port?: number;
+    user: string;
+    password?: string;
+  } & SshOptions,
+): Promise<SshTestResult> {
   return invoke('ssh_test', {
     host: target.host,
     port: target.port ?? null,
@@ -163,11 +198,27 @@ export interface SshHostKeyInfo {
 }
 
 export function connectionTarget(conn: SshConnection) {
-  return { name: conn.name, host: conn.host, user: conn.user, port: conn.port, connectionId: conn.id,
-    identityFile: conn.identityFile, jumpHost: conn.jumpHost, jumpConnectionId: conn.jumpConnectionId, serverAliveInterval: conn.serverAliveInterval,
-    shellIntegration: conn.shellIntegration, localForwards: conn.localForwards,
-    remoteForwards: conn.remoteForwards, dynamicForwards: conn.dynamicForwards,
-    autoReconnect: conn.autoReconnect, proxyId: conn.proxyId, environment: conn.environment, notes: conn.notes, aiNotes: conn.aiNotes, authenticationMode: conn.authMethod };
+  return {
+    name: conn.name,
+    host: conn.host,
+    user: conn.user,
+    port: conn.port,
+    connectionId: conn.id,
+    identityFile: conn.identityFile,
+    jumpHost: conn.jumpHost,
+    jumpConnectionId: conn.jumpConnectionId,
+    serverAliveInterval: conn.serverAliveInterval,
+    shellIntegration: conn.shellIntegration,
+    localForwards: conn.localForwards,
+    remoteForwards: conn.remoteForwards,
+    dynamicForwards: conn.dynamicForwards,
+    autoReconnect: conn.autoReconnect,
+    proxyId: conn.proxyId,
+    environment: conn.environment,
+    notes: conn.notes,
+    aiNotes: conn.aiNotes,
+    authenticationMode: conn.authMethod,
+  };
 }
 
 export function sshHostKeyInfo(host: string, port?: number, options?: SshOptions): Promise<SshHostKeyInfo> {
@@ -226,41 +277,84 @@ export interface SshStatusMetrics {
 }
 
 /** Omitted selections retain full collection for existing terminal status panels. */
-export async function sshSystemStatus(id: string, host: string, port: number, user?: string, metrics?: SshStatusMetrics): Promise<SshSystemStatus> {
-  const status = await invoke<SshSystemStatus>('ssh_system_status', { id, host, port, user: user ?? null, ...(metrics ? { metrics } : {}) });
+export async function sshSystemStatus(
+  id: string,
+  host: string,
+  port: number,
+  user?: string,
+  metrics?: SshStatusMetrics,
+): Promise<SshSystemStatus> {
+  const status = await invoke<SshSystemStatus>('ssh_system_status', {
+    id,
+    host,
+    port,
+    user: user ?? null,
+    ...(metrics ? { metrics } : {}),
+  });
   if (status?.system) useHostSystems.getState().remember(id, status.system);
   return status;
 }
 
 /** Submit secrets through redacted fields; neither profiles nor diagnostics retain them. */
-export function sshAuthenticateSession(target: SshAuthenticationTarget, method: 'password' | 'keyPassphrase', secret: string): Promise<void> {
-  return invoke('ssh_authenticate_session', { id: target.connectionId, host: target.host, port: target.port ?? 22,
-    user: target.user ?? '', method, password: method === 'password' ? secret : '', passphrase: method === 'keyPassphrase' ? secret : '' });
+export function sshAuthenticateSession(
+  target: SshAuthenticationTarget,
+  method: 'password' | 'keyPassphrase',
+  secret: string,
+): Promise<void> {
+  return invoke('ssh_authenticate_session', {
+    id: target.connectionId,
+    host: target.host,
+    port: target.port ?? 22,
+    user: target.user ?? '',
+    method,
+    password: method === 'password' ? secret : '',
+    passphrase: method === 'keyPassphrase' ? secret : '',
+  });
 }
 
-interface ChallengeTarget { connectionId: string; host: string; port: number; user: string }
+interface ChallengeTarget {
+  connectionId: string;
+  host: string;
+  port: number;
+  user: string;
+}
 export type SshAuthenticationChallenge =
   | { kind: 'hostKey'; round: number; target: ChallengeTarget; fingerprint: string; keyType: string }
   | { kind: 'prompts'; round: number; target: ChallengeTarget; instructions: string; prompts: { text: string; echo: boolean }[] };
 export type SshChallengeReply = (responses: string[]) => Promise<void>;
 
 /** Answers belong to one live handshake; successful services reuse its transport. */
-export async function sshAuthenticateInteractive(target: SshAuthenticationTarget, signal: AbortSignal,
-  onChallenge: (challenge: SshAuthenticationChallenge, reply: SshChallengeReply) => void): Promise<void> {
+export async function sshAuthenticateInteractive(
+  target: SshAuthenticationTarget,
+  signal: AbortSignal,
+  onChallenge: (challenge: SshAuthenticationChallenge, reply: SshChallengeReply) => void,
+): Promise<void> {
   signal.throwIfAborted();
   const attemptId = crypto.randomUUID();
   const channel = new Channel<SshAuthenticationChallenge>();
-  channel.onmessage = challenge => {
-    if (!signal.aborted) onChallenge(challenge, responses => {
-      signal.throwIfAborted();
-      return invoke('ssh_authentication_respond', { attemptId, round: challenge.round, responses });
-    });
+  channel.onmessage = (challenge) => {
+    if (!signal.aborted)
+      onChallenge(challenge, (responses) => {
+        signal.throwIfAborted();
+        return invoke('ssh_authentication_respond', { attemptId, round: challenge.round, responses });
+      });
   };
-  const cancel = () => { void invoke('ssh_authentication_cancel', { attemptId }).catch(() => {}); };
+  const cancel = () => {
+    void invoke('ssh_authentication_cancel', { attemptId }).catch(() => {});
+  };
   signal.addEventListener('abort', cancel, { once: true });
   try {
-    await invoke('ssh_authenticate_session', { id: target.connectionId, host: target.host, port: target.port ?? 22,
-      user: target.user ?? '', method: 'keyboardInteractive', password: '', passphrase: '', attemptId, onChallenge: channel });
+    await invoke('ssh_authenticate_session', {
+      id: target.connectionId,
+      host: target.host,
+      port: target.port ?? 22,
+      user: target.user ?? '',
+      method: 'keyboardInteractive',
+      password: '',
+      passphrase: '',
+      attemptId,
+      onChallenge: channel,
+    });
     signal.throwIfAborted();
   } finally {
     signal.removeEventListener('abort', cancel);
@@ -273,17 +367,29 @@ export function sshForgetSessionAuth(id: string): Promise<void> {
 }
 
 /** Search through one file channel and cancel obsolete requests. */
-export async function sshSearchFiles(id: string, path: string, query: string, signal: AbortSignal,
-  onProgress?: (result: { entries: FsEntry[]; truncated: boolean; skipped: number }) => void):
-  Promise<{ entries: FsEntry[]; truncated: boolean; skipped: number }> {
+export async function sshSearchFiles(
+  id: string,
+  path: string,
+  query: string,
+  signal: AbortSignal,
+  onProgress?: (result: { entries: FsEntry[]; truncated: boolean; skipped: number }) => void,
+): Promise<{ entries: FsEntry[]; truncated: boolean; skipped: number }> {
   const requestId = crypto.randomUUID();
-  const cancel = () => { void invoke('ssh_search_cancel', { requestId }).catch(() => {}); };
+  const cancel = () => {
+    void invoke('ssh_search_cancel', { requestId }).catch(() => {});
+  };
   if (signal.aborted) return { entries: [], truncated: false, skipped: 0 };
   const progress = new Channel<{ entries: FsEntry[]; truncated: boolean; skipped: number }>();
-  progress.onmessage = result => { if (!signal.aborted) onProgress?.(result); };
+  progress.onmessage = (result) => {
+    if (!signal.aborted) onProgress?.(result);
+  };
   signal.addEventListener('abort', cancel, { once: true });
-  try { return await invoke('ssh_search', { id, path, text: query, requestId, onProgress: progress }); }
-  finally { signal.removeEventListener('abort', cancel); progress.onmessage = () => {}; }
+  try {
+    return await invoke('ssh_search', { id, path, text: query, requestId, onProgress: progress });
+  } finally {
+    signal.removeEventListener('abort', cancel);
+    progress.onmessage = () => {};
+  }
 }
 
 /** Downloads a remote file to a local temporary directory and returns the local path (for opening with the system default app). */

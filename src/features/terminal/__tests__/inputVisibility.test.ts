@@ -35,15 +35,11 @@ describe('isInputBoxVisible', () => {
   });
 
   it('long-running + agent in control -> visible', () => {
-    expect(
-      isInputBoxVisible(ctx({ isLongRunning: true, isAgentInControl: true })),
-    ).toBe(true);
+    expect(isInputBoxVisible(ctx({ isLongRunning: true, isAgentInControl: true }))).toBe(true);
   });
 
   it('long-running + agent tagged -> visible', () => {
-    expect(
-      isInputBoxVisible(ctx({ isLongRunning: true, isAgentTaggedIn: true })),
-    ).toBe(true);
+    expect(isInputBoxVisible(ctx({ isLongRunning: true, isAgentTaggedIn: true }))).toBe(true);
   });
 
   it('read-only outranks the others -> always hidden', () => {
@@ -51,11 +47,7 @@ describe('isInputBoxVisible', () => {
   });
 
   it('TUI outranks agent -> hidden', () => {
-    expect(
-      isInputBoxVisible(
-        ctx({ isAltScreenActive: true, isAgentInControl: true }),
-      ),
-    ).toBe(false);
+    expect(isInputBoxVisible(ctx({ isAltScreenActive: true, isAgentInControl: true }))).toBe(false);
   });
 });
 

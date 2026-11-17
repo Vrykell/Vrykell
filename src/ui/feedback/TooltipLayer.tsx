@@ -140,9 +140,11 @@ export default function TooltipLayer() {
         top: placement ? placement.top : hint.rect.top,
         left: placement ? placement.left : hint.rect.left,
         visibility: placement ? 'visible' : 'hidden',
-      }}
-    >
-      <span className="app-tooltip-copy"><span>{hint.text}</span>{hint.description && <small>{hint.description}</small>}</span>
+      }}>
+      <span className="app-tooltip-copy">
+        <span>{hint.text}</span>
+        {hint.description && <small>{hint.description}</small>}
+      </span>
       {hint.shortcut && <KeyHint shortcut={hint.shortcut} />}
     </div>,
     document.body,

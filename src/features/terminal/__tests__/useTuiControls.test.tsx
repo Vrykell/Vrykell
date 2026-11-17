@@ -18,9 +18,17 @@ vi.mock('@utils/killForeground', () => ({
 
 function block(patch: Partial<TermBlock>): TermBlock {
   return {
-    id: 'block-1', command: 'npm run dev', status: 'done', exitCode: 0,
-    startedAt: 1, endedAt: 2, wasLongRunning: false,
-    outputHtml: '', outputText: '', outputRaw: '', linesTruncated: 0,
+    id: 'block-1',
+    command: 'npm run dev',
+    status: 'done',
+    exitCode: 0,
+    startedAt: 1,
+    endedAt: 2,
+    wasLongRunning: false,
+    outputHtml: '',
+    outputText: '',
+    outputRaw: '',
+    linesTruncated: 0,
     ...patch,
   };
 }
@@ -62,7 +70,9 @@ describe('useTuiControls', () => {
   it('arms escalation after termination and exits the alt-screen scene', async () => {
     const { result } = renderHook(() => useTuiControls('pane-1'));
 
-    await act(async () => { result.current.killApp(); });
+    await act(async () => {
+      result.current.killApp();
+    });
     expect(ptyMocks.killForeground).toHaveBeenCalledWith('session-1');
     expect(result.current.killArmed).toBe(true);
 
@@ -75,11 +85,24 @@ describe('useTuiControls', () => {
   });
 
   it('restores the fullscreen split pane after another tab becomes active', () => {
-    useWorkspaceStore.setState({ tabs: [
-      { id: 'owner', kind: 'session', title: 'Owner', layout: { type: 'split', dir: 'row', ratio: .5,
-        first: { type: 'leaf', terminal: { id: 'first-pane', kind: 'local' } }, second: { type: 'leaf', terminal: { id: 'pane-1', kind: 'local' } } } },
-      { id: 'other', kind: 'session', title: 'Other', layout: { type: 'leaf', terminal: { id: 'other-pane', kind: 'local' } } },
-    ], activeId: 'owner' });
+    useWorkspaceStore.setState({
+      tabs: [
+        {
+          id: 'owner',
+          kind: 'session',
+          title: 'Owner',
+          layout: {
+            type: 'split',
+            dir: 'row',
+            ratio: 0.5,
+            first: { type: 'leaf', terminal: { id: 'first-pane', kind: 'local' } },
+            second: { type: 'leaf', terminal: { id: 'pane-1', kind: 'local' } },
+          },
+        },
+        { id: 'other', kind: 'session', title: 'Other', layout: { type: 'leaf', terminal: { id: 'other-pane', kind: 'local' } } },
+      ],
+      activeId: 'owner',
+    });
     useWorkspaceStore.getState().activate('other');
     expect(useTerminalStore.getState().manualFullscreen['pane-1']).toBe(true);
     useWorkspaceStore.getState().activate('owner');

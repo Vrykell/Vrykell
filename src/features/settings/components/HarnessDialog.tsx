@@ -16,7 +16,12 @@ import SettingsDialog from './SettingsDialog';
 const fieldStyle: CSSProperties = { ...inputStyle, minWidth: 0 };
 const labelStyle: CSSProperties = { color: 'var(--text-secondary)', fontSize: 'var(--fs-caption)' };
 
-export default function HarnessDialog({ open, entry, onClose, onSave }: {
+export default function HarnessDialog({
+  open,
+  entry,
+  onClose,
+  onSave,
+}: {
   open: boolean;
   /** The entry being edited; null opens an empty form. */
   entry: HarnessEntry | null;
@@ -47,14 +52,20 @@ export default function HarnessDialog({ open, entry, onClose, onSave }: {
     setError(false);
     try {
       const saved = await onSave({
-        name: name.trim(), command: command.trim(),
+        name: name.trim(),
+        command: command.trim(),
         args: args ? args.split(/\r?\n/) : [],
-        env: entry?.env ?? {}, cwd: entry?.cwd ?? '', enabled,
+        env: entry?.env ?? {},
+        cwd: entry?.cwd ?? '',
+        enabled,
       });
       if (saved) onClose();
       else setError(true);
-    } catch { setError(true); }
-    finally { setSaving(false); }
+    } catch {
+      setError(true);
+    } finally {
+      setSaving(false);
+    }
   };
 
   return (
@@ -64,25 +75,34 @@ export default function HarnessDialog({ open, entry, onClose, onSave }: {
       title={entry ? t('Edit server') : t('Add server')}
       width={480}
       initialFocus="[data-testid=harness-dialog-name]"
-      onClose={() => { if (!saving) onClose(); }}
-      footer={<>
-        <OutlineButton disabled={saving} onClick={onClose} data-testid="harness-dialog-cancel">{t('Cancel')}</OutlineButton>
-        <button
-          type="button"
-          className="primary-button"
-          disabled={!canSave}
-          onClick={() => void save()}
-          data-testid="harness-dialog-save"
-          style={{
-            padding: '5px 16px', fontSize: 'calc(12px * var(--ui-font-scale))', border: 'none',
-            borderRadius: 'var(--radius-inner)', background: 'var(--primary-button-bg)',
-            color: 'var(--primary-button-text)', cursor: 'pointer', opacity: canSave ? 1 : 0.6,
-          }}
-        >
-          {entry ? t('Save') : t('Add')}
-        </button>
-      </>}
-    >
+      onClose={() => {
+        if (!saving) onClose();
+      }}
+      footer={
+        <>
+          <OutlineButton disabled={saving} onClick={onClose} data-testid="harness-dialog-cancel">
+            {t('Cancel')}
+          </OutlineButton>
+          <button
+            type="button"
+            className="primary-button"
+            disabled={!canSave}
+            onClick={() => void save()}
+            data-testid="harness-dialog-save"
+            style={{
+              padding: '5px 16px',
+              fontSize: 'calc(12px * var(--ui-font-scale))',
+              border: 'none',
+              borderRadius: 'var(--radius-inner)',
+              background: 'var(--primary-button-bg)',
+              color: 'var(--primary-button-text)',
+              cursor: 'pointer',
+              opacity: canSave ? 1 : 0.6,
+            }}>
+            {entry ? t('Save') : t('Add')}
+          </button>
+        </>
+      }>
       {error && <ErrorBox compact>{t('Could not save servers. Your changes are kept. Try again.')}</ErrorBox>}
       <div style={{ display: 'grid', gridTemplateColumns: 'auto 1fr', alignItems: 'center', gap: '10px 12px' }}>
         <label htmlFor="harness-dialog-name" style={labelStyle}>
@@ -111,7 +131,9 @@ export default function HarnessDialog({ open, entry, onClose, onSave }: {
           onChange={(event) => setCommand(event.target.value)}
           style={fieldStyle}
         />
-        <label htmlFor="harness-dialog-args" style={labelStyle}>{t('Arguments')}</label>
+        <label htmlFor="harness-dialog-args" style={labelStyle}>
+          {t('Arguments')}
+        </label>
         <TextArea
           variant="field"
           autoSizeMaxHeight={180}
@@ -125,7 +147,8 @@ export default function HarnessDialog({ open, entry, onClose, onSave }: {
           style={fieldStyle}
         />
       </div>
-      <label style={{ display: 'inline-flex', alignItems: 'center', gap: 6, color: 'var(--text-secondary)', fontSize: 'var(--fs-caption)' }}>
+      <label
+        style={{ display: 'inline-flex', alignItems: 'center', gap: 6, color: 'var(--text-secondary)', fontSize: 'var(--fs-caption)' }}>
         <input type="checkbox" disabled={saving} checked={enabled} onChange={(event) => setEnabled(event.target.checked)} />
         {t('Enabled')}
       </label>

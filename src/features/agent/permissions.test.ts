@@ -40,15 +40,23 @@ afterEach(() => reset());
 it('refuses a late authorization after the owning turn was cancelled', async () => {
   const controller = new AbortController();
   let finish!: (decision: ToolDecision) => void;
-  setToolAuthorizer(() => new Promise(resolve => { finish = resolve; }));
+  setToolAuthorizer(
+    () =>
+      new Promise((resolve) => {
+        finish = resolve;
+      }),
+  );
   const result = gate('write_file', { path: '/file', content: 'draft' }, 'cancelled', { tabId: 'first', signal: controller.signal });
-  controller.abort(); finish(allow());
+  controller.abort();
+  finish(allow());
   expect(await result).toMatchObject({ proceed: false, result: { denied: true } });
 });
 
 it('stopping a native conversation does not deny an external session approval', async () => {
-  setToolAuthorizer(async () => ASK); setToolApprover(async () => allow());
-  const firstState = vi.fn(); const secondState = vi.fn();
+  setToolAuthorizer(async () => ASK);
+  setToolApprover(async () => allow());
+  const firstState = vi.fn();
+  const secondState = vi.fn();
   const first = gate('write_file', {}, 'native', { tabId: 'native', setToolState: firstState });
   const second = gate('write_file', {}, 'external', { tabId: 'external', setToolState: secondState });
   await vi.waitFor(() => expect(firstState).toHaveBeenCalled());
@@ -60,7 +68,8 @@ it('stopping a native conversation does not deny an external session approval', 
 });
 
 it('removes only the cancelled turn approval and leaves another conversation pending', async () => {
-  setToolAuthorizer(async () => ASK); setToolApprover(async () => allow());
+  setToolAuthorizer(async () => ASK);
+  setToolApprover(async () => allow());
   const controller = new AbortController();
   const first = gate('write_file', {}, 'first', { tabId: 'first', signal: controller.signal, setToolState: vi.fn() });
   const secondState = vi.fn();
@@ -68,7 +77,8 @@ it('removes only the cancelled turn approval and leaves another conversation pen
   await vi.waitFor(() => expect(secondState).toHaveBeenCalled());
   controller.abort();
   expect(await first).toMatchObject({ proceed: false });
-  resolveApproval('first', 'once'); resolveApproval('second', 'once');
+  resolveApproval('first', 'once');
+  resolveApproval('second', 'once');
   expect(await second).toMatchObject({ proceed: true });
 });
 
@@ -92,8 +102,10 @@ describe('gate', () => {
     const authorize = vi.fn(async () => allow());
     setToolAuthorizer(authorize);
     for (const name of ['read_file', 'write_file', 'edit_file', 'list_dir', 'search_files'] as const) {
-      expect(await gate(name, { path: '/remote/file' }, 'remote', { ...mkCtx(), remote: true }))
-        .toMatchObject({ proceed: false, result: { denied: true, error: expect.stringContaining('远程执行主机') } });
+      expect(await gate(name, { path: '/remote/file' }, 'remote', { ...mkCtx(), remote: true })).toMatchObject({
+        proceed: false,
+        result: { denied: true, error: expect.stringContaining('远程执行主机') },
+      });
     }
     expect(authorize).not.toHaveBeenCalled();
   });
@@ -146,9 +158,7 @@ describe('gate', () => {
       expect(g.result.denied).toBe(true);
       expect(g.result.error).toContain('递归/强制删除');
     }
-    expect(ctx.states).toEqual([
-      { id: 'tc1', state: 'denied', extra: { danger: '递归/强制删除文件' } },
-    ]);
+    expect(ctx.states).toEqual([{ id: 'tc1', state: 'denied', extra: { danger: '递归/强制删除文件' } }]);
   });
 
   it('retains the reviewed command in the execution outcome and visible tool state', async () => {
@@ -209,9 +219,7 @@ describe('gate', () => {
     });
     const ctx = mkCtx();
     const p = gate('run_command', { command: 'npm run build' }, 'tc1', ctx);
-    await vi.waitFor(() => expect(ctx.states).toEqual([
-      { id: 'tc1', state: 'approval-pending', extra: { shape: 'npm run' } },
-    ]));
+    await vi.waitFor(() => expect(ctx.states).toEqual([{ id: 'tc1', state: 'approval-pending', extra: { shape: 'npm run' } }]));
     resolveApproval('tc1', 'shape');
     expect(await p).toEqual({ proceed: true, lease: 'lease-s' });
     expect(ctx.states.map((s) => s.state)).toEqual(['approval-pending', 'running']);

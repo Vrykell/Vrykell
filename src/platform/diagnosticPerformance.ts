@@ -47,9 +47,12 @@ export function startPerformanceProbe(
   for (const type of ['longtask', 'long-animation-frame']) {
     try {
       if (typeof PerformanceObserver === 'undefined' || !PerformanceObserver.supportedEntryTypes.includes(type)) continue;
-      const observer = new PerformanceObserver(list => {
+      const observer = new PerformanceObserver((list) => {
         if (stopped) return;
-        for (const entry of list.getEntries().filter(entry => entry.duration >= stallMs).slice(-10)) {
+        for (const entry of list
+          .getEntries()
+          .filter((entry) => entry.duration >= stallMs)
+          .slice(-10)) {
           const frame = entry as SlowFrameTiming;
           record(type === 'longtask' ? 'main-thread-long-task' : 'main-thread-long-frame', {
             startTimestampMs: Math.round(performance.timeOrigin + entry.startTime),
@@ -57,14 +60,18 @@ export function startPerformanceProbe(
             blockingDurationMs: frame.blockingDuration,
             visibility: document.visibilityState,
             hasFocus: document.hasFocus(),
-            scripts: frame.scripts?.slice().sort((a, b) => b.duration - a.duration).slice(0, 5).map(script => ({
-              durationMs: Math.round(script.duration),
-              sourcePath: sourcePath(script.sourceURL),
-              functionName: script.sourceFunctionName?.slice(0, 120),
-              sourceCharPosition: script.sourceCharPosition,
-              invokerType: script.invokerType,
-              forcedStyleAndLayoutDurationMs: script.forcedStyleAndLayoutDuration,
-            })),
+            scripts: frame.scripts
+              ?.slice()
+              .sort((a, b) => b.duration - a.duration)
+              .slice(0, 5)
+              .map((script) => ({
+                durationMs: Math.round(script.duration),
+                sourcePath: sourcePath(script.sourceURL),
+                functionName: script.sourceFunctionName?.slice(0, 120),
+                sourceCharPosition: script.sourceCharPosition,
+                invokerType: script.invokerType,
+                forcedStyleAndLayoutDurationMs: script.forcedStyleAndLayoutDuration,
+              })),
           });
         }
       });
@@ -83,12 +90,13 @@ export function startPerformanceProbe(
     timerTicks += 1;
     timerLag = Math.max(timerLag, lagMs);
     lastTimerAt = now;
-    if (lagMs >= stallMs) record('event-loop-delay', {
-      lagMs: Math.round(lagMs),
-      frameAgeMs: Math.round(now - lastFrameAt),
-      visibility: document.visibilityState,
-      hasFocus: document.hasFocus(),
-    });
+    if (lagMs >= stallMs)
+      record('event-loop-delay', {
+        lagMs: Math.round(lagMs),
+        frameAgeMs: Math.round(now - lastFrameAt),
+        visibility: document.visibilityState,
+        hasFocus: document.hasFocus(),
+      });
   }, 1000);
 
   const watchFrame = () => {
@@ -109,6 +117,6 @@ export function startPerformanceProbe(
     stopped = true;
     window.clearInterval(timer);
     window.cancelAnimationFrame(frame);
-    observers.forEach(observer => observer.disconnect());
+    observers.forEach((observer) => observer.disconnect());
   };
 }

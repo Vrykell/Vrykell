@@ -6,7 +6,12 @@ import { newEditorFile } from '@features/editor/services/documentActions';
 import { useAiWorkspace } from '@features/chat/stores/aiWorkspace';
 import { useChatStore } from '@features/chat/stores/chat';
 import { useWorkspaceStore } from '../stores/workspace';
-import { rebindWorkspaceResources, resolveWorkspaceResource, terminalWorkspaceLayout, workspacePaneCells } from '../model/workspaceResources';
+import {
+  rebindWorkspaceResources,
+  resolveWorkspaceResource,
+  terminalWorkspaceLayout,
+  workspacePaneCells,
+} from '../model/workspaceResources';
 import type { PaneTarget } from '@core/paneLayout';
 import { editorFileKey } from '@core/editor';
 import { gitComparisonKey } from '@core/git';
@@ -21,8 +26,24 @@ import { removeContainerPane } from './workbench';
 
 export function createUnifiedTerminal(spec?: TerminalSpec, target?: PaneTarget) {
   const state = useUnifiedWorkspace.getState();
-  if (target && (!state.layout || workspacePaneCells(state.layout).length >= 4 || !workspacePaneCells(state.layout).some(cell => cell.id === target.leafId))) return;
-  const id = useWorkspaceStore.getState().addTab(spec ? { kind: spec.kind, shellType: spec.shellType as ShellType | undefined, ssh: spec.ssh, cwd: spec.cwd, useProfileDirectory: spec.useProfileDirectory } : undefined);
+  if (
+    target &&
+    (!state.layout ||
+      workspacePaneCells(state.layout).length >= 4 ||
+      !workspacePaneCells(state.layout).some((cell) => cell.id === target.leafId))
+  )
+    return;
+  const id = useWorkspaceStore.getState().addTab(
+    spec
+      ? {
+          kind: spec.kind,
+          shellType: spec.shellType as ShellType | undefined,
+          ssh: spec.ssh,
+          cwd: spec.cwd,
+          useProfileDirectory: spec.useProfileDirectory,
+        }
+      : undefined,
+  );
   const resource = resolveWorkspaceResource(`terminal:${id}`, currentWorkspaceResources());
   if (!resource) return;
   if (target) state.place(resource.id, target);
@@ -30,19 +51,29 @@ export function createUnifiedTerminal(spec?: TerminalSpec, target?: PaneTarget) 
 }
 
 export function requestTerminalSplit(spec: TerminalSpec | null) {
-  if (useWorkspaceNavigation.getState().area !== 'unified') { useUiStore.getState().beginSplit(spec); return; }
+  if (useWorkspaceNavigation.getState().area !== 'unified') {
+    useUiStore.getState().beginSplit(spec);
+    return;
+  }
   const state = useUnifiedWorkspace.getState();
   if (!state.layout || workspacePaneCells(state.layout).length >= 4) return;
   useUnifiedWorkspace.setState({ choosingSplit: true, startActive: false });
 }
 
 export function closeTerminalPane(paneId: string) {
-  if (useWorkspaceNavigation.getState().area !== 'unified') { useWorkspaceStore.getState().closeTerminal(paneId); return; }
+  if (useWorkspaceNavigation.getState().area !== 'unified') {
+    useWorkspaceStore.getState().closeTerminal(paneId);
+    return;
+  }
   const state = useUnifiedWorkspace.getState();
   if (!state.layout || workspacePaneCells(state.layout).length < 2) return;
-  const tab = useWorkspaceStore.getState().tabs.find(tab => tab.kind === 'session' && leaves(tab.layout).some(terminal => terminal.id === paneId));
-  const resource = currentWorkspaceResources().find(resource => resource.kind === 'terminal' && resource.tabId === tab?.id && resource.paneId === paneId);
-  const cell = state.layout && workspacePaneCells(state.layout).find(cell => cell.resourceId === resource?.id);
+  const tab = useWorkspaceStore
+    .getState()
+    .tabs.find((tab) => tab.kind === 'session' && leaves(tab.layout).some((terminal) => terminal.id === paneId));
+  const resource = currentWorkspaceResources().find(
+    (resource) => resource.kind === 'terminal' && resource.tabId === tab?.id && resource.paneId === paneId,
+  );
+  const cell = state.layout && workspacePaneCells(state.layout).find((cell) => cell.resourceId === resource?.id);
   if (cell && resource) removeUnifiedPane(resource.id);
 }
 
@@ -53,15 +84,15 @@ export function removeUnifiedPane(resourceId: string) {
 export function createUnifiedResource(kind: 'terminal' | 'document' | 'conversation', direction?: 'row' | 'col', target?: PaneTarget) {
   const state = useUnifiedWorkspace.getState();
   if ((direction || target) && state.layout && workspacePaneCells(state.layout).length >= 4) return;
-  if (target && (!state.layout || !workspacePaneCells(state.layout).some(cell => cell.id === target.leafId))) return;
-  const previous = new Set(currentWorkspaceResources().map(resource => resource.id));
+  if (target && (!state.layout || !workspacePaneCells(state.layout).some((cell) => cell.id === target.leafId))) return;
+  const previous = new Set(currentWorkspaceResources().map((resource) => resource.id));
   if (kind === 'terminal') useWorkspaceStore.getState().addTab();
   else if (kind === 'document') newEditorFile();
   else {
     useAiWorkspace.getState().openNative(useChatStore.getState().createConversation());
     useWorkspaceStore.getState().openHarnessTab();
   }
-  const resource = currentWorkspaceResources().find(resource => resource.kind === kind && !previous.has(resource.id));
+  const resource = currentWorkspaceResources().find((resource) => resource.kind === kind && !previous.has(resource.id));
   if (resource) {
     if (target || direction) useUnifiedWorkspace.getState().selectTab(state.activeTabId);
     if (target) state.place(resource.id, target);
@@ -92,32 +123,40 @@ export function focusUnifiedResource(id: string) {
 }
 
 export function showUnifiedTerminalGroup(tabId: string) {
-  const tab = useWorkspaceStore.getState().tabs.find(tab => tab.id === tabId);
+  const tab = useWorkspaceStore.getState().tabs.find((tab) => tab.id === tabId);
   if (tab?.kind !== 'session') return;
   const layout = terminalWorkspaceLayout(tab.layout);
   const focused = useTerminalStore.getState().focusedPaneId;
   useUnifiedWorkspace.getState().restore(layout, focused ?? firstLeaf(tab.layout).id);
-  focusUnifiedResource(`terminal:${focused && leaves(tab.layout).some(terminal => terminal.id === focused) ? focused : firstLeaf(tab.layout).id}`);
+  focusUnifiedResource(
+    `terminal:${focused && leaves(tab.layout).some((terminal) => terminal.id === focused) ? focused : firstLeaf(tab.layout).id}`,
+  );
 }
 
 export function openUnifiedWorkspace() {
   const state = useUnifiedWorkspace.getState();
-  const resources = currentWorkspaceResources().filter(resource => resource.kind !== 'page');
+  const resources = currentWorkspaceResources().filter((resource) => resource.kind !== 'page');
   if (state.layout) {
     const layout = rebindWorkspaceResources(state.layout, resources);
     if (layout !== state.layout) useUnifiedWorkspace.setState({ layout });
   }
-  reconcileUnifiedResources(resources.map(resource => resource.id));
+  reconcileUnifiedResources(resources.map((resource) => resource.id));
   selectWorkspaceArea('unified');
 }
 
 export function reconcileUnifiedResources(ids: string[]) {
-  const workbench = useWorkbenchStore.getState(); if (!workbench.ready) return;
+  const workbench = useWorkbenchStore.getState();
+  if (!workbench.ready) return;
   useUnifiedWorkspace.getState().reconcile(ids);
 }
 
-export function requestWorkspaceSplit(resourceId?: string, anchor?: { x: number; y: number }, creation?: import('../model/workspaceCreation').WorkspaceCreation) {
-  const navigation = useWorkspaceNavigation.getState(); const workspace = useWorkspaceStore.getState();
+export function requestWorkspaceSplit(
+  resourceId?: string,
+  anchor?: { x: number; y: number },
+  creation?: import('../model/workspaceCreation').WorkspaceCreation,
+) {
+  const navigation = useWorkspaceNavigation.getState();
+  const workspace = useWorkspaceStore.getState();
   if (navigation.area === 'terminal') {
     if (creation === 'terminal' || creation === 'ssh') useUiStore.getState().openSplitPicker(creation === 'ssh' ? 'ssh' : 'shell', anchor);
     else requestTerminalSplit(null);
@@ -125,13 +164,28 @@ export function requestWorkspaceSplit(resourceId?: string, anchor?: { x: number;
   }
   if (navigation.area === 'code' || navigation.area === 'ai') {
     const area = navigation.area;
-    const tab = workspace.tabs.find(tab => tab.id === workspace.activeId);
-    const comparisonId = tab?.kind === 'git-diff'
-      ? tab.comparisons?.find(item => gitComparisonKey(item.selection) === gitComparisonKey(tab.selection))?.id ?? tab.id
-      : undefined;
-    const id = resourceId ?? (area === 'ai' ? useAiWorkspace.getState().selected : tab?.kind === 'editor' ? `file:${editorFileKey(tab.selected)}` : tab?.kind === 'git-diff' ? `diff:${comparisonId}` : undefined);
-    const resource = currentWorkspaceResources().find(resource => resource.id === id);
-    if (!resource || (area === 'code' ? resource.kind !== 'document' && resource.kind !== 'comparison' : resource.kind !== 'conversation' && resource.kind !== 'agent')) return;
+    const tab = workspace.tabs.find((tab) => tab.id === workspace.activeId);
+    const comparisonId =
+      tab?.kind === 'git-diff'
+        ? (tab.comparisons?.find((item) => gitComparisonKey(item.selection) === gitComparisonKey(tab.selection))?.id ?? tab.id)
+        : undefined;
+    const id =
+      resourceId ??
+      (area === 'ai'
+        ? useAiWorkspace.getState().selected
+        : tab?.kind === 'editor'
+          ? `file:${editorFileKey(tab.selected)}`
+          : tab?.kind === 'git-diff'
+            ? `diff:${comparisonId}`
+            : undefined);
+    const resource = currentWorkspaceResources().find((resource) => resource.id === id);
+    if (
+      !resource ||
+      (area === 'code'
+        ? resource.kind !== 'document' && resource.kind !== 'comparison'
+        : resource.kind !== 'conversation' && resource.kind !== 'agent')
+    )
+      return;
     const store = scopedPaneStores[area];
     store.getState().show(resource.id);
     if (store.getState().layout && workspacePaneCells(store.getState().layout!).length >= 4) return;
@@ -148,14 +202,19 @@ export function connectUnifiedAgent(harness: string, target?: PaneTarget, direct
   const workspace = useWorkspaceStore.getState();
   if (target) {
     const layout = useUnifiedWorkspace.getState().layout;
-    if (!layout || workspacePaneCells(layout).length >= 4 || !workspacePaneCells(layout).some(cell => cell.id === target.leafId)) return;
-    const source = layout && workspacePaneCells(layout).find(cell => cell.id === target.leafId)?.resourceId;
+    if (!layout || workspacePaneCells(layout).length >= 4 || !workspacePaneCells(layout).some((cell) => cell.id === target.leafId)) return;
+    const source = layout && workspacePaneCells(layout).find((cell) => cell.id === target.leafId)?.resourceId;
     const agents = useHarnessWorkspace.getState();
-    const cwd = directory ?? (source?.startsWith('acp:') ? agents.connections.find(connection => `acp:${connection.id}` === source)?.cwd : undefined);
+    const cwd =
+      directory ??
+      (source?.startsWith('acp:') ? agents.connections.find((connection) => `acp:${connection.id}` === source)?.cwd : undefined);
     const id = agents.connect(harness, cwd, true);
-    workspace.openHarnessTab(); useUnifiedWorkspace.getState().place(`acp:${id}`, target); focusUnifiedResource(`acp:${id}`);
+    workspace.openHarnessTab();
+    useUnifiedWorkspace.getState().place(`acp:${id}`, target);
+    focusUnifiedResource(`acp:${id}`);
   } else {
-    workspace.openHarnessTab(harness, directory); const id = useHarnessWorkspace.getState().selected;
+    workspace.openHarnessTab(harness, directory);
+    const id = useHarnessWorkspace.getState().selected;
     if (id) focusUnifiedResource(`acp:${id}`);
   }
 }

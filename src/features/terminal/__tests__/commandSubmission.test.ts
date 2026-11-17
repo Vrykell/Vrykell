@@ -17,7 +17,7 @@ describe('script submission', () => {
   });
 
   it('treats script lines beginning with options as printf data', () => {
-    expect(posixScriptCommand('-n\n--flag')).toBe('eval "$(printf \'%s\\n\' \'-n\' \'--flag\')"');
+    expect(posixScriptCommand('-n\n--flag')).toBe("eval \"$(printf '%s\\n' '-n' '--flag')\"");
   });
 
   it('transports Unicode and multiline expressions without interpolation by the line editor', () => {
@@ -25,7 +25,7 @@ describe('script submission', () => {
     const payload = formatCommandSubmission(script, 'powershell');
     expect(payload.trimEnd()).not.toMatch(/[\r\n]/);
     const encoded = /FromBase64String\('([^']+)'\)/.exec(payload)![1]!;
-    expect(new TextDecoder().decode(Uint8Array.from(atob(encoded), char => char.charCodeAt(0)))).toBe(script);
+    expect(new TextDecoder().decode(Uint8Array.from(atob(encoded), (char) => char.charCodeAt(0)))).toBe(script);
   });
 
   it('decodes the PowerShell transport back to the submitted script', () => {
@@ -37,11 +37,17 @@ describe('script submission', () => {
 
   it('rejects malformed PowerShell transports and ordinary commands', () => {
     expect(decodePowerShellSubmission('git status')).toBeNull();
-    expect(decodePowerShellSubmission("Invoke-Expression ([System.Text.Encoding]::UTF8.GetString([System.Convert]::FromBase64String('abc')))")).toBeNull();
-    expect(decodePowerShellSubmission("Invoke-Expression ([System.Text.Encoding]::UTF8.GetString([System.Convert]::FromBase64String('/w=='))))")).toBeNull();
+    expect(
+      decodePowerShellSubmission("Invoke-Expression ([System.Text.Encoding]::UTF8.GetString([System.Convert]::FromBase64String('abc')))"),
+    ).toBeNull();
+    expect(
+      decodePowerShellSubmission("Invoke-Expression ([System.Text.Encoding]::UTF8.GetString([System.Convert]::FromBase64String('/w=='))))"),
+    ).toBeNull();
   });
 
   it('decodes an empty PowerShell transport to an empty script', () => {
-    expect(decodePowerShellSubmission("Invoke-Expression ([System.Text.Encoding]::UTF8.GetString([System.Convert]::FromBase64String('')))")).toBe('');
+    expect(
+      decodePowerShellSubmission("Invoke-Expression ([System.Text.Encoding]::UTF8.GetString([System.Convert]::FromBase64String('')))"),
+    ).toBe('');
   });
 });

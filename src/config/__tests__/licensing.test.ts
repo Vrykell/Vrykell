@@ -36,8 +36,8 @@ it('ships original license texts, covered source links and asset attribution wit
   expect(notices).toContain('SIL OPEN FONT LICENSE');
   expect(notices).toContain('MIT License');
   expect(notices).not.toMatch(/[A-Z]:[\\/]Users[\\/]|\/Users\/|\/home\/[^/]+\/(?:\.cargo|node_modules)/i);
-  const references = [...notices.matchAll(/^License text reference: (license-text-[a-f0-9]+)$/gm)].map(match => match[1]);
-  const blocks = new Set([...notices.matchAll(/^(license-text-[a-f0-9]+)$/gm)].map(match => match[1]));
+  const references = [...notices.matchAll(/^License text reference: (license-text-[a-f0-9]+)$/gm)].map((match) => match[1]);
+  const blocks = new Set([...notices.matchAll(/^(license-text-[a-f0-9]+)$/gm)].map((match) => match[1]));
   expect(references.length).toBeGreaterThan(100);
   for (const reference of references) expect(blocks.has(reference)).toBe(true);
 });

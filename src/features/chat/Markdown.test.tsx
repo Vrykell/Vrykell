@@ -44,7 +44,11 @@ describe('Markdown', () => {
   });
 
   it('wraps display math in a focusable scroll surface while keeping positioning styles', () => {
-    const { container } = render(<Markdown content={String.raw`$$\nabla^2\mathbf{E}-\frac{1}{c^2}\frac{\partial^2\mathbf{E}}{\partial t^2}=0,\quad c=\frac{1}{\sqrt{\varepsilon_0\mu_0}}$$`} />);
+    const { container } = render(
+      <Markdown
+        content={String.raw`$$\nabla^2\mathbf{E}-\frac{1}{c^2}\frac{\partial^2\mathbf{E}}{\partial t^2}=0,\quad c=\frac{1}{\sqrt{\varepsilon_0\mu_0}}$$`}
+      />,
+    );
     const formula = screen.getByRole('region', { name: '数学公式' });
     expect(formula).toHaveAttribute('tabindex', '0');
     expect(formula.querySelector('.katex-display')).toBeInTheDocument();
@@ -73,7 +77,9 @@ describe('Markdown', () => {
   it('rejects trusted math commands even when renderer options inherit a polluted trust flag', () => {
     Object.defineProperty(Object.prototype, 'trust', { value: true, configurable: true });
     try {
-      const { container } = render(<Markdown content={String.raw`$\href{https://example.com/tracking}{link} + \includegraphics{https://example.com/pixel.png}$`} />);
+      const { container } = render(
+        <Markdown content={String.raw`$\href{https://example.com/tracking}{link} + \includegraphics{https://example.com/pixel.png}$`} />,
+      );
       expect(container.querySelector('a, img')).not.toBeInTheDocument();
       expect(openUrlMock).not.toHaveBeenCalled();
     } finally {
@@ -87,9 +93,7 @@ describe('Markdown', () => {
   });
 
   it('renders strikethrough and task lists (the rebuilt GFM feature set stays intact)', () => {
-    const { container } = render(
-      <Markdown content={'~~删掉~~\n\n- [x] 已完成\n- [ ] 待办'} />,
-    );
+    const { container } = render(<Markdown content={'~~删掉~~\n\n- [x] 已完成\n- [ ] 待办'} />);
     expect(container.querySelector('del')).toBeInTheDocument();
     expect(container.querySelectorAll('input[type="checkbox"]')).toHaveLength(2);
   });
@@ -97,9 +101,7 @@ describe('Markdown', () => {
   // Regression: autolink-literal is no longer in the plugin set (its lookbehind regex throws
   // SyntaxError on older WebKit), so bare URLs and emails must stay plain text - no <a>.
   it('renders bare URLs and emails as plain text (no linkify)', () => {
-    const { container } = render(
-      <Markdown content={'参见 https://example.com 或 www.example.com，联系 a@b.com'} />,
-    );
+    const { container } = render(<Markdown content={'参见 https://example.com 或 www.example.com，联系 a@b.com'} />);
     expect(container.querySelector('a')).not.toBeInTheDocument();
     expect(container.textContent).toContain('https://example.com');
   });

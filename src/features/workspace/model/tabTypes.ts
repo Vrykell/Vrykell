@@ -92,6 +92,6 @@ export function buildNewTabOptions(
   // their insertion order.
   return opts
     .map((o, i) => ({ o, i }))
-    .sort((a, b) => (b.o.lastOpenedAt - a.o.lastOpenedAt) || (a.i - b.i))
+    .sort((a, b) => b.o.lastOpenedAt - a.o.lastOpenedAt || a.i - b.i)
     .map(({ o }) => o);
 }

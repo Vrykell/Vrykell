@@ -5,11 +5,12 @@ import { setupTauriMock } from './tauri-mock';
 test('expanding an empty folder shows no empty hint and the expander stays to collapse it', async ({ page }) => {
   await setupTauriMock(page);
   await page.addInitScript(() => {
-    const internals = (window as unknown as { __TAURI_INTERNALS__: { invoke: (command: string, args?: Record<string, unknown>) => Promise<unknown> } }).__TAURI_INTERNALS__;
+    const internals = (
+      window as unknown as { __TAURI_INTERNALS__: { invoke: (command: string, args?: Record<string, unknown>) => Promise<unknown> } }
+    ).__TAURI_INTERNALS__;
     const original = internals.invoke;
-    internals.invoke = (command, args) => command === 'fs_list' && args?.path === '/home/e2e/Documents'
-      ? Promise.resolve([])
-      : original(command, args);
+    internals.invoke = (command, args) =>
+      command === 'fs_list' && args?.path === '/home/e2e/Documents' ? Promise.resolve([]) : original(command, args);
   });
   await page.goto('/');
   await page.locator('[data-dock-btn="files"]').click();
@@ -51,7 +52,9 @@ test('clicking the expander repeatedly does not enter the directory', async ({ p
 test('the loading hint appears only when directory expansion is slow', async ({ page }) => {
   await setupTauriMock(page);
   await page.addInitScript(() => {
-    const internals = (window as unknown as { __TAURI_INTERNALS__: { invoke: (command: string, args?: Record<string, unknown>) => Promise<unknown> } }).__TAURI_INTERNALS__;
+    const internals = (
+      window as unknown as { __TAURI_INTERNALS__: { invoke: (command: string, args?: Record<string, unknown>) => Promise<unknown> } }
+    ).__TAURI_INTERNALS__;
     const original = internals.invoke;
     internals.invoke = async (command, args) => {
       if (command === 'fs_list' && args?.path === '/home/e2e/Downloads') {

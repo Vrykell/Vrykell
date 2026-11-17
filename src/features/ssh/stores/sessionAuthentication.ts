@@ -17,15 +17,19 @@ export function requestSshAuthentication(target: SshAuthenticationTarget) {
 }
 
 export function finishSshAuthentication(requestId: number, authenticatedId?: string) {
-  useSessionAuthenticationStore.setState(state => {
+  useSessionAuthenticationStore.setState((state) => {
     if (state.request?.requestId !== requestId) return state;
     const id = authenticatedId ?? state.request.connectionId;
-    return { request: id === state.request.connectionId ? null : state.request, revisions: { ...state.revisions, [id]: (state.revisions[id] ?? 0) + 1 }, temporary: { ...state.temporary, [id]: true } };
+    return {
+      request: id === state.request.connectionId ? null : state.request,
+      revisions: { ...state.revisions, [id]: (state.revisions[id] ?? 0) + 1 },
+      temporary: { ...state.temporary, [id]: true },
+    };
   });
 }
 
 export function clearSshAuthenticationMetadata(id: string) {
-  useSessionAuthenticationStore.setState(state => ({
+  useSessionAuthenticationStore.setState((state) => ({
     request: state.request?.connectionId === id ? null : state.request,
     revisions: { ...state.revisions, [id]: (state.revisions[id] ?? 0) + 1 },
     temporary: { ...state.temporary, [id]: false },

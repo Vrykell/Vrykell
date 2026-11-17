@@ -19,19 +19,34 @@ function pasteTarget(paneId: string) {
   const scene = state.scenes[paneId];
   const manual = state.manualFullscreen[paneId];
   const bracketed = term?.modes.bracketedPasteMode;
-  const running = () => (useBlockStore.getState().byTab[paneId] ?? []).filter(block => block.status === 'executing').map(block => block.id).join(':');
+  const running = () =>
+    (useBlockStore.getState().byTab[paneId] ?? [])
+      .filter((block) => block.status === 'executing')
+      .map((block) => block.id)
+      .join(':');
   const blockId = running();
-  return { sessionId, term, isCurrent: () => {
-    const current = useTerminalStore.getState();
-    return current.sessions[paneId] === sessionId && current.scenes[paneId] === scene
-      && current.manualFullscreen[paneId] === manual && getPaneTerminal(paneId) === term
-      && term?.modes.bracketedPasteMode === bracketed && running() === blockId;
-  } };
+  return {
+    sessionId,
+    term,
+    isCurrent: () => {
+      const current = useTerminalStore.getState();
+      return (
+        current.sessions[paneId] === sessionId &&
+        current.scenes[paneId] === scene &&
+        current.manualFullscreen[paneId] === manual &&
+        getPaneTerminal(paneId) === term &&
+        term?.modes.bracketedPasteMode === bracketed &&
+        running() === blockId
+      );
+    },
+  };
 }
 
 function cancelledPaste(paneId: string): false {
   terminalDebug('terminal-paste-target-changed', { paneId });
-  useToastStore.getState().addToast(t('Paste stopped because the foreground application changed. The remaining text was not sent.'), 'info');
+  useToastStore
+    .getState()
+    .addToast(t('Paste stopped because the foreground application changed. The remaining text was not sent.'), 'info');
   return false;
 }
 
@@ -59,7 +74,7 @@ export function getPaneTerminal(paneId: string): Terminal | null {
   // A manually fullscreened running block keeps showing its own terminal; only a real
   // alternate buffer hands the pane back to the main terminal.
   const blockSurface = scenes[paneId] === 'blockList' || (scenes[paneId] === 'altScreen' && manualFullscreen[paneId]);
-  return blockSurface ? block ?? main ?? null : main ?? block ?? null;
+  return blockSurface ? (block ?? main ?? null) : (main ?? block ?? null);
 }
 
 /**
@@ -121,7 +136,9 @@ export async function pasteClipboardIntoTerminal(paneId: string): Promise<boolea
   try {
     // Image paste is a native key, never a pasted text payload.
     const epoch = await ptyInputEpoch(sessionId);
-    await writeTerminalPaste(sessionId, { epoch, isCurrent: target.isCurrent }, () => { void writeTerminalInput(sessionId, text); });
+    await writeTerminalPaste(sessionId, { epoch, isCurrent: target.isCurrent }, () => {
+      void writeTerminalInput(sessionId, text);
+    });
     return target.isCurrent() || cancelledPaste(paneId);
   } catch (error) {
     if (!target.isCurrent() || String(error).includes('terminal input target changed')) return cancelledPaste(paneId);
@@ -136,17 +153,19 @@ export async function pasteTextIntoTerminal(paneId: string, text: string, target
   const sessionId = target.sessionId;
   if (!sessionId || !text) return false;
   if (!target.isCurrent()) return cancelledPaste(paneId);
-  const running = (useBlockStore.getState().byTab[paneId] ?? []).some(block => block.status === 'executing');
+  const running = (useBlockStore.getState().byTab[paneId] ?? []).some((block) => block.status === 'executing');
   if (state.scenes[paneId] === 'blockList' && !running && /[\r\n]/.test(text)) {
     state.stageCommand(paneId, text);
     return true;
   }
   const term = target.term;
   let epoch: number;
-  try { epoch = await ptyInputEpoch(sessionId); }
-  catch (error) {
+  try {
+    epoch = await ptyInputEpoch(sessionId);
+  } catch (error) {
     if (!target.isCurrent() || String(error).includes('terminal input target changed')) return cancelledPaste(paneId);
-    useToastStore.getState().addToast(t('terminal.clipboard.pasteFailed'), 'error'); return false;
+    useToastStore.getState().addToast(t('terminal.clipboard.pasteFailed'), 'error');
+    return false;
   }
   const reason = pasteConfirmReason(text, term?.modes.bracketedPasteMode ?? false);
   if (reason) {

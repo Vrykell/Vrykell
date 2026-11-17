@@ -136,10 +136,7 @@ export function supportsVision(provider: ProviderKind, model: string): boolean {
  * Non-vision: images are downgraded to placeholder hint text.
  * Returns { text: the text segment merged into user content, images: dataUrl list for image parts }.
  */
-export async function attachmentsForModel(
-  atts: AttachmentMeta[],
-  vision: boolean,
-): Promise<{ text: string; images: string[] }> {
+export async function attachmentsForModel(atts: AttachmentMeta[], vision: boolean): Promise<{ text: string; images: string[] }> {
   const textParts: string[] = [];
   const images: string[] = [];
   for (const att of atts) {

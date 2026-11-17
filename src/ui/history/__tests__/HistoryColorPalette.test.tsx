@@ -8,7 +8,9 @@ const anchor = { x: 40, y: 40 };
 
 describe('HistoryColorPalette', () => {
   it('renders every swatch plus the automatic option', () => {
-    const { container } = render(<HistoryColorPalette anchor={anchor} value={null} onSelect={() => {}} onClose={() => {}} testId="palette" />);
+    const { container } = render(
+      <HistoryColorPalette anchor={anchor} value={null} onSelect={() => {}} onClose={() => {}} testId="palette" />,
+    );
     expect(container.querySelectorAll('.history-palette-swatch')).toHaveLength(0);
     expect(screen.getByTestId('palette').querySelectorAll('.history-palette-swatch')).toHaveLength(8);
     expect(screen.getByTestId('palette-auto')).toBeTruthy();

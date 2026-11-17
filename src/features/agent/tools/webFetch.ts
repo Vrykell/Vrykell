@@ -52,8 +52,7 @@ const CRAWL_TEXT_CAP = 8000;
 
 function formatSearchResults(r: WebSearchResponse): string {
   const lines = (r.results ?? []).map(
-    (it, i) =>
-      `${i + 1}. ${it.title ?? ''}\n   ${it.url ?? ''}\n   ${(it.content ?? '').slice(0, CONTENT_CAP)}`,
+    (it, i) => `${i + 1}. ${it.title ?? ''}\n   ${it.url ?? ''}\n   ${(it.content ?? '').slice(0, CONTENT_CAP)}`,
   );
   return lines.length ? lines.join('\n') : '（无结果）';
 }
@@ -67,16 +66,14 @@ function formatFetch(r: WebFetchResponse): string {
   let body = r.text ?? '';
   if (r.truncated) body += '\n\n[正文已截断]';
   const links = (r.links ?? []).slice(0, FETCH_LINKS_CAP);
-  const linkBlock = links.length
-    ? '\n\n页内链接：\n' + links.map((l, i) => `${i + 1}. ${l.text ?? ''} ${l.url ?? ''}`).join('\n')
-    : '';
+  const linkBlock = links.length ? '\n\n页内链接：\n' + links.map((l, i) => `${i + 1}. ${l.text ?? ''} ${l.url ?? ''}`).join('\n') : '';
   return head + body + linkBlock;
 }
 
 /** web_search fallback: HTML search-engine scraping (no API key required). */
 export function buildWebSearchTool(ctx: ToolContext) {
   return tool({
-      description: DESC_WEB_SEARCH_DDG,
+    description: DESC_WEB_SEARCH_DDG,
     inputSchema: z.object({
       query: z.string().describe('Search query'),
       maxResults: z.number().int().min(1).max(8).optional().describe('Result limit, default 5'),
@@ -100,7 +97,7 @@ export function buildWebSearchTool(ctx: ToolContext) {
 /** web_fetch: fetch any URL → structured Markdown text (first-class tool). */
 export function buildWebFetchTool(ctx: ToolContext) {
   return tool({
-      description: DESC_WEB_FETCH,
+    description: DESC_WEB_FETCH,
     inputSchema: z.object({
       url: z.string().describe('Complete HTTP or HTTPS URL'),
     }),
@@ -120,7 +117,7 @@ export function buildWebFetchTool(ctx: ToolContext) {
 /** web_crawl: crawl multiple pages (BFS, same domain / depth limit / page limit), structured per page. */
 export function buildWebCrawlTool(ctx: ToolContext) {
   return tool({
-      description: DESC_WEB_CRAWL,
+    description: DESC_WEB_CRAWL,
     inputSchema: z.object({
       start_url: z.string().describe('Starting HTTP or HTTPS URL'),
       max_pages: z.number().int().min(1).max(30).optional().describe('Page limit, default 10'),

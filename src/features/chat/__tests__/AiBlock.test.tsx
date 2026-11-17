@@ -16,36 +16,56 @@ afterEach(() => {
   cleanup();
   useChatStore.setState({ sendingTabs: [] });
 });
-const exchange: ChatExchange = { id: 'question', createdAt: 1,
+const exchange: ChatExchange = {
+  id: 'question',
+  createdAt: 1,
   question: { id: 'question', role: 'user', content: 'Why did the build fail?', createdAt: 1 },
   answer: { id: 'answer', role: 'assistant', content: 'Check the **configuration**.', createdAt: 2 },
 };
 
-it.each(['block', 'conversation'] as const)('shows only the output cursor when structured text is streaming in %s presentation', presentation => {
-  const { container, rerender } = render(<AiBlock presentation={presentation} exchange={{ ...exchange,
-    answer: { ...exchange.answer!, content: '', pending: true, parts: [{ kind: 'text', text: 'The reply is arriving.' }] },
-  }} />);
-  expect(screen.getByText('The reply is arriving.')).toBeVisible();
-  expect(screen.queryByText('处理中')).toBeNull();
-  expect(container.querySelectorAll('.ai-pending-cursor')).toHaveLength(1);
-  rerender(<AiBlock presentation={presentation} exchange={{ ...exchange,
-    answer: { ...exchange.answer!, content: '', pending: false, parts: [{ kind: 'text', text: 'The reply is arriving.' }] },
-  }} />);
-  expect(container.querySelector('.ai-pending-cursor')).toBeNull();
-});
+it.each(['block', 'conversation'] as const)(
+  'shows only the output cursor when structured text is streaming in %s presentation',
+  (presentation) => {
+    const { container, rerender } = render(
+      <AiBlock
+        presentation={presentation}
+        exchange={{
+          ...exchange,
+          answer: { ...exchange.answer!, content: '', pending: true, parts: [{ kind: 'text', text: 'The reply is arriving.' }] },
+        }}
+      />,
+    );
+    expect(screen.getByText('The reply is arriving.')).toBeVisible();
+    expect(screen.queryByText('处理中')).toBeNull();
+    expect(container.querySelectorAll('.ai-pending-cursor')).toHaveLength(1);
+    rerender(
+      <AiBlock
+        presentation={presentation}
+        exchange={{
+          ...exchange,
+          answer: { ...exchange.answer!, content: '', pending: false, parts: [{ kind: 'text', text: 'The reply is arriving.' }] },
+        }}
+      />,
+    );
+    expect(container.querySelector('.ai-pending-cursor')).toBeNull();
+  },
+);
 
-it.each(['', ' \n ', '<|tool_calls_begin|>'])('keeps one waiting indicator when the stream tail has no visible text (%j)', text => {
-  const { container } = render(<AiBlock presentation="conversation" exchange={{ ...exchange,
-    answer: { ...exchange.answer!, content: '', pending: true, parts: [{ kind: 'text', text }] },
-  }} />);
+it.each(['', ' \n ', '<|tool_calls_begin|>'])('keeps one waiting indicator when the stream tail has no visible text (%j)', (text) => {
+  const { container } = render(
+    <AiBlock
+      presentation="conversation"
+      exchange={{ ...exchange, answer: { ...exchange.answer!, content: '', pending: true, parts: [{ kind: 'text', text }] } }}
+    />,
+  );
   expect(screen.getByRole('status')).toHaveTextContent('处理中');
   expect(container.querySelectorAll('.ai-pending-cursor')).toHaveLength(1);
 });
 
 it('switches between waiting, text output and a tool continuation without duplicate cursors', () => {
-  const view = (parts?: import('@features/agent/model/messageParts').MessagePart[]) => <AiBlock presentation="conversation" exchange={{ ...exchange,
-    answer: { ...exchange.answer!, content: '', pending: true, parts },
-  }} />;
+  const view = (parts?: import('@features/agent/model/messageParts').MessagePart[]) => (
+    <AiBlock presentation="conversation" exchange={{ ...exchange, answer: { ...exchange.answer!, content: '', pending: true, parts } }} />
+  );
   const { container, rerender } = render(view());
   expect(screen.getByRole('status')).toHaveTextContent('处理中');
   rerender(view([{ kind: 'text', text: 'Checking the project.' }]));
@@ -60,7 +80,18 @@ it('switches between waiting, text output and a tool continuation without duplic
 });
 
 it('keeps sent attachments beneath the question and dismisses previews on outside press and Escape', () => {
-  const view = render(<AiBlock presentation="conversation" exchange={{ ...exchange, question: { ...exchange.question!, attachments: [{ id: 'paste', kind: 'paste', name: 'Pasted sample', mime: 'text/plain', size: 11, textContent: 'sample text' }] } }} />);
+  const view = render(
+    <AiBlock
+      presentation="conversation"
+      exchange={{
+        ...exchange,
+        question: {
+          ...exchange.question!,
+          attachments: [{ id: 'paste', kind: 'paste', name: 'Pasted sample', mime: 'text/plain', size: 11, textContent: 'sample text' }],
+        },
+      }}
+    />,
+  );
   const question = view.container.querySelector('.ai-block-question')!;
   expect(question.nextElementSibling).toHaveClass('chat-question-attachments');
   const trigger = screen.getByRole('button', { name: 'Pasted sample' });
@@ -98,8 +129,10 @@ it('keeps failed replies in their exchange when restored instead of replaying no
 
 it('shows an external reply failure immediately and retries through its owning session', () => {
   const retry = vi.fn();
-  const failed = { ...exchange, answer: { ...exchange.answer!, error: true,
-    errorSummary: 'Service quota exhausted', errorText: '402: Insufficient Balance' } };
+  const failed = {
+    ...exchange,
+    answer: { ...exchange.answer!, error: true, errorSummary: 'Service quota exhausted', errorText: '402: Insufficient Balance' },
+  };
   render(<AiBlock exchange={failed} allowExchangeActions={false} onRetry={retry} presentation="conversation" />);
   expect(screen.getByRole('alert')).toHaveTextContent('Service quota exhausted');
   fireEvent.click(screen.getByRole('button', { name: '重试' }));
@@ -109,8 +142,13 @@ it('shows an external reply failure immediately and retries through its owning s
 
 it('uses the tool summary treatment for reasoning and keeps its disclosure usable', () => {
   const reasoning = 'Inspect the build configuration first.\n\nThen check the dependencies.';
-  const { container } = render(<AiBlock exchange={{ ...exchange, answer: { ...exchange.answer!, reasoning } }}
-    presentation="conversation" conversationId="conversation" />);
+  const { container } = render(
+    <AiBlock
+      exchange={{ ...exchange, answer: { ...exchange.answer!, reasoning } }}
+      presentation="conversation"
+      conversationId="conversation"
+    />,
+  );
   const thinking = container.querySelector('.ai-thinking')!;
   expect(thinking).toHaveClass('ai-tool-card');
   const summary = within(thinking as HTMLElement).getByRole('button', { name: /思考过程/ });
@@ -134,8 +172,11 @@ it('renders panel answers as plain conversation content with message actions', (
   expect(screen.queryByRole('button', { name: '收起回答' })).not.toBeInTheDocument();
   // The reply's actions stay in the open instead of hiding in a menu.
   const actions = container.querySelector('.chat-answer-actions')!;
-  expect(within(actions as HTMLElement).getAllByRole('button').map(button => button.getAttribute('aria-label')))
-    .toEqual(['复制', '重新生成', '编辑重发', '删除']);
+  expect(
+    within(actions as HTMLElement)
+      .getAllByRole('button')
+      .map((button) => button.getAttribute('aria-label')),
+  ).toEqual(['复制', '重新生成', '编辑重发', '删除']);
   // The sent message carries its clock time and a copy target.
   expect(container.querySelector('.chat-question-meta')).toHaveTextContent(/\d{1,2}:\d{2}/);
   expect(screen.getByTestId('chat-question-copy')).toBeInTheDocument();
@@ -164,10 +205,21 @@ it('rotates the disclosure chevron a quarter turn instead of pointing it sideway
   expect(arrow().style.transform).toBe('rotate(90deg)');
 });
 
-it.each(['', ' \n '])('keeps an attachment-only message without an empty text bubble (%j)', content => {
-  const { container } = render(<AiBlock conversationId="conversation" presentation="conversation" exchange={{ ...exchange,
-    question: { ...exchange.question!, content, attachments: [{ id: 'paste', kind: 'paste', name: 'Pasted log', mime: 'text/plain', size: 5, textContent: 'hello' }] },
-  }} />);
+it.each(['', ' \n '])('keeps an attachment-only message without an empty text bubble (%j)', (content) => {
+  const { container } = render(
+    <AiBlock
+      conversationId="conversation"
+      presentation="conversation"
+      exchange={{
+        ...exchange,
+        question: {
+          ...exchange.question!,
+          content,
+          attachments: [{ id: 'paste', kind: 'paste', name: 'Pasted log', mime: 'text/plain', size: 5, textContent: 'hello' }],
+        },
+      }}
+    />,
+  );
   expect(container.querySelector('.ai-block-question')).toBeNull();
   expect(screen.queryByTestId('chat-question-copy')).not.toBeInTheDocument();
   fireEvent.click(screen.getByRole('button', { name: 'Pasted log' }));
@@ -176,10 +228,40 @@ it.each(['', ' \n '])('keeps an attachment-only message without an empty text bu
 });
 
 it('keeps approval actions and failures visible without timeline nodes', () => {
-  const { container } = render(<AiBlock conversationId="conversation" exchange={{ ...exchange, answer: { ...exchange.answer!, parts: [
-    { kind: 'tool', tool: { toolCallId: 'approval', toolName: 'run_command', input: { command: 'npm run build' }, state: 'approval-pending', startedAt: 1 } },
-    { kind: 'tool', tool: { toolCallId: 'failure', toolName: 'read_file', input: { path: '/project/missing' }, state: 'error', startedAt: 1, error: 'Missing file' } },
-  ] } }} />);
+  const { container } = render(
+    <AiBlock
+      conversationId="conversation"
+      exchange={{
+        ...exchange,
+        answer: {
+          ...exchange.answer!,
+          parts: [
+            {
+              kind: 'tool',
+              tool: {
+                toolCallId: 'approval',
+                toolName: 'run_command',
+                input: { command: 'npm run build' },
+                state: 'approval-pending',
+                startedAt: 1,
+              },
+            },
+            {
+              kind: 'tool',
+              tool: {
+                toolCallId: 'failure',
+                toolName: 'read_file',
+                input: { path: '/project/missing' },
+                state: 'error',
+                startedAt: 1,
+                error: 'Missing file',
+              },
+            },
+          ],
+        },
+      }}
+    />,
+  );
   expect(screen.getByRole('button', { name: '运行' })).toBeInTheDocument();
   fireEvent.click(screen.getByRole('button', { name: /读取文件.*失败/ }));
   expect(container.querySelector('.ai-tool-verdict')).toHaveTextContent('Missing file');
@@ -189,9 +271,31 @@ it('keeps approval actions and failures visible without timeline nodes', () => {
 });
 
 it('opens a restored failure inside the card and collapses it again', () => {
-  const { container } = render(<AiBlock conversationId="conversation" presentation="conversation" exchange={{ ...exchange, answer: { ...exchange.answer!, parts: [
-    { kind: 'tool', tool: { toolCallId: 'failure', toolName: 'run_command', input: { command: 'cat /etc/hosts' }, state: 'error', startedAt: 1, error: 'Exit code 2' } },
-  ] } }} />);
+  const { container } = render(
+    <AiBlock
+      conversationId="conversation"
+      presentation="conversation"
+      exchange={{
+        ...exchange,
+        answer: {
+          ...exchange.answer!,
+          parts: [
+            {
+              kind: 'tool',
+              tool: {
+                toolCallId: 'failure',
+                toolName: 'run_command',
+                input: { command: 'cat /etc/hosts' },
+                state: 'error',
+                startedAt: 1,
+                error: 'Exit code 2',
+              },
+            },
+          ],
+        },
+      }}
+    />,
+  );
   const summary = () => container.querySelector('.ai-tool-summary') as HTMLElement;
   expect(screen.queryByRole('alert')).toBeNull();
   expect(summary()).toHaveAttribute('aria-expanded', 'false');
@@ -205,10 +309,19 @@ it('opens a restored failure inside the card and collapses it again', () => {
 });
 
 it('retains a late failure for explicit review after the row was collapsed', () => {
-  const running: ToolRun = { toolCallId: 'late', toolName: 'run_command', input: { command: 'npm run build' }, state: 'running', startedAt: 1 };
+  const running: ToolRun = {
+    toolCallId: 'late',
+    toolName: 'run_command',
+    input: { command: 'npm run build' },
+    state: 'running',
+    startedAt: 1,
+  };
   const view = (tool: ToolRun) => (
-    <AiBlock conversationId="conversation" presentation="conversation"
-      exchange={{ ...exchange, answer: { ...exchange.answer!, parts: [{ kind: 'tool', tool }] } }} />
+    <AiBlock
+      conversationId="conversation"
+      presentation="conversation"
+      exchange={{ ...exchange, answer: { ...exchange.answer!, parts: [{ kind: 'tool', tool }] } }}
+    />
   );
   // The row is collapsed while the command is still running ...
   const { container, rerender } = render(view(running));
@@ -223,10 +336,17 @@ it('retains a late failure for explicit review after the row was collapsed', () 
   expect(document.querySelector('#app-notifications [role="alert"]')).toBeNull();
 });
 
-const commandPart = { kind: 'tool' as const, tool: {
-  toolCallId: 'command', toolName: 'run_command', input: { command: 'npm run build' }, state: 'done' as const,
-  startedAt: 1, output: JSON.stringify({ exitCode: 0, output: 'built' }),
-} };
+const commandPart = {
+  kind: 'tool' as const,
+  tool: {
+    toolCallId: 'command',
+    toolName: 'run_command',
+    input: { command: 'npm run build' },
+    state: 'done' as const,
+    startedAt: 1,
+    output: JSON.stringify({ exitCode: 0, output: 'built' }),
+  },
+};
 
 function outputSurface(container: HTMLElement): HTMLElement {
   fireEvent.click(container.querySelector('.ai-tool-summary')!);
@@ -234,8 +354,13 @@ function outputSurface(container: HTMLElement): HTMLElement {
 }
 
 it('keeps panel tool output inside the shared frame without a second terminal surface or scroll container', () => {
-  const { container } = render(<AiBlock conversationId="conversation" presentation="conversation"
-    exchange={{ ...exchange, answer: { ...exchange.answer!, parts: [commandPart] } }} />);
+  const { container } = render(
+    <AiBlock
+      conversationId="conversation"
+      presentation="conversation"
+      exchange={{ ...exchange, answer: { ...exchange.answer!, parts: [commandPart] } }}
+    />,
+  );
   const surface = outputSurface(container);
   expect(surface.style.padding).toBe('0px');
   // The box owns scrolling; the snapshot inside must not cap its own height.
@@ -243,8 +368,9 @@ it('keeps panel tool output inside the shared frame without a second terminal su
 });
 
 it('keeps the terminal surface for inline AI blocks', () => {
-  const { container } = render(<AiBlock conversationId="conversation"
-    exchange={{ ...exchange, answer: { ...exchange.answer!, parts: [commandPart] } }} />);
+  const { container } = render(
+    <AiBlock conversationId="conversation" exchange={{ ...exchange, answer: { ...exchange.answer!, parts: [commandPart] } }} />,
+  );
   const surface = outputSurface(container);
   expect(surface.style.padding).toBe('2px 8px 8px');
   expect(surface.style.maxHeight).toBe('');
@@ -254,8 +380,13 @@ it('keeps the terminal surface for inline AI blocks', () => {
 
 it('copies the panel tool output from the frame corner', async () => {
   writeClipboardTextMock.mockClear();
-  const { container } = render(<AiBlock conversationId="conversation" presentation="conversation"
-    exchange={{ ...exchange, answer: { ...exchange.answer!, parts: [commandPart] } }} />);
+  const { container } = render(
+    <AiBlock
+      conversationId="conversation"
+      presentation="conversation"
+      exchange={{ ...exchange, answer: { ...exchange.answer!, parts: [commandPart] } }}
+    />,
+  );
   outputSurface(container);
   const copy = screen.getByTestId('tool-output-copy');
   expect(copy).toHaveAttribute('data-tip', '复制输出');
@@ -269,19 +400,36 @@ it('copies the panel tool output from the frame corner', async () => {
 
 it('copies the tool log when a stopped reply has no answer text yet', async () => {
   writeClipboardTextMock.mockClear();
-  render(<AiBlock conversationId="conversation" presentation="conversation"
-    exchange={{ ...exchange, answer: { ...exchange.answer!, content: '', stopped: true, parts: [commandPart] } }} />);
+  render(
+    <AiBlock
+      conversationId="conversation"
+      presentation="conversation"
+      exchange={{ ...exchange, answer: { ...exchange.answer!, content: '', stopped: true, parts: [commandPart] } }}
+    />,
+  );
   fireEvent.click(screen.getByTestId('chat-answer-copy'));
   await waitFor(() => expect(writeClipboardTextMock).toHaveBeenCalledWith('[执行命令: npm run build → 成功]'));
 });
 
 it('copies ACP text parts when the flat answer content is empty', async () => {
   writeClipboardTextMock.mockClear();
-  render(<AiBlock conversationId="conversation" presentation="conversation"
-    exchange={{ ...exchange, answer: { ...exchange.answer!, content: '', parts: [
-      { kind: 'text', text: 'First paragraph.' },
-      { kind: 'text', text: 'Second paragraph.' },
-    ] } }} />);
+  render(
+    <AiBlock
+      conversationId="conversation"
+      presentation="conversation"
+      exchange={{
+        ...exchange,
+        answer: {
+          ...exchange.answer!,
+          content: '',
+          parts: [
+            { kind: 'text', text: 'First paragraph.' },
+            { kind: 'text', text: 'Second paragraph.' },
+          ],
+        },
+      }}
+    />,
+  );
   fireEvent.click(screen.getByTestId('chat-answer-copy'));
   await waitFor(() => expect(writeClipboardTextMock).toHaveBeenCalledWith('First paragraph.\n\nSecond paragraph.'));
 });
@@ -302,11 +450,15 @@ it('hides regenerate and edit while its own conversation answers', () => {
 });
 
 it('explains a reply whose provider sent its tool call as plain text', () => {
-  const leaked = '<\uFF5C\uFF5CDSML\uFF5C\uFF5C calls>\n'
-    + '<\uFF5C\uFF5CDSML\uFF5C\uFF5C invoke name="run_command">\ndir\n</\uFF5C\uFF5CDSML\uFF5C\uFF5C calls>';
+  const leaked =
+    '<\uFF5C\uFF5CDSML\uFF5C\uFF5C calls>\n' +
+    '<\uFF5C\uFF5CDSML\uFF5C\uFF5C invoke name="run_command">\ndir\n</\uFF5C\uFF5CDSML\uFF5C\uFF5C calls>';
   const view = (content: string) => (
-    <AiBlock conversationId="conversation" presentation="conversation"
-      exchange={{ ...exchange, answer: { ...exchange.answer!, content } }} />
+    <AiBlock
+      conversationId="conversation"
+      presentation="conversation"
+      exchange={{ ...exchange, answer: { ...exchange.answer!, content } }}
+    />
   );
   const { container, rerender } = render(view(leaked));
   expect(screen.getByTestId('chat-leaked-tool-call')).toHaveTextContent('本次没有执行任何工具');
@@ -318,9 +470,30 @@ it('explains a reply whose provider sent its tool call as plain text', () => {
 });
 
 it('keeps a refusal inside the expanded card without a footer error', () => {
-  const { container } = render(<AiBlock conversationId="conversation" exchange={{ ...exchange, answer: { ...exchange.answer!, parts: [
-    { kind: 'tool', tool: { toolCallId: 'denied', toolName: 'run_command', input: { command: 'rm -rf /' }, state: 'denied', startedAt: 1, danger: '等待 5 分钟无人应答，已自动拒绝本次操作。' } },
-  ] } }} />);
+  const { container } = render(
+    <AiBlock
+      conversationId="conversation"
+      exchange={{
+        ...exchange,
+        answer: {
+          ...exchange.answer!,
+          parts: [
+            {
+              kind: 'tool',
+              tool: {
+                toolCallId: 'denied',
+                toolName: 'run_command',
+                input: { command: 'rm -rf /' },
+                state: 'denied',
+                startedAt: 1,
+                danger: '等待 5 分钟无人应答，已自动拒绝本次操作。',
+              },
+            },
+          ],
+        },
+      }}
+    />,
+  );
   // The result retains its state; explicit review expands its reason in the transcript.
   expect(container.querySelector('.ai-tool-summary')).toHaveTextContent('已拒绝');
   expect(document.querySelector('#app-notifications [role="alert"]')).toBeNull();
@@ -331,9 +504,30 @@ it('keeps a refusal inside the expanded card without a footer error', () => {
 });
 
 it('labels the narrowest approval with the shape and keeps the wider one out of the way', () => {
-  render(<AiBlock conversationId="conversation" exchange={{ ...exchange, answer: { ...exchange.answer!, parts: [
-    { kind: 'tool', tool: { toolCallId: 'shape', toolName: 'run_command', input: { command: 'npm run build' }, state: 'approval-pending', startedAt: 1, shape: 'npm run' } },
-  ] } }} />);
+  render(
+    <AiBlock
+      conversationId="conversation"
+      exchange={{
+        ...exchange,
+        answer: {
+          ...exchange.answer!,
+          parts: [
+            {
+              kind: 'tool',
+              tool: {
+                toolCallId: 'shape',
+                toolName: 'run_command',
+                input: { command: 'npm run build' },
+                state: 'approval-pending',
+                startedAt: 1,
+                shape: 'npm run',
+              },
+            },
+          ],
+        },
+      }}
+    />,
+  );
   // The narrowest grant lives in the approval options menu; while a shape exists the whole-tool
   // session grant is not offered there.
   fireEvent.click(screen.getByRole('button', { name: '审批选项' }));
@@ -344,19 +538,28 @@ it('labels the narrowest approval with the shape and keeps the wider one out of 
 });
 
 it('shows a terminal tool row as the bare command without a prompt marker', () => {
-  render(<AiBlock conversationId="conversation" presentation="conversation"
-    exchange={{ ...exchange, answer: { ...exchange.answer!, parts: [commandPart] } }} />);
+  render(
+    <AiBlock
+      conversationId="conversation"
+      presentation="conversation"
+      exchange={{ ...exchange, answer: { ...exchange.answer!, parts: [commandPart] } }}
+    />,
+  );
   // The terminal icon already states the tool type, so no `$` prompt prefix is needed.
   expect(screen.getByText('npm run build')).toHaveClass('ai-tool-description');
   expect(screen.queryByText('$ npm run build')).toBeNull();
 });
 
 it('explains a reply whose provider sent its tool call as plain text', () => {
-  const leaked = '<\uFF5C\uFF5CDSML\uFF5C\uFF5C calls>\n'
-    + '<\uFF5C\uFF5CDSML\uFF5C\uFF5C invoke name="run_command">\ndir\n</\uFF5C\uFF5CDSML\uFF5C\uFF5C calls>';
+  const leaked =
+    '<\uFF5C\uFF5CDSML\uFF5C\uFF5C calls>\n' +
+    '<\uFF5C\uFF5CDSML\uFF5C\uFF5C invoke name="run_command">\ndir\n</\uFF5C\uFF5CDSML\uFF5C\uFF5C calls>';
   const view = (content: string) => (
-    <AiBlock conversationId="conversation" presentation="conversation"
-      exchange={{ ...exchange, answer: { ...exchange.answer!, content } }} />
+    <AiBlock
+      conversationId="conversation"
+      presentation="conversation"
+      exchange={{ ...exchange, answer: { ...exchange.answer!, content } }}
+    />
   );
   const { container, rerender } = render(view(leaked));
   expect(screen.getByTestId('chat-leaked-tool-call')).toHaveTextContent('本次没有执行任何工具');

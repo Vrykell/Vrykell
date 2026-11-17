@@ -120,10 +120,11 @@ test('rename and delete manage conversation history independently of terminals',
   await page.getByTestId('workspace-area-terminal').click();
   await expect(page.locator('[data-terminal-input]')).toBeVisible();
   await page.reload();
-  if (!await page.getByRole('button', { name: 'AI 对话历史' }).isVisible()) await page.locator('[data-dock-btn="chat"]').click();
+  if (!(await page.getByRole('button', { name: 'AI 对话历史' }).isVisible())) await page.locator('[data-dock-btn="chat"]').click();
   await page.getByRole('button', { name: 'AI 对话历史' }).click();
-  await expect(page.getByTestId('unified-history-page').locator('[data-history-kind="conversation"]')
-    .filter({ hasText: 'Build investigation' })).toHaveCount(0);
+  await expect(
+    page.getByTestId('unified-history-page').locator('[data-history-kind="conversation"]').filter({ hasText: 'Build investigation' }),
+  ).toHaveCount(0);
 });
 
 test('command analysis stages a reference before sending and never changes terminal input', async ({ page }) => {
@@ -150,9 +151,12 @@ test('command analysis stages a reference before sending and never changes termi
 
 for (const themePalette of ['dark', 'light'] as const) {
   test(`plain conversation answers remain readable in ${themePalette}`, async ({ page }) => {
-    await mockAnthropic(page, 'The build failed because the configuration is missing.\n\n```sh\nnpm run build\n```\n\n| 监听地址 | 含义 |\n| --- | --- |\n| `0.0.0.0:80` | 全网卡、外部可达 |\n| `127.0.0.1:3306` | 仅本机 |\n\nCheck the configuration and run the build again.');
+    await mockAnthropic(
+      page,
+      'The build failed because the configuration is missing.\n\n```sh\nnpm run build\n```\n\n| 监听地址 | 含义 |\n| --- | --- |\n| `0.0.0.0:80` | 全网卡、外部可达 |\n| `127.0.0.1:3306` | 仅本机 |\n\nCheck the configuration and run the build again.',
+    );
     await setupTauriMock(page, {});
-    await page.addInitScript(theme => localStorage.setItem('vrykell-theme-mode', theme), themePalette);
+    await page.addInitScript((theme) => localStorage.setItem('vrykell-theme-mode', theme), themePalette);
     await page.goto('/');
     await page.locator('[data-dock-btn="chat"]').click();
     await page.locator('[data-chat-composer]:visible').fill('Why did the build fail?');
@@ -161,11 +165,11 @@ for (const themePalette of ['dark', 'light'] as const) {
     await expect(exchange.getByText('Check the configuration and run the build again.')).toBeVisible();
     await expect(exchange).not.toHaveClass(/command-block/);
     await expect(exchange).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
-    expect(await exchange.evaluate(element => getComputedStyle(element, '::before').content)).toBe('none');
+    expect(await exchange.evaluate((element) => getComputedStyle(element, '::before').content)).toBe('none');
     await expect(exchange.locator('.ai-block-heading')).toHaveCount(0);
     await expect(page.locator('html')).toHaveAttribute('data-theme', themePalette);
     // A table uses the same frame as a code block so the answer reads as one system.
-    const frames = await exchange.evaluate(element => ({
+    const frames = await exchange.evaluate((element) => ({
       code: getComputedStyle(element.querySelector('.md pre')!.parentElement as HTMLElement).borderTopColor,
       table: getComputedStyle(element.querySelector('.md table') as HTMLElement).borderTopColor,
     }));
@@ -173,7 +177,7 @@ for (const themePalette of ['dark', 'light'] as const) {
     expect(frames.table).toBe(frames.code);
     // The frame ends where the columns end: a stretched block would paint an empty surface next
     // to the table at a wide panel.
-    const widths = await exchange.evaluate(element => {
+    const widths = await exchange.evaluate((element) => {
       const table = element.querySelector('.md table') as HTMLElement;
       const row = table.querySelector('tr') as HTMLElement;
       return { box: table.getBoundingClientRect().width, row: row.getBoundingClientRect().width };
@@ -201,20 +205,57 @@ test('tool activity stays available within the plain conversation flow', async (
   await page.evaluate(async () => {
     const now = Date.now();
     const id = 'tool-row-review';
-    const invoke = (window as unknown as { __TAURI_INTERNALS__: { invoke: (command: string, args: Record<string, unknown>) => Promise<unknown> } }).__TAURI_INTERNALS__.invoke;
+    const invoke = (
+      window as unknown as { __TAURI_INTERNALS__: { invoke: (command: string, args: Record<string, unknown>) => Promise<unknown> } }
+    ).__TAURI_INTERNALS__.invoke;
     await invoke('save_conversation', { id, title: 'Server discovery', createdAt: now, updatedAt: now, environment: 'null' });
-    await invoke('append_conversation_message', { id: 'tool-question', conversationId: id, role: 'user',
-      content: 'Help me inspect the services deployed on this server.', createdAt: now, parts: '', attachments: '', paneId: null, context: '{}' });
+    await invoke('append_conversation_message', {
+      id: 'tool-question',
+      conversationId: id,
+      role: 'user',
+      content: 'Help me inspect the services deployed on this server.',
+      createdAt: now,
+      parts: '',
+      attachments: '',
+      paneId: null,
+      context: '{}',
+    });
     const parts = [
-      ...['hostname; uname -a', 'ss -tulnp'].map((command, index) => ({ kind: 'tool', tool: {
-        toolCallId: `tool-${index}`, toolName: 'run_command', input: { command }, state: 'done', startedAt: now + index,
-        endedAt: now + index + 1, output: JSON.stringify({ ok: true, exitCode: 0, output: 'Example output' }),
-      } })),
-      { kind: 'tool', tool: { toolCallId: 'tool-failed', toolName: 'run_command', input: { command: 'cat /etc/hosts' },
-        state: 'error', startedAt: now + 3, error: 'Exit code 2' } },
+      ...['hostname; uname -a', 'ss -tulnp'].map((command, index) => ({
+        kind: 'tool',
+        tool: {
+          toolCallId: `tool-${index}`,
+          toolName: 'run_command',
+          input: { command },
+          state: 'done',
+          startedAt: now + index,
+          endedAt: now + index + 1,
+          output: JSON.stringify({ ok: true, exitCode: 0, output: 'Example output' }),
+        },
+      })),
+      {
+        kind: 'tool',
+        tool: {
+          toolCallId: 'tool-failed',
+          toolName: 'run_command',
+          input: { command: 'cat /etc/hosts' },
+          state: 'error',
+          startedAt: now + 3,
+          error: 'Exit code 2',
+        },
+      },
     ];
-    await invoke('append_conversation_message', { id: 'tool-answer', conversationId: id, role: 'assistant', content: '',
-      createdAt: now + 1, parts: JSON.stringify(parts), attachments: '', paneId: null, context: '{}' });
+    await invoke('append_conversation_message', {
+      id: 'tool-answer',
+      conversationId: id,
+      role: 'assistant',
+      content: '',
+      createdAt: now + 1,
+      parts: JSON.stringify(parts),
+      attachments: '',
+      paneId: null,
+      context: '{}',
+    });
     localStorage.setItem('active-ai-conversation', id);
   });
   await page.reload();
@@ -222,7 +263,7 @@ test('tool activity stays available within the plain conversation flow', async (
   await page.getByTestId('unified-history-conversation:tool-row-review').click();
   const rows = page.locator('.ai-tool-card:visible');
   await expect(rows).toHaveCount(3);
-  const presentation = await rows.first().evaluate(element => ({
+  const presentation = await rows.first().evaluate((element) => ({
     background: getComputedStyle(element).backgroundColor,
     radius: getComputedStyle(element).borderRadius,
     borderTop: getComputedStyle(element).borderTopStyle,
@@ -237,7 +278,7 @@ test('tool activity stays available within the plain conversation flow', async (
   await expect(rows.first().locator('.ai-tool-section-label')).toHaveText(['输入', '输出']);
   const output = rows.first().locator('.ai-tool-output');
   await expect(output).toBeVisible();
-  const frame = await output.evaluate(element => ({
+  const frame = await output.evaluate((element) => ({
     background: getComputedStyle(element).backgroundColor,
     radius: getComputedStyle(element).borderRadius,
     borderTop: getComputedStyle(element).borderTopStyle,
@@ -246,7 +287,7 @@ test('tool activity stays available within the plain conversation flow', async (
   expect(frame).toMatchObject({ radius: '8px', borderTop: 'solid', paddingLeft: '12px' });
   expect(frame.background).not.toBe('rgba(0, 0, 0, 0)');
   // One scroll container only: the framed box scrolls, the terminal snapshot inside does not.
-  const scroll = await output.evaluate(element => ({
+  const scroll = await output.evaluate((element) => ({
     wrapper: getComputedStyle(element).overflowY,
     inner: getComputedStyle(element.firstElementChild as HTMLElement).overflowY,
   }));
@@ -275,13 +316,18 @@ test('reading earlier content pauses automatic scroll until the user returns to 
   await page.locator('[data-chat-composer]:visible').fill('Explain the project');
   await page.locator('[data-chat-composer]:visible').press('Enter');
   const transcript = page.locator('.chat-transcript:visible');
-  await expect.poll(() => transcript.evaluate(element => element.scrollHeight)).toBeGreaterThan(1000);
-  await transcript.evaluate(element => { element.scrollTop = 0; element.dispatchEvent(new Event('scroll')); });
+  await expect.poll(() => transcript.evaluate((element) => element.scrollHeight)).toBeGreaterThan(1000);
+  await transcript.evaluate((element) => {
+    element.scrollTop = 0;
+    element.dispatchEvent(new Event('scroll'));
+  });
   await expect(page.getByRole('button', { name: '回到最新回复' })).toBeVisible();
   await expect(page.getByRole('button', { name: '发送', exact: true })).toBeVisible();
-  expect(await transcript.evaluate(element => element.scrollTop)).toBeLessThan(10);
+  expect(await transcript.evaluate((element) => element.scrollTop)).toBeLessThan(10);
   await page.getByRole('button', { name: '回到最新回复' }).click();
-  await expect.poll(() => transcript.evaluate(element => element.scrollHeight - element.scrollTop - element.clientHeight)).toBeLessThan(25);
+  await expect
+    .poll(() => transcript.evaluate((element) => element.scrollHeight - element.scrollTop - element.clientHeight))
+    .toBeLessThan(25);
 });
 
 test('pausing and resuming the follow never shifts the transcript layout', async ({ page }) => {
@@ -290,26 +336,33 @@ test('pausing and resuming the follow never shifts the transcript layout', async
   await page.locator('[data-chat-composer]:visible').press('Enter');
   const transcript = page.locator('.chat-transcript:visible');
   const jump = page.getByTestId('ai-surface-side').locator('.chat-jump-latest');
-  await expect.poll(() => transcript.evaluate(element => element.scrollHeight - element.clientHeight)).toBeGreaterThan(200);
-  const layout = () => transcript.evaluate(element => {
-    const rect = element.getBoundingClientRect();
-    return {
-      box: `${Math.round(rect.top)}/${Math.round(rect.height)}`,
-      slot: element.closest('.ai-chat-panel')?.querySelector('.chat-jump-slot')?.getAttribute('data-active') ?? null,
-    };
-  });
+  await expect.poll(() => transcript.evaluate((element) => element.scrollHeight - element.clientHeight)).toBeGreaterThan(200);
+  const layout = () =>
+    transcript.evaluate((element) => {
+      const rect = element.getBoundingClientRect();
+      return {
+        box: `${Math.round(rect.top)}/${Math.round(rect.height)}`,
+        slot: element.closest('.ai-chat-panel')?.querySelector('.chat-jump-slot')?.getAttribute('data-active') ?? null,
+      };
+    });
   const following = await layout();
   expect(following.slot).toBeNull();
   await expect(jump).toHaveCSS('visibility', 'hidden');
   // Pausing the follow must not add or remove a row above the transcript: the jump target
   // keeps its reserved height so the content cannot bob up and down.
-  await transcript.evaluate(element => { element.scrollTop -= 120; element.dispatchEvent(new Event('scroll')); });
+  await transcript.evaluate((element) => {
+    element.scrollTop -= 120;
+    element.dispatchEvent(new Event('scroll'));
+  });
   await expect.poll(async () => (await layout()).slot).toBe('true');
   expect((await layout()).box).toBe(following.box);
   await expect(jump).toHaveCSS('visibility', 'visible');
   await jump.hover();
-  const hoverAlpha = await jump.evaluate(element => {
-    const alpha = getComputedStyle(element).backgroundColor.match(/[\d.]+/g)?.map(Number) ?? [];
+  const hoverAlpha = await jump.evaluate((element) => {
+    const alpha =
+      getComputedStyle(element)
+        .backgroundColor.match(/[\d.]+/g)
+        ?.map(Number) ?? [];
     return alpha.length === 4 ? alpha[3] : 1;
   });
   expect(hoverAlpha).toBe(1);
@@ -332,8 +385,10 @@ test('a small scroll while the reply streams keeps the reading position', async 
   await composer.press('Enter');
 
   const transcript = page.locator('.chat-transcript:visible');
-  const distance = () => transcript.evaluate(element => element.scrollHeight - element.scrollTop - element.clientHeight);
-  await expect.poll(() => transcript.evaluate(element => element.scrollHeight - element.clientHeight), { timeout: 30_000 }).toBeGreaterThan(200);
+  const distance = () => transcript.evaluate((element) => element.scrollHeight - element.scrollTop - element.clientHeight);
+  await expect
+    .poll(() => transcript.evaluate((element) => element.scrollHeight - element.clientHeight), { timeout: 30_000 })
+    .toBeGreaterThan(200);
   await transcript.hover();
   await page.mouse.wheel(0, -18);
 

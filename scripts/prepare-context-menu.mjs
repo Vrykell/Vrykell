@@ -22,19 +22,39 @@ const catalog = fs.readFileSync(path.join(root, 'src', 'i18n', 'zh.ts'), 'utf8')
 const title = catalog.match(/'Open in Vrykell':\s*'([^']+)'/)?.[1];
 if (!title) throw new Error('The native context menu needs its Chinese catalog entry.');
 const uninstallMessage = 'Could not unregister the context menu. Disable it in application settings and retry uninstalling.';
-const translatedUninstall = catalog.match(/'Could not unregister the context menu\. Disable it in application settings and retry uninstalling\.':\s*'([^']+)'/)?.[1];
+const translatedUninstall = catalog.match(
+  /'Could not unregister the context menu\. Disable it in application settings and retry uninstalling\.':\s*'([^']+)'/,
+)?.[1];
 if (!translatedUninstall) throw new Error('The uninstall hook needs its Chinese catalog entry.');
-fs.writeFileSync(path.join(output, 'installer-translations.nsh'),
-  `LangString ContextMenuUnregisterError 1033 "${uninstallMessage}"\nLangString ContextMenuUnregisterError 2052 "${translatedUninstall}"\n`, 'utf8');
+fs.writeFileSync(
+  path.join(output, 'installer-translations.nsh'),
+  `LangString ContextMenuUnregisterError 1033 "${uninstallMessage}"\nLangString ContextMenuUnregisterError 2052 "${translatedUninstall}"\n`,
+  'utf8',
+);
 const resources = path.join(build, 'menu.rc');
 // Generate shell resources from the canonical vector, rather than a possibly stale icon bundle.
 const icons = path.join(build, 'icons');
-run(process.execPath, [path.join(root, 'node_modules', '@tauri-apps', 'cli', 'tauri.js'), 'icon', path.join(root, 'src-tauri', 'icons', 'icon.svg'), '--output', icons]);
+run(process.execPath, [
+  path.join(root, 'node_modules', '@tauri-apps', 'cli', 'tauri.js'),
+  'icon',
+  path.join(root, 'src-tauri', 'icons', 'icon.svg'),
+  '--output',
+  icons,
+]);
 const resourceText = `#include <windows.h>\n101 ICON "${path.join(icons, 'icon.ico').replaceAll('\\', '/')}"\nLANGUAGE LANG_ENGLISH, SUBLANG_ENGLISH_US\nSTRINGTABLE\nBEGIN\n102 "Open in Vrykell"\nEND\nLANGUAGE LANG_CHINESE, SUBLANG_CHINESE_SIMPLIFIED\nSTRINGTABLE\nBEGIN\n102 "${title.replaceAll('"', '\\"')}"\nEND\n`;
 fs.writeFileSync(resources, Buffer.concat([Buffer.from([0xff, 0xfe]), Buffer.from(resourceText, 'utf16le')]));
-run('cmake', ['-S', native, '-B', build, '-A', arch === 'arm64' ? 'ARM64' : 'x64', `-DMENU_RESOURCES:FILEPATH=${resources.replaceAll('\\', '/')}`]);
+run('cmake', [
+  '-S',
+  native,
+  '-B',
+  build,
+  '-A',
+  arch === 'arm64' ? 'ARM64' : 'x64',
+  `-DMENU_RESOURCES:FILEPATH=${resources.replaceAll('\\', '/')}`,
+]);
 run('cmake', ['--build', build, '--config', 'Release']);
-if (process.argv.includes('--test') || process.argv.includes('--test-native')) run('ctest', ['--test-dir', build, '-C', 'Release', '--output-on-failure']);
+if (process.argv.includes('--test') || process.argv.includes('--test-native'))
+  run('ctest', ['--test-dir', build, '-C', 'Release', '--output-on-failure']);
 if (process.argv.includes('--test-native')) process.exit(0);
 fs.mkdirSync(path.join(staging, 'windows-context-menu'), { recursive: true });
 const dll = path.join(build, 'Release', 'VrykellExplorerCommand.dll');
@@ -59,8 +79,11 @@ for (const file of ['StoreLogo.png', 'Square150x150Logo.png', 'Square44x44Logo.p
   fs.copyFileSync(path.join(icons, '128x128.png'), path.join(staging, 'Assets', file));
 }
 const version = `${JSON.parse(fs.readFileSync(path.join(root, 'package.json'), 'utf8')).version}.0`;
-const manifest = fs.readFileSync(path.join(native, 'AppxManifest.xml'), 'utf8')
-  .replaceAll('__ARCH__', arch).replaceAll('__VERSION__', version).replaceAll('__DLL_NAME__', dllName);
+const manifest = fs
+  .readFileSync(path.join(native, 'AppxManifest.xml'), 'utf8')
+  .replaceAll('__ARCH__', arch)
+  .replaceAll('__VERSION__', version)
+  .replaceAll('__DLL_NAME__', dllName);
 // Guard the crash this split fixes: declaring the application itself as the package's Application
 // gives every process with that image name the package identity, and an ended shell activation then
 // terminates the running application.
@@ -69,5 +92,16 @@ if (declared !== `windows-context-menu\\${hostName}`) {
   throw new Error(`The identity manifest must declare the shell host, not "${declared ?? 'nothing'}".`);
 }
 fs.writeFileSync(path.join(staging, 'AppxManifest.xml'), manifest);
-run('powershell.exe', ['-NoLogo', '-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-File',
-  path.join(root, 'scripts', 'sign-context-menu.ps1'), '-StagingDirectory', staging, '-OutputDirectory', output]);
+run('powershell.exe', [
+  '-NoLogo',
+  '-NoProfile',
+  '-NonInteractive',
+  '-ExecutionPolicy',
+  'Bypass',
+  '-File',
+  path.join(root, 'scripts', 'sign-context-menu.ps1'),
+  '-StagingDirectory',
+  staging,
+  '-OutputDirectory',
+  output,
+]);

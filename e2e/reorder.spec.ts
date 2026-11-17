@@ -23,12 +23,12 @@ async function startDragRow(page: Page, sourceTestId: string, targetTestId: stri
 }
 
 const sshOrder = (page: Page) =>
-  page.locator('[data-reorder-item][data-reorder-kind="ssh"]')
+  page
+    .locator('[data-reorder-item][data-reorder-kind="ssh"]')
     .evaluateAll((els) => els.map((el) => (el as HTMLElement).dataset.reorderItem));
 
 const tabOrder = (page: Page) =>
-  page.locator('[data-tab-row-id]')
-    .evaluateAll((els) => els.map((el) => (el as HTMLElement).dataset.reorderItem));
+  page.locator('[data-tab-row-id]').evaluateAll((els) => els.map((el) => (el as HTMLElement).dataset.reorderItem));
 
 test.describe('sidebar list drag reordering', () => {
   for (const singleton of [false, true]) {
@@ -37,14 +37,16 @@ test.describe('sidebar list drag reordering', () => {
       await page.goto('/');
       await expect(page.getByPlaceholder(/输入命令/)).toBeVisible();
       await ensureTabsOpen(page);
-      const { first, groupId } = await page.evaluate(async withSingleton => {
+      const { first, groupId } = await page.evaluate(async (withSingleton) => {
         const path = '/src/features/workspace/stores/workspace.ts';
-        const { useWorkspaceStore } = await import(path) as typeof import('../src/features/workspace/stores/workspace');
+        const { useWorkspaceStore } = (await import(path)) as typeof import('../src/features/workspace/stores/workspace');
         const store = useWorkspaceStore.getState();
-        const first = store.tabs.find(tab => tab.kind === 'session')!.id;
+        const first = store.tabs.find((tab) => tab.kind === 'session')!.id;
         const second = store.addTab({ title: 'Grouped second' });
         const workbenchPath = '/src/features/workspace/services/workbench.ts';
-        const { synchronizeWorkbench, createContainerGroup, assignWorkspaceGroup } = await import(workbenchPath) as typeof import('../src/features/workspace/services/workbench');
+        const { synchronizeWorkbench, createContainerGroup, assignWorkspaceGroup } = (await import(
+          workbenchPath
+        )) as typeof import('../src/features/workspace/services/workbench');
         synchronizeWorkbench();
         const groupId = await createContainerGroup(first, 'Regression group');
         await assignWorkspaceGroup(second, groupId);
@@ -72,7 +74,9 @@ test.describe('sidebar list drag reordering', () => {
       await expect(list.locator(`[data-group-id="${groupId}"] [data-tab-row-id="${first}"]`)).toHaveCount(0);
     });
   }
-  test('SSH connections: the source row makes way with a borderless placeholder while dragging, and the order persists after dropping', async ({ page }) => {
+  test('SSH connections: the source row makes way with a borderless placeholder while dragging, and the order persists after dropping', async ({
+    page,
+  }) => {
     await setupTauriMock(page);
     await page.goto('/');
     await page.locator('[data-dock-btn="ssh"]').click();
@@ -155,7 +159,7 @@ test.describe('sidebar list drag reordering', () => {
       const member = (await page.getByTestId(`tab-row-${memberId}`).boundingBox())!;
       for (let x = member.x + member.width + 60; x > 240; x -= 10) {
         await page.mouse.move(x, y);
-        if (await group.locator('[data-reorder-placeholder]').count() > 0) return;
+        if ((await group.locator('[data-reorder-placeholder]').count()) > 0) return;
       }
     };
     await dragUntilGroupPlaceholder(b, a);

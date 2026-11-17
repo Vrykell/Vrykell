@@ -10,61 +10,100 @@ let hit: Element | null;
 const original = Object.getOwnPropertyDescriptor(document, 'elementFromPoint');
 function Harness() {
   const start = useNavigationButtonDrag();
-  return <>
-    <nav data-dock-zone="right">
-      <div data-dock-slot="files"><button onPointerDown={event => start(event, 'files')} onClick={clicked}>Files</button></div>
-      <div data-dock-slot="git">Changes</div><div data-dock-slot="chat">Assistant</div>
-    </nav>
-    <div data-testid="heading" onPointerDown={event => start(event, 'files')}><span>Panel heading</span><button onClick={clicked}>Close</button></div>
-    <div className="workspace-body" data-testid="body" />
-  </>;
+  return (
+    <>
+      <nav data-dock-zone="right">
+        <div data-dock-slot="files">
+          <button onPointerDown={(event) => start(event, 'files')} onClick={clicked}>
+            Files
+          </button>
+        </div>
+        <div data-dock-slot="git">Changes</div>
+        <div data-dock-slot="chat">Assistant</div>
+      </nav>
+      <div data-testid="heading" onPointerDown={(event) => start(event, 'files')}>
+        <span>Panel heading</span>
+        <button onClick={clicked}>Close</button>
+      </div>
+      <div className="workspace-body" data-testid="body" />
+    </>
+  );
 }
 function pointer(type: string, x: number, y: number, target: HTMLElement | Window = window, button = 0) {
   const event = new MouseEvent(type, { bubbles: true, cancelable: true, clientX: x, clientY: y, button });
-  Object.defineProperty(event, 'pointerId', { value: 1 }); fireEvent(target, event);
+  Object.defineProperty(event, 'pointerId', { value: 1 });
+  fireEvent(target, event);
 }
 beforeEach(() => {
-  vi.useFakeTimers(); clicked.mockClear();
-  useDockStore.setState({ leftZone: [], rightZone: ['files', 'git', 'chat'], leftPanels: [], rightPanels: ['files'], collapsedPanels: [], panelWidths: {} });
-  useNavigationDrag.getState().end(); hit = null;
+  vi.useFakeTimers();
+  clicked.mockClear();
+  useDockStore.setState({
+    leftZone: [],
+    rightZone: ['files', 'git', 'chat'],
+    leftPanels: [],
+    rightPanels: ['files'],
+    collapsedPanels: [],
+    panelWidths: {},
+  });
+  useNavigationDrag.getState().end();
+  hit = null;
   Object.defineProperty(document, 'elementFromPoint', { configurable: true, value: () => hit });
 });
 afterEach(() => {
-  cleanup(); vi.runAllTimers(); vi.useRealTimers();
-  if (original) Object.defineProperty(document, 'elementFromPoint', original); else Reflect.deleteProperty(document, 'elementFromPoint');
+  cleanup();
+  vi.runAllTimers();
+  vi.useRealTimers();
+  if (original) Object.defineProperty(document, 'elementFromPoint', original);
+  else Reflect.deleteProperty(document, 'elementFromPoint');
 });
 
 describe('auxiliary navigation pointer gestures', () => {
   it('leaves ordinary clicks and tiny movements unchanged', () => {
     render(<Harness />);
     const button = screen.getByText('Files');
-    pointer('pointerdown', 10, 10, button); pointer('pointermove', 12, 11); pointer('pointerup', 12, 11); fireEvent.click(button);
+    pointer('pointerdown', 10, 10, button);
+    pointer('pointermove', 12, 11);
+    pointer('pointerup', 12, 11);
+    fireEvent.click(button);
     expect(clicked).toHaveBeenCalledOnce();
     expect(useNavigationDrag.getState().id).toBeNull();
   });
   it('reorders horizontally without closing the panel or triggering a release click', () => {
-    render(<Harness />); hit = screen.getByText('Assistant');
+    render(<Harness />);
+    hit = screen.getByText('Assistant');
     const button = screen.getByText('Files');
-    pointer('pointerdown', 10, 10, button); pointer('pointermove', 100, 10); pointer('pointerup', 100, 10); fireEvent.click(button);
+    pointer('pointerdown', 10, 10, button);
+    pointer('pointermove', 100, 10);
+    pointer('pointerup', 100, 10);
+    fireEvent.click(button);
     expect(clicked).not.toHaveBeenCalled();
     expect(useDockStore.getState().rightZone).toEqual(['git', 'chat', 'files']);
     expect(useDockStore.getState().rightPanels).toEqual(['files']);
     expect(JSON.parse(localStorage.getItem('dock-layout-v6')!).rightZone).toEqual(['git', 'chat', 'files']);
   });
   it('accepts a panel heading while keeping its close button independent', () => {
-    render(<Harness />); hit = screen.getByText('Assistant');
-    pointer('pointerdown', 10, 10, screen.getByRole('button', { name: 'Close' })); pointer('pointermove', 100, 10); pointer('pointerup', 100, 10);
+    render(<Harness />);
+    hit = screen.getByText('Assistant');
+    pointer('pointerdown', 10, 10, screen.getByRole('button', { name: 'Close' }));
+    pointer('pointermove', 100, 10);
+    pointer('pointerup', 100, 10);
     expect(useNavigationDrag.getState().id).toBeNull();
-    fireEvent.click(screen.getByRole('button', { name: 'Close' })); expect(clicked).toHaveBeenCalledOnce();
-    pointer('pointerdown', 10, 10, screen.getByText('Panel heading')); pointer('pointermove', 100, 10); pointer('pointerup', 100, 10);
+    fireEvent.click(screen.getByRole('button', { name: 'Close' }));
+    expect(clicked).toHaveBeenCalledOnce();
+    pointer('pointerdown', 10, 10, screen.getByText('Panel heading'));
+    pointer('pointermove', 100, 10);
+    pointer('pointerup', 100, 10);
     expect(useDockStore.getState().rightZone).toEqual(['git', 'chat', 'files']);
   });
-  it.each(['escape', 'blur', 'pointercancel', 'unmount'])('cancels on %s without saving', reason => {
+  it.each(['escape', 'blur', 'pointercancel', 'unmount'])('cancels on %s without saving', (reason) => {
     const { unmount } = render(<Harness />);
-    const saved = localStorage.getItem('dock-layout-v6'); hit = screen.getByText('Assistant');
-    pointer('pointerdown', 10, 10, screen.getByText('Files')); pointer('pointermove', 100, 10);
+    const saved = localStorage.getItem('dock-layout-v6');
+    hit = screen.getByText('Assistant');
+    pointer('pointerdown', 10, 10, screen.getByText('Files'));
+    pointer('pointermove', 100, 10);
     if (reason === 'escape') fireEvent.keyDown(window, { key: 'Escape' });
-    else if (reason === 'unmount') unmount(); else fireEvent(window, new Event(reason));
+    else if (reason === 'unmount') unmount();
+    else fireEvent(window, new Event(reason));
     pointer('pointerup', 100, 10);
     expect(useDockStore.getState().rightZone).toEqual(['files', 'git', 'chat']);
     expect(useNavigationDrag.getState().id).toBeNull();
@@ -72,31 +111,51 @@ describe('auxiliary navigation pointer gestures', () => {
   });
   it('offers only the right content edge and uses the full preview as the release target', () => {
     render(<Harness />);
-    vi.spyOn(screen.getByTestId('body'), 'getBoundingClientRect').mockReturnValue({ left: 208, right: 1240, top: 76, bottom: 800, width: 1032, height: 724 } as DOMRect);
+    vi.spyOn(screen.getByTestId('body'), 'getBoundingClientRect').mockReturnValue({
+      left: 208,
+      right: 1240,
+      top: 76,
+      bottom: 800,
+      width: 1032,
+      height: 724,
+    } as DOMRect);
     useDockStore.setState({ rightPanels: [], panelWidths: { files: 280 } });
     pointer('pointerdown', 10, 10, screen.getByText('Files'));
-    pointer('pointermove', 250, 200); expect(useNavigationDrag.getState().target).toBeNull();
-    pointer('pointermove', 970, 200); expect(useNavigationDrag.getState().target).toMatchObject({ side: 'right', openPanel: true });
-    pointer('pointermove', 700, 200); expect(useNavigationDrag.getState().target).toBeNull();
-    pointer('pointerup', 970, 200); expect(useDockStore.getState().rightPanels).toEqual(['files']);
+    pointer('pointermove', 250, 200);
+    expect(useNavigationDrag.getState().target).toBeNull();
+    pointer('pointermove', 970, 200);
+    expect(useNavigationDrag.getState().target).toMatchObject({ side: 'right', openPanel: true });
+    pointer('pointermove', 700, 200);
+    expect(useNavigationDrag.getState().target).toBeNull();
+    pointer('pointerup', 970, 200);
+    expect(useDockStore.getState().rightPanels).toEqual(['files']);
     expect(useDockStore.getState().leftPanels).toEqual([]);
   });
   it('ignores secondary buttons and invalid release targets', () => {
-    render(<Harness />); const button = screen.getByText('Files');
-    pointer('pointerdown', 10, 10, button, 2); pointer('pointermove', 100, 10);
+    render(<Harness />);
+    const button = screen.getByText('Files');
+    pointer('pointerdown', 10, 10, button, 2);
+    pointer('pointermove', 100, 10);
     expect(useNavigationDrag.getState().id).toBeNull();
-    pointer('pointerdown', 10, 10, button); pointer('pointermove', 100, 10); pointer('pointerup', 100, 10);
+    pointer('pointerdown', 10, 10, button);
+    pointer('pointermove', 100, 10);
+    pointer('pointerup', 100, 10);
     expect(useDockStore.getState().rightZone).toEqual(['files', 'git', 'chat']);
   });
   it('uses the full left middle area for placement while excluding navigation', () => {
     render(<Harness />);
-    const middle = document.createElement('div'); middle.dataset.testid = 'workspace-left-dock'; document.body.append(middle);
-    const sidebar = document.createElement('div'); sidebar.className = 'workspace-sidebar'; document.body.append(sidebar);
+    const middle = document.createElement('div');
+    middle.dataset.testid = 'workspace-left-dock';
+    document.body.append(middle);
+    const sidebar = document.createElement('div');
+    sidebar.className = 'workspace-sidebar';
+    document.body.append(sidebar);
     vi.spyOn(middle, 'getBoundingClientRect').mockReturnValue({ left: 0, top: 210, width: 208, height: 500 } as DOMRect);
     // The open left panel removes the settings foot, so the dock and its preview reach the bottom.
     vi.spyOn(sidebar, 'getBoundingClientRect').mockReturnValue({ left: 0, top: 0, width: 208, height: 800, bottom: 800 } as DOMRect);
     const button = screen.getByText('Files');
-    pointer('pointerdown', 10, 10, button); pointer('pointermove', 100, 160);
+    pointer('pointerdown', 10, 10, button);
+    pointer('pointermove', 100, 160);
     expect(useNavigationDrag.getState().target).toBeNull();
     pointer('pointermove', 100, 300);
     expect(useNavigationDrag.getState().target).toMatchObject({ side: 'left', openPanel: true });
@@ -105,14 +164,20 @@ describe('auxiliary navigation pointer gestures', () => {
     pointer('pointerup', 200, 700);
     expect(useDockStore.getState().leftPanels).toEqual(['files']);
     expect(useWorkspaceNavigation.getState().collapsed).toBe(false);
-    middle.remove(); sidebar.remove();
+    middle.remove();
+    sidebar.remove();
   });
   it('keeps the indicated insertion slot when released inside the placeholder', () => {
     render(<Harness />);
     const area = document.querySelector('[data-dock-zone="right"]')!;
-    const gap = document.createElement('div'); gap.dataset.dockPlaceholder = '0'; area.prepend(gap); hit = gap;
-    pointer('pointerdown', 10, 10, screen.getByText('Files')); pointer('pointermove', 100, 10);
+    const gap = document.createElement('div');
+    gap.dataset.dockPlaceholder = '0';
+    area.prepend(gap);
+    hit = gap;
+    pointer('pointerdown', 10, 10, screen.getByText('Files'));
+    pointer('pointermove', 100, 10);
     expect(useNavigationDrag.getState().target).toEqual({ side: 'right', index: 0 });
-    pointer('pointerup', 100, 10); expect(useDockStore.getState().rightZone).toEqual(['files', 'git', 'chat']);
+    pointer('pointerup', 100, 10);
+    expect(useDockStore.getState().rightZone).toEqual(['files', 'git', 'chat']);
   });
 });

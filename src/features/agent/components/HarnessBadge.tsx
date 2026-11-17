@@ -21,12 +21,21 @@ export default function HarnessBadge({ name, size = 28 }: { name: string; size?:
   const Mark = harnessMark(name);
   const branded = !AGENT_MARKS[agentKey(name)] && info.branded;
   return (
-    <span aria-hidden="true" data-testid="harness-badge" data-hue={info.hue} style={{
-      display: 'inline-flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
-      width: size, height: size, borderRadius: Math.round(size / 3.5),
-      background: branded ? info.hue : 'var(--hover)',
-      color: branded ? 'var(--canvas)' : 'var(--text-primary)',
-    }}>
+    <span
+      aria-hidden="true"
+      data-testid="harness-badge"
+      data-hue={info.hue}
+      style={{
+        display: 'inline-flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        flexShrink: 0,
+        width: size,
+        height: size,
+        borderRadius: Math.round(size / 3.5),
+        background: branded ? info.hue : 'var(--hover)',
+        color: branded ? 'var(--canvas)' : 'var(--text-primary)',
+      }}>
       <Mark size={Math.round(size * 0.62)} />
     </span>
   );

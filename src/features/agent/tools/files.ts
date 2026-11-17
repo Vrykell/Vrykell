@@ -28,7 +28,13 @@ export function buildFileTools(ctx: ToolContext) {
       description: DESC_READ_FILE,
       inputSchema: z.object({
         path: z.string().describe('Absolute file path'),
-        max_bytes: z.number().int().min(1).max(8 * 1024 * 1024).optional().describe('Maximum bytes to read, default 256KB, limit 8MB'),
+        max_bytes: z
+          .number()
+          .int()
+          .min(1)
+          .max(8 * 1024 * 1024)
+          .optional()
+          .describe('Maximum bytes to read, default 256KB, limit 8MB'),
       }),
       execute: async ({ path, max_bytes }, { toolCallId }) => {
         const args = { path, maxBytes: max_bytes ?? null };

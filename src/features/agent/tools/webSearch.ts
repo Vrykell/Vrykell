@@ -32,7 +32,7 @@ const CONTENT_CAP = 300;
 
 export function buildTavilySearchTool(ctx: ToolContext) {
   return tool({
-      description: DESC_WEB_SEARCH_TAVILY,
+    description: DESC_WEB_SEARCH_TAVILY,
     inputSchema: z.object({
       query: z.string().describe('Search query'),
       maxResults: z.number().int().min(1).max(8).optional().describe('Result limit, default 5'),
@@ -56,8 +56,7 @@ export function buildTavilySearchTool(ctx: ToolContext) {
 /** Search response → plain text (answer + numbered result list), for both the model and the expanded card. */
 export function formatResults(r: TavilyResponse): string {
   const lines = (r.results ?? []).map(
-    (it, i) =>
-      `${i + 1}. ${it.title ?? ''}\n   ${it.url ?? ''}\n   ${(it.content ?? '').slice(0, CONTENT_CAP)}`,
+    (it, i) => `${i + 1}. ${it.title ?? ''}\n   ${it.url ?? ''}\n   ${(it.content ?? '').slice(0, CONTENT_CAP)}`,
   );
   const head = r.answer ? `摘要：${r.answer}\n\n` : '';
   return head + (lines.length ? lines.join('\n') : '（无结果）');

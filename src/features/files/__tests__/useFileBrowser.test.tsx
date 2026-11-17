@@ -39,7 +39,9 @@ describe('useFileBrowser (local target)', () => {
     fsMocks.fsHome.mockReset().mockResolvedValue('C:/Users/test');
     fsMocks.fsDisks.mockReset().mockResolvedValue([]);
     fsMocks.fsList.mockReset().mockResolvedValue([entry('src', 'C:/work/src', true), entry('a.txt', 'C:/work/a.txt')]);
-    fsMocks.fsRename.mockReset().mockImplementation((path: string, name: string) => Promise.resolve(`${path.slice(0, path.lastIndexOf('/'))}/${name}`));
+    fsMocks.fsRename
+      .mockReset()
+      .mockImplementation((path: string, name: string) => Promise.resolve(`${path.slice(0, path.lastIndexOf('/'))}/${name}`));
     fsMocks.fsCreateFile.mockReset().mockResolvedValue('C:/work/Untitled');
     fsMocks.fsCreateDir.mockReset().mockResolvedValue('C:/work/NewFolder');
     fsMocks.fsCopy.mockReset().mockResolvedValue({ completed: [], errors: [] });
@@ -49,7 +51,9 @@ describe('useFileBrowser (local target)', () => {
     fsMocks.fsPurgeStaged.mockReset().mockResolvedValue(undefined);
   });
 
-  afterEach(() => { vi.clearAllMocks(); });
+  afterEach(() => {
+    vi.clearAllMocks();
+  });
 
   it('retains undo for completed deletions when a later item fails', async () => {
     const completed = [{ from: 'C:/work/a.txt', to: 'C:/Users/test/.vrykell/undo/u-a.txt' }];
@@ -57,9 +61,13 @@ describe('useFileBrowser (local target)', () => {
     const { result } = renderHook(() => useFileBrowser({ target: LOCAL_TARGET, initialPath: 'C:/work', openEntry }));
     await waitFor(() => expect(result.current.entries).toHaveLength(2));
     act(() => result.current.confirmDelete([entry('a.txt', 'C:/work/a.txt'), entry('b.txt', 'C:/work/b.txt')]));
-    await act(async () => { result.current.confirmAction(); });
+    await act(async () => {
+      result.current.confirmAction();
+    });
     await waitFor(() => expect(result.current.undo?.pairs).toEqual(completed));
-    await act(async () => { await result.current.runUndo(); });
+    await act(async () => {
+      await result.current.runUndo();
+    });
     expect(fsMocks.fsRestoreStaged).toHaveBeenCalledWith(completed);
   });
 
@@ -82,13 +90,16 @@ describe('useFileBrowser (local target)', () => {
 
   it('does not re-read the directory when the caller passes a new callback on every render, such as a panel resize', async () => {
     const { result, rerender } = renderHook(
-      ({ tick }: { tick: number }) => useFileBrowser({
-        target: LOCAL_TARGET,
-        initialPath: 'C:/work',
-        openEntry,
-        // Inline callback: a new function on every render, matching how RemoteFiles passes it.
-        onPathChange: () => { void tick; },
-      }),
+      ({ tick }: { tick: number }) =>
+        useFileBrowser({
+          target: LOCAL_TARGET,
+          initialPath: 'C:/work',
+          openEntry,
+          // Inline callback: a new function on every render, matching how RemoteFiles passes it.
+          onPathChange: () => {
+            void tick;
+          },
+        }),
       { initialProps: { tick: 0 } },
     );
     await waitFor(() => expect(result.current.entries).toHaveLength(2));
@@ -101,16 +112,22 @@ describe('useFileBrowser (local target)', () => {
   });
 
   it('pushes a view snapshot on navigation and restores selection and scroll position on back', async () => {
-    fsMocks.fsList.mockImplementation((dir?: string | null) => Promise.resolve(
-      dir === 'C:/work/src' ? [entry('main.ts', 'C:/work/src/main.ts')] : [entry('src', 'C:/work/src', true), entry('a.txt', 'C:/work/a.txt')],
-    ));
+    fsMocks.fsList.mockImplementation((dir?: string | null) =>
+      Promise.resolve(
+        dir === 'C:/work/src'
+          ? [entry('main.ts', 'C:/work/src/main.ts')]
+          : [entry('src', 'C:/work/src', true), entry('a.txt', 'C:/work/a.txt')],
+      ),
+    );
     const { result } = renderHook(() => useFileBrowser({ target: LOCAL_TARGET, initialPath: 'C:/work', openEntry }));
     await waitFor(() => expect(result.current.entries).toHaveLength(2));
 
     act(() => result.current.replaceSelection(['C:/work/src', 'C:/work/a.txt']));
     expect(result.current.canGoBack).toBe(false);
 
-    await act(async () => { await result.current.navigate('C:/work/src'); });
+    await act(async () => {
+      await result.current.navigate('C:/work/src');
+    });
     await waitFor(() => expect(result.current.entries[0]?.name).toBe('main.ts'));
     expect(result.current.selection.size).toBe(0);
     expect(result.current.canGoBack).toBe(true);
@@ -125,11 +142,15 @@ describe('useFileBrowser (local target)', () => {
     const { result } = renderHook(() => useFileBrowser({ target: LOCAL_TARGET, initialPath: 'C:/work', openEntry }));
     await waitFor(() => expect(result.current.entries).toHaveLength(2));
 
-    await act(async () => { await result.current.navigate('C:/work/src'); });
+    await act(async () => {
+      await result.current.navigate('C:/work/src');
+    });
     await waitFor(() => expect(result.current.path).toBe('C:/work/src'));
 
     // Jump back to an already visited root: the cursor returns to the existing entry without a duplicate trail record.
-    await act(async () => { await result.current.navigate('C:/work'); });
+    await act(async () => {
+      await result.current.navigate('C:/work');
+    });
     await waitFor(() => expect(result.current.path).toBe('C:/work'));
     expect(result.current.canGoBack).toBe(false);
     expect(result.current.canGoForward).toBe(true);
@@ -143,36 +164,56 @@ describe('useFileBrowser (local target)', () => {
   });
 
   it('restores the previous selection when re-entering a visited directory', async () => {
-    fsMocks.fsList.mockImplementation((dir?: string | null) => Promise.resolve(
-      dir === 'C:/work/src' ? [entry('main.ts', 'C:/work/src/main.ts')] : [entry('src', 'C:/work/src', true), entry('a.txt', 'C:/work/a.txt')],
-    ));
+    fsMocks.fsList.mockImplementation((dir?: string | null) =>
+      Promise.resolve(
+        dir === 'C:/work/src'
+          ? [entry('main.ts', 'C:/work/src/main.ts')]
+          : [entry('src', 'C:/work/src', true), entry('a.txt', 'C:/work/a.txt')],
+      ),
+    );
     const { result } = renderHook(() => useFileBrowser({ target: LOCAL_TARGET, initialPath: 'C:/work', openEntry }));
     await waitFor(() => expect(result.current.entries).toHaveLength(2));
 
-    await act(async () => { await result.current.navigate('C:/work/src'); });
+    await act(async () => {
+      await result.current.navigate('C:/work/src');
+    });
     await waitFor(() => expect(result.current.path).toBe('C:/work/src'));
     act(() => result.current.selectOnly('C:/work/src/main.ts'));
 
     // Save the src view on leave and restore it on re-entry.
-    await act(async () => { await result.current.navigate('C:/work'); });
+    await act(async () => {
+      await result.current.navigate('C:/work');
+    });
     await waitFor(() => expect(result.current.path).toBe('C:/work'));
-    await act(async () => { await result.current.navigate('C:/work/src'); });
+    await act(async () => {
+      await result.current.navigate('C:/work/src');
+    });
     await waitFor(() => expect(result.current.path).toBe('C:/work/src'));
     expect([...result.current.selection]).toEqual(['C:/work/src/main.ts']);
   });
 
   it('drops forward history when entering a new directory', async () => {
-    fsMocks.fsList.mockImplementation((dir?: string | null) => Promise.resolve(
-      dir === 'C:/work/archive' ? [entry('old.txt', 'C:/work/archive/old.txt')] : [entry('src', 'C:/work/src', true), entry('a.txt', 'C:/work/a.txt')],
-    ));
+    fsMocks.fsList.mockImplementation((dir?: string | null) =>
+      Promise.resolve(
+        dir === 'C:/work/archive'
+          ? [entry('old.txt', 'C:/work/archive/old.txt')]
+          : [entry('src', 'C:/work/src', true), entry('a.txt', 'C:/work/a.txt')],
+      ),
+    );
     const { result } = renderHook(() => useFileBrowser({ target: LOCAL_TARGET, initialPath: 'C:/work', openEntry }));
     await waitFor(() => expect(result.current.entries).toHaveLength(2));
 
-    await act(async () => { await result.current.navigate('C:/work/src'); });
-    await act(async () => { await result.current.navigate('C:/work'); });
+    await act(async () => {
+      await result.current.navigate('C:/work/src');
+    });
+    await act(async () => {
+      await result.current.navigate('C:/work');
+    });
     expect(result.current.canGoForward).toBe(true);
 
-    await act(async () => { await result.current.navigate('C:/work/archive'); });
+    await act(async () => {
+      await result.current.navigate('C:/work/archive');
+    });
     await waitFor(() => expect(result.current.path).toBe('C:/work/archive'));
     expect(result.current.canGoForward).toBe(false);
     expect(result.current.canGoBack).toBe(true);
@@ -187,7 +228,9 @@ describe('useFileBrowser (local target)', () => {
     await waitFor(() => expect(result.current.path).toBe('C:/work'));
 
     for (let index = 0; index < 55; index += 1) {
-      await act(async () => { await result.current.navigate(`C:/work/d${index}`); });
+      await act(async () => {
+        await result.current.navigate(`C:/work/d${index}`);
+      });
     }
     expect(result.current.canGoBack).toBe(true);
 
@@ -203,9 +246,9 @@ describe('useFileBrowser (local target)', () => {
   });
 
   it('lazy-loads children and revalidates the cache when expanding again', async () => {
-    fsMocks.fsList.mockImplementation((dir?: string | null) => Promise.resolve(
-      dir === 'C:/work/src' ? [entry('main.ts', 'C:/work/src/main.ts')] : [entry('src', 'C:/work/src', true)],
-    ));
+    fsMocks.fsList.mockImplementation((dir?: string | null) =>
+      Promise.resolve(dir === 'C:/work/src' ? [entry('main.ts', 'C:/work/src/main.ts')] : [entry('src', 'C:/work/src', true)]),
+    );
     const { result } = renderHook(() => useFileBrowser({ target: LOCAL_TARGET, initialPath: 'C:/work', openEntry }));
     await waitFor(() => expect(result.current.entries).toHaveLength(1));
     const folder = result.current.entries[0]!;
@@ -216,7 +259,9 @@ describe('useFileBrowser (local target)', () => {
 
     act(() => result.current.toggleExpand(folder));
     fsMocks.fsList.mockResolvedValue([entry('new.ts', 'C:/work/src/new.ts')]);
-    await act(async () => { result.current.toggleExpand(folder); });
+    await act(async () => {
+      result.current.toggleExpand(folder);
+    });
     expect(fsMocks.fsList.mock.calls.length).toBe(calls + 1);
     expect(result.current.childCache[folder.path]?.[0]?.name).toBe('new.ts');
   });
@@ -231,13 +276,17 @@ describe('useFileBrowser (local target)', () => {
 
     fsMocks.fsCopy.mockResolvedValue({ completed: [{ from: 'C:/work/a.txt', to: 'C:/work/src/a.txt' }], errors: [] });
     act(() => result.current.copySelection([entry('a.txt', 'C:/work/a.txt')]));
-    await act(async () => { await result.current.pasteInto('C:/work/src'); });
+    await act(async () => {
+      await result.current.pasteInto('C:/work/src');
+    });
     expect(fsMocks.fsCopy).toHaveBeenCalledWith(['C:/work/a.txt'], 'C:/work/src');
     // Copy-paste is undoable too: undo moves the copied entries into the staging area.
     expect(result.current.undo).toMatchObject({ kind: 'remove', labelKey: 'files.undo.paste' });
 
     act(() => result.current.cutSelection([entry('a.txt', 'C:/work/a.txt')]));
-    await act(async () => { await result.current.pasteInto('C:/work/src'); });
+    await act(async () => {
+      await result.current.pasteInto('C:/work/src');
+    });
     expect(fsMocks.fsMove).toHaveBeenCalledWith(['C:/work/a.txt'], 'C:/work/src');
     expect(result.current.undo?.pairs).toEqual([{ from: 'C:/work/a.txt', to: 'C:/work/src/a (1).txt' }]);
   });
@@ -247,17 +296,24 @@ describe('useFileBrowser (local target)', () => {
     await waitFor(() => expect(result.current.entries).toHaveLength(2));
 
     act(() => result.current.cutSelection([entry('a.txt', 'C:/work/a.txt')]));
-    await act(async () => { await result.current.pasteInto('C:/work'); });
+    await act(async () => {
+      await result.current.pasteInto('C:/work');
+    });
     expect(fsMocks.fsMove).not.toHaveBeenCalled();
   });
 
   it('stages deletions and restores them from the history stack', async () => {
-    fsMocks.fsStageDelete.mockResolvedValue({ completed: [{ from: 'C:/work/a.txt', to: 'C:/Users/test/.vrykell/undo/u-a.txt' }], errors: [] });
+    fsMocks.fsStageDelete.mockResolvedValue({
+      completed: [{ from: 'C:/work/a.txt', to: 'C:/Users/test/.vrykell/undo/u-a.txt' }],
+      errors: [],
+    });
     const { result } = renderHook(() => useFileBrowser({ target: LOCAL_TARGET, initialPath: 'C:/work', openEntry }));
     await waitFor(() => expect(result.current.entries).toHaveLength(2));
 
     act(() => result.current.confirmDelete([entry('a.txt', 'C:/work/a.txt')]));
-    await act(async () => { result.current.confirmAction(); });
+    await act(async () => {
+      result.current.confirmAction();
+    });
     await waitFor(() => expect(fsMocks.fsStageDelete).toHaveBeenCalledWith(['C:/work/a.txt']));
     expect(result.current.undo).toMatchObject({ kind: 'delete' });
 
@@ -265,7 +321,9 @@ describe('useFileBrowser (local target)', () => {
       completed: [{ from: 'C:/work/a.txt', to: 'C:/Users/test/.vrykell/undo/u-a.txt' }],
       errors: [],
     });
-    await act(async () => { await result.current.runUndo(); });
+    await act(async () => {
+      await result.current.runUndo();
+    });
     expect(fsMocks.fsRestoreStaged).toHaveBeenCalled();
     expect(result.current.undoCount).toBe(0);
   });
@@ -277,19 +335,23 @@ describe('useFileBrowser (local target)', () => {
 
     act(() => result.current.startRename(entry('a.txt', 'C:/work/a.txt')));
     act(() => result.current.requestRename(entry('a.txt', 'C:/work/a.txt'), 'b.txt'));
-    await act(async () => { result.current.confirmAction(); });
+    await act(async () => {
+      result.current.confirmAction();
+    });
     await waitFor(() => expect(result.current.undo?.pairs).toEqual([{ from: 'C:/work/a.txt', to: 'C:/work/b (1).txt' }]));
   });
 
   it('creates inside the hit folder, starts rename immediately and expands that folder', async () => {
-    fsMocks.fsList.mockImplementation((dir?: string | null) => Promise.resolve(
-      dir === 'C:/work/src' ? [] : [entry('src', 'C:/work/src', true)],
-    ));
+    fsMocks.fsList.mockImplementation((dir?: string | null) =>
+      Promise.resolve(dir === 'C:/work/src' ? [] : [entry('src', 'C:/work/src', true)]),
+    );
     const { result } = renderHook(() => useFileBrowser({ target: LOCAL_TARGET, initialPath: 'C:/work', openEntry }));
     await waitFor(() => expect(result.current.entries).toHaveLength(1));
     const folder = result.current.entries[0]!;
 
-    await act(async () => { await result.current.createEntry('file', folder); });
+    await act(async () => {
+      await result.current.createEntry('file', folder);
+    });
     expect(fsMocks.fsCreateFile).toHaveBeenCalledWith('C:/work/src', 'Untitled');
     expect(result.current.renameTarget?.path).toBe('C:/work/Untitled');
     expect(result.current.expandedSet.has('C:/work/src')).toBe(true);
@@ -301,18 +363,22 @@ describe('useFileBrowser (local target)', () => {
     const { result } = renderHook(() => useFileBrowser({ target: LOCAL_TARGET, initialPath: 'C:/work/a', openEntry }));
     await waitFor(() => expect(result.current.entries).toHaveLength(2));
 
-    await act(async () => { await result.current.createEntry('dir', null); });
+    await act(async () => {
+      await result.current.createEntry('dir', null);
+    });
     expect(fsMocks.fsCreateDir).toHaveBeenCalledWith('C:/work/a', 'NewFolder');
 
-    await act(async () => { await result.current.createEntry('file', file); });
+    await act(async () => {
+      await result.current.createEntry('file', file);
+    });
     expect(fsMocks.fsCreateFile).toHaveBeenLastCalledWith('C:/work', 'Untitled');
   });
 
   it('refreshes an expanded child directory after rename instead of keeping the old name', async () => {
     const child = entry('a.txt', 'C:/work/src/a.txt');
-    fsMocks.fsList.mockImplementation((dir?: string | null) => Promise.resolve(
-      dir === 'C:/work/src' ? [child] : [entry('src', 'C:/work/src', true)],
-    ));
+    fsMocks.fsList.mockImplementation((dir?: string | null) =>
+      Promise.resolve(dir === 'C:/work/src' ? [child] : [entry('src', 'C:/work/src', true)]),
+    );
     const { result } = renderHook(() => useFileBrowser({ target: LOCAL_TARGET, initialPath: 'C:/work', openEntry }));
     await waitFor(() => expect(result.current.entries).toHaveLength(1));
     const folder = result.current.entries[0]!;
@@ -321,19 +387,21 @@ describe('useFileBrowser (local target)', () => {
 
     // Re-read the parent after rename so the cache shows the new name instead of a.txt.
     fsMocks.fsRename.mockResolvedValue('C:/work/src/b.txt');
-    fsMocks.fsList.mockImplementation((dir?: string | null) => Promise.resolve(
-      dir === 'C:/work/src' ? [entry('b.txt', 'C:/work/src/b.txt')] : [entry('src', 'C:/work/src', true)],
-    ));
+    fsMocks.fsList.mockImplementation((dir?: string | null) =>
+      Promise.resolve(dir === 'C:/work/src' ? [entry('b.txt', 'C:/work/src/b.txt')] : [entry('src', 'C:/work/src', true)]),
+    );
     act(() => result.current.requestRename(child, 'b.txt'));
-    await act(async () => { result.current.confirmAction(); });
+    await act(async () => {
+      result.current.confirmAction();
+    });
     await waitFor(() => expect(result.current.childCache['C:/work/src']?.[0]?.name).toBe('b.txt'));
   });
 
   it('refreshes an expanded child directory after deletion instead of keeping a ghost entry', async () => {
     const child = entry('a.txt', 'C:/work/src/a.txt');
-    fsMocks.fsList.mockImplementation((dir?: string | null) => Promise.resolve(
-      dir === 'C:/work/src' ? [child] : [entry('src', 'C:/work/src', true)],
-    ));
+    fsMocks.fsList.mockImplementation((dir?: string | null) =>
+      Promise.resolve(dir === 'C:/work/src' ? [child] : [entry('src', 'C:/work/src', true)]),
+    );
     const { result } = renderHook(() => useFileBrowser({ target: LOCAL_TARGET, initialPath: 'C:/work', openEntry }));
     await waitFor(() => expect(result.current.entries).toHaveLength(1));
     const folder = result.current.entries[0]!;
@@ -341,19 +409,21 @@ describe('useFileBrowser (local target)', () => {
     await waitFor(() => expect(result.current.childCache['C:/work/src']).toHaveLength(1));
 
     fsMocks.fsStageDelete.mockResolvedValue({ completed: [{ from: child.path, to: 'C:/Users/test/.vrykell/undo/u-a.txt' }], errors: [] });
-    fsMocks.fsList.mockImplementation((dir?: string | null) => Promise.resolve(
-      dir === 'C:/work/src' ? [] : [entry('src', 'C:/work/src', true)],
-    ));
+    fsMocks.fsList.mockImplementation((dir?: string | null) =>
+      Promise.resolve(dir === 'C:/work/src' ? [] : [entry('src', 'C:/work/src', true)]),
+    );
     act(() => result.current.confirmDelete([child]));
-    await act(async () => { result.current.confirmAction(); });
+    await act(async () => {
+      result.current.confirmAction();
+    });
     await waitFor(() => expect(result.current.childCache['C:/work/src']).toHaveLength(0));
   });
 
   it('refreshes the source cache after moving an entry out of an expanded child directory', async () => {
     const child = entry('a.txt', 'C:/work/src/a.txt');
-    fsMocks.fsList.mockImplementation((dir?: string | null) => Promise.resolve(
-      dir === 'C:/work/archive' ? [] : dir === 'C:/work/src' ? [child] : [entry('src', 'C:/work/src', true)],
-    ));
+    fsMocks.fsList.mockImplementation((dir?: string | null) =>
+      Promise.resolve(dir === 'C:/work/archive' ? [] : dir === 'C:/work/src' ? [child] : [entry('src', 'C:/work/src', true)]),
+    );
     const { result } = renderHook(() => useFileBrowser({ target: LOCAL_TARGET, initialPath: 'C:/work', openEntry }));
     await waitFor(() => expect(result.current.entries).toHaveLength(1));
     const folder = result.current.entries[0]!;
@@ -362,12 +432,18 @@ describe('useFileBrowser (local target)', () => {
 
     fsMocks.fsMove.mockResolvedValue({ completed: [{ from: child.path, to: 'C:/work/archive/a.txt' }], errors: [] });
     // After the move, the source is empty and the destination contains the file.
-    fsMocks.fsList.mockImplementation((dir?: string | null) => Promise.resolve(
-      dir === 'C:/work/archive'
-        ? [entry('a.txt', 'C:/work/archive/a.txt')]
-        : dir === 'C:/work/src' ? [] : [entry('src', 'C:/work/src', true)],
-    ));
-    await act(async () => { await result.current.transferInto([child.path], 'C:/work/archive', 'move'); });
+    fsMocks.fsList.mockImplementation((dir?: string | null) =>
+      Promise.resolve(
+        dir === 'C:/work/archive'
+          ? [entry('a.txt', 'C:/work/archive/a.txt')]
+          : dir === 'C:/work/src'
+            ? []
+            : [entry('src', 'C:/work/src', true)],
+      ),
+    );
+    await act(async () => {
+      await result.current.transferInto([child.path], 'C:/work/archive', 'move');
+    });
     await waitFor(() => expect(result.current.childCache['C:/work/src']).toHaveLength(0));
     expect(result.current.undo?.pairs).toEqual([{ from: child.path, to: 'C:/work/archive/a.txt' }]);
   });
@@ -376,7 +452,9 @@ describe('useFileBrowser (local target)', () => {
     const { result } = renderHook(() => useFileBrowser({ target: LOCAL_TARGET, initialPath: 'C:/work', openEntry }));
     await waitFor(() => expect(result.current.entries).toHaveLength(2));
 
-    await act(async () => { await result.current.toggleExpand(entry('src', 'C:/work/src')); });
+    await act(async () => {
+      await result.current.toggleExpand(entry('src', 'C:/work/src'));
+    });
     expect(result.current.expandedSet.has('C:/work/src')).toBe(true);
     await waitFor(() => expect(result.current.childCache['C:/work/src']).toBeDefined());
 
@@ -390,10 +468,12 @@ describe('useFileBrowser (local target)', () => {
     const { result } = renderHook(() => useFileBrowser({ target: LOCAL_TARGET, initialPath: 'C:/work', openEntry }));
     await waitFor(() => expect(result.current.entries).toHaveLength(2));
 
-    fsMocks.fsList.mockImplementation(() => Promise.resolve([
-      entry('src', 'C:/work/src', true), entry('a.txt', 'C:/work/a.txt'), entry('new.txt', 'C:/work/new.txt'),
-    ]));
-    await act(async () => { result.current.refresh(); });
+    fsMocks.fsList.mockImplementation(() =>
+      Promise.resolve([entry('src', 'C:/work/src', true), entry('a.txt', 'C:/work/a.txt'), entry('new.txt', 'C:/work/new.txt')]),
+    );
+    await act(async () => {
+      result.current.refresh();
+    });
 
     await waitFor(() => expect(result.current.entries).toHaveLength(3));
     expect(fsMocks.fsList).toHaveBeenLastCalledWith('C:/work');
@@ -406,33 +486,40 @@ describe('useFileBrowser (local target)', () => {
     const { result } = renderHook(() => useFileBrowser({ target: LOCAL_TARGET, initialPath: 'C:/work', openEntry }));
     await waitFor(() => expect(result.current.entries).toHaveLength(2));
 
-    await act(async () => { await result.current.createEntry('file', null); });
+    await act(async () => {
+      await result.current.createEntry('file', null);
+    });
     expect(result.current.undo).toMatchObject({ kind: 'remove', labelKey: 'files.undo.create' });
     expect(result.current.undo?.pairs).toEqual([{ from: 'C:/work/Untitled', to: 'C:/work/Untitled' }]);
 
-    fsMocks.fsStageDelete.mockResolvedValue({ completed: [{ from: 'C:/work/Untitled', to: 'C:/Users/test/.vrykell/undo/u-Untitled' }], errors: [] });
-    await act(async () => { await result.current.runUndo(); });
+    fsMocks.fsStageDelete.mockResolvedValue({
+      completed: [{ from: 'C:/work/Untitled', to: 'C:/Users/test/.vrykell/undo/u-Untitled' }],
+      errors: [],
+    });
+    await act(async () => {
+      await result.current.runUndo();
+    });
     expect(fsMocks.fsStageDelete).toHaveBeenCalledWith(['C:/work/Untitled']);
     expect(result.current.undoCount).toBe(0);
   });
 
   it('creates beside a file in an expanded child directory, refreshes its cache and keeps it expanded', async () => {
     const child = entry('a.txt', 'C:/work/src/a.txt');
-    fsMocks.fsList.mockImplementation((dir?: string | null) => Promise.resolve(
-      dir === 'C:/work/src' ? [child] : [entry('src', 'C:/work/src', true)],
-    ));
+    fsMocks.fsList.mockImplementation((dir?: string | null) =>
+      Promise.resolve(dir === 'C:/work/src' ? [child] : [entry('src', 'C:/work/src', true)]),
+    );
     const { result } = renderHook(() => useFileBrowser({ target: LOCAL_TARGET, initialPath: 'C:/work', openEntry }));
     await waitFor(() => expect(result.current.entries).toHaveLength(1));
     act(() => result.current.toggleExpand(result.current.entries[0]!));
     await waitFor(() => expect(result.current.childCache['C:/work/src']).toHaveLength(1));
 
     fsMocks.fsCreateFile.mockResolvedValue('C:/work/src/Untitled');
-    fsMocks.fsList.mockImplementation((dir?: string | null) => Promise.resolve(
-      dir === 'C:/work/src'
-        ? [child, entry('Untitled', 'C:/work/src/Untitled')]
-        : [entry('src', 'C:/work/src', true)],
-    ));
-    await act(async () => { await result.current.createEntry('file', child); });
+    fsMocks.fsList.mockImplementation((dir?: string | null) =>
+      Promise.resolve(dir === 'C:/work/src' ? [child, entry('Untitled', 'C:/work/src/Untitled')] : [entry('src', 'C:/work/src', true)]),
+    );
+    await act(async () => {
+      await result.current.createEntry('file', child);
+    });
 
     // The new entry lands beside the file (in the expanded child directory), so that cache must refresh.
     expect(fsMocks.fsCreateFile).toHaveBeenCalledWith('C:/work/src', 'Untitled');
@@ -446,11 +533,18 @@ describe('useFileBrowser (local target)', () => {
     await waitFor(() => expect(result.current.entries).toHaveLength(2));
 
     act(() => result.current.copySelection([entry('a.txt', 'C:/work/a.txt')]));
-    await act(async () => { await result.current.pasteInto('C:/work/src'); });
+    await act(async () => {
+      await result.current.pasteInto('C:/work/src');
+    });
     expect(result.current.undo).toMatchObject({ kind: 'remove', labelKey: 'files.undo.paste' });
 
-    fsMocks.fsStageDelete.mockResolvedValue({ completed: [{ from: 'C:/work/src/a (1).txt', to: 'C:/Users/test/.vrykell/undo/u-a' }], errors: [] });
-    await act(async () => { await result.current.runUndo(); });
+    fsMocks.fsStageDelete.mockResolvedValue({
+      completed: [{ from: 'C:/work/src/a (1).txt', to: 'C:/Users/test/.vrykell/undo/u-a' }],
+      errors: [],
+    });
+    await act(async () => {
+      await result.current.runUndo();
+    });
     expect(fsMocks.fsStageDelete).toHaveBeenCalledWith(['C:/work/src/a (1).txt']);
     expect(result.current.undoCount).toBe(0);
   });
@@ -461,13 +555,17 @@ describe('useFileBrowser (local target)', () => {
     await waitFor(() => expect(result.current.entries).toHaveLength(2));
 
     act(() => result.current.requestRename(entry('a.txt', 'C:/work/a.txt'), 'b.txt'));
-    await act(async () => { result.current.confirmAction(); });
+    await act(async () => {
+      result.current.confirmAction();
+    });
     await waitFor(() => expect(result.current.undoCount).toBe(1));
     expect(result.current.undo?.pairs).toEqual([{ from: 'C:/work/a.txt', to: 'C:/work/b.txt' }]);
 
     // The file was moved elsewhere: undo fails, but the step must still be consumed.
     fsMocks.fsRename.mockRejectedValueOnce(new Error('File does not exist'));
-    await act(async () => { await result.current.runUndo(); });
+    await act(async () => {
+      await result.current.runUndo();
+    });
     expect(result.current.undoCount).toBe(0);
     expect(result.current.undo).toBeNull();
   });
@@ -480,12 +578,16 @@ describe('useFileBrowser (local target)', () => {
     await waitFor(() => expect(result.current.entries).toHaveLength(2));
 
     act(() => result.current.confirmDelete([entry('a.txt', 'C:/work/a.txt'), entry('b.txt', 'C:/work/b.txt')]));
-    await act(async () => { result.current.confirmAction(); });
+    await act(async () => {
+      result.current.confirmAction();
+    });
     await waitFor(() => expect(result.current.undoCount).toBe(1));
 
     // Only one entry can be restored: successes become selected and failures leave the stack.
     fsMocks.fsRestoreStaged.mockResolvedValue({ completed: [first], errors: ['Restore failed: C:/work/b.txt already exists'] });
-    await act(async () => { await result.current.runUndo(); });
+    await act(async () => {
+      await result.current.runUndo();
+    });
     expect(result.current.undoCount).toBe(0);
     expect([...result.current.selection]).toEqual(['C:/work/a.txt']);
   });
@@ -495,7 +597,9 @@ describe('useFileBrowser (local target)', () => {
     const { result } = renderHook(() => useFileBrowser({ target: LOCAL_TARGET, initialPath: 'C:/work', openEntry }));
     await waitFor(() => expect(result.current.entries).toHaveLength(2));
     act(() => result.current.confirmDelete([entry('a.txt', 'C:/work/a.txt')]));
-    await act(async () => { result.current.confirmAction(); });
+    await act(async () => {
+      result.current.confirmAction();
+    });
     expect(fsMocks.fsStageDelete).toHaveBeenCalledWith(['C:/work/a.txt'], false);
     expect(result.current.undoCount).toBe(0);
     expect(result.current.undo).toBeNull();
@@ -507,11 +611,12 @@ describe('useFileBrowser (local target)', () => {
     fsMocks.fsStageDelete.mockResolvedValue({ completed: [{ from: 'C:/work/a.txt', to: '' }], errors: [] });
     const { result } = renderHook(() => useFileBrowser({ target: LOCAL_TARGET, initialPath: 'C:/work', openEntry }));
     await waitFor(() => expect(result.current.entries).toHaveLength(2));
-    await act(async () => { await result.current.removeAfterTransfer([entry('a.txt', 'C:/work/a.txt')]); });
+    await act(async () => {
+      await result.current.removeAfterTransfer([entry('a.txt', 'C:/work/a.txt')]);
+    });
     expect(fsMocks.fsStageDelete).toHaveBeenCalledWith(['C:/work/a.txt'], false);
     expect(result.current.undoCount).toBe(0);
     const toasts = useToastStore.getState().toasts;
     expect(toasts[toasts.length - 1]?.message).toBe('已移动到系统，不保留应用撤销记录');
   });
-
 });

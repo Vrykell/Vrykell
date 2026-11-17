@@ -17,5 +17,4 @@ export const getShellLaunchDirectory = () => invoke<string | null>('shell_launch
 /** Directories a launch forwarded to this already-running window; drains the queue. */
 export const takeForwardedLaunchDirectories = () => invoke<string[]>('shell_take_forwarded_directories');
 /** Fires when another launch was redirected here, so the caller can drain the queue. */
-export const onForwardedLaunch = (handler: () => void): Promise<UnlistenFn> =>
-  listen('shell-launch-forwarded', () => handler());
+export const onForwardedLaunch = (handler: () => void): Promise<UnlistenFn> => listen('shell-launch-forwarded', () => handler());

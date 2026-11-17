@@ -6,16 +6,21 @@ async function expectDockedStatus(page: Page) {
   const pane = page.locator('.terminal-pane:visible').last();
   // The terminal and the docked panel reflow after the status surface mounts; wait for the
   // final geometry instead of sampling a transitional frame.
-  await expect.poll(async () => {
-    const content = (await pane.locator('.ssh-pane-content').boundingBox())!;
-    const status = (await panel.boundingBox())!;
-    return content.x + content.width <= status.x + 1;
-  }).toBe(true);
+  await expect
+    .poll(async () => {
+      const content = (await pane.locator('.ssh-pane-content').boundingBox())!;
+      const status = (await panel.boundingBox())!;
+      return content.x + content.width <= status.x + 1;
+    })
+    .toBe(true);
   const content = (await pane.locator('.ssh-pane-content').boundingBox())!;
   const status = (await panel.boundingBox())!;
   expect(content.width).toBeGreaterThanOrEqual(320);
-  expect(status.y).toBeCloseTo((await page.locator('.workspace-titlebar').boundingBox())!.y + (await page.locator('.workspace-titlebar').boundingBox())!.height, 0);
-  expect(await pane.evaluate(element => element.scrollWidth - element.clientWidth)).toBeLessThanOrEqual(1);
+  expect(status.y).toBeCloseTo(
+    (await page.locator('.workspace-titlebar').boundingBox())!.y + (await page.locator('.workspace-titlebar').boundingBox())!.height,
+    0,
+  );
+  expect(await pane.evaluate((element) => element.scrollWidth - element.clientWidth)).toBeLessThanOrEqual(1);
 }
 
 test('the docked status panel follows the light theme and shows event history directly', async ({ page }) => {
@@ -87,7 +92,9 @@ test('SSH status uses real session state and does not write probes into the term
   const panel = page.getByTestId('ssh-status-panel');
   await expect(rightPanel).toBeHidden();
   await expect(page.locator('#ssh-status-sidebar-host header')).toContainText('root@prod.example.com:22');
-  await expect.poll(async () => Math.round((await panel.boundingBox())!.y - (await page.locator('.workspace-body').boundingBox())!.y)).toBe(0);
+  await expect
+    .poll(async () => Math.round((await panel.boundingBox())!.y - (await page.locator('.workspace-body').boundingBox())!.y))
+    .toBe(0);
   await expect(page.getByTestId('ssh-session-toolbar')).toHaveCount(1);
   expect(await page.getByTestId('ssh-connection-input').getByTestId('ssh-session-toolbar').count()).toBe(0);
   await expect(panel).toContainText('Linux 6.8');
@@ -211,23 +218,33 @@ test('resource failures retain samples and pause can be resumed', async ({ page 
   await expect(panel).toContainText('Linux 6.8');
   await panel.getByRole('button', { name: '暂停监控' }).click();
   await expect(panel).toContainText('监控已暂停');
-  await page.evaluate(() => { (window as unknown as Record<string, unknown>).__SSH_STATUS_ERROR__ = 'Permission denied'; });
+  await page.evaluate(() => {
+    (window as unknown as Record<string, unknown>).__SSH_STATUS_ERROR__ = 'Permission denied';
+  });
   await panel.getByRole('button', { name: '恢复监控' }).click();
   await expect(page.getByRole('alert')).toContainText('资源采集失败');
   await expect(panel.getByRole('button', { name: '暂停监控' })).toBeEnabled();
   await expect(panel).not.toContainText('监控已暂停');
   await expect(panel).toContainText('Linux 6.8');
   await expect(page.getByTestId('ssh-session-toolbar').last().getByRole('status')).toContainText('已连接');
-  await page.evaluate(() => { delete (window as unknown as Record<string, unknown>).__SSH_STATUS_ERROR__; });
+  await page.evaluate(() => {
+    delete (window as unknown as Record<string, unknown>).__SSH_STATUS_ERROR__;
+  });
   await panel.getByRole('button', { name: '刷新远端资源' }).click();
   await expect(page.getByRole('alert')).toHaveCount(0);
-  await page.evaluate(() => { (window as unknown as Record<string, unknown>).__SSH_STATUS_ERROR__ = '[Session(-18)] Authentication failed (username/password)'; });
+  await page.evaluate(() => {
+    (window as unknown as Record<string, unknown>).__SSH_STATUS_ERROR__ = '[Session(-18)] Authentication failed (username/password)';
+  });
   await panel.getByRole('button', { name: '刷新远端资源' }).click();
   await expect(page.getByRole('alert')).toContainText('已保存的 SSH 认证信息被拒绝');
   await expect(page.getByRole('alert')).toContainText('认证这两个服务');
   await expect(page.getByTestId('ssh-session-toolbar').last().getByRole('status')).toContainText('已连接');
-  await page.evaluate(() => { delete (window as unknown as Record<string, unknown>).__SSH_STATUS_ERROR__; });
-  await page.evaluate(() => { (window as unknown as { __TAURI_INTERNALS__: { emitPtyExit: (code: number) => void } }).__TAURI_INTERNALS__.emitPtyExit(0); });
+  await page.evaluate(() => {
+    delete (window as unknown as Record<string, unknown>).__SSH_STATUS_ERROR__;
+  });
+  await page.evaluate(() => {
+    (window as unknown as { __TAURI_INTERNALS__: { emitPtyExit: (code: number) => void } }).__TAURI_INTERNALS__.emitPtyExit(0);
+  });
   await expect(page.getByTestId('ssh-session-toolbar').last().getByRole('status')).toContainText('已断开');
   await panel.getByRole('button', { name: '重新连接 SSH 会话' }).click();
   await expect(page.getByTestId('ssh-session-toolbar').last().getByRole('status')).toContainText('已连接');
@@ -267,9 +284,11 @@ test('deleted profiles report unavailable instead of remaining in a connecting s
   await page.locator('[data-dock-btn="ssh"]').click();
   await expect(page.getByTestId('ssh-row-ssh-1')).toBeVisible();
   await page.evaluate(() => {
-    const internals = (window as unknown as { __TAURI_INTERNALS__: { invoke: (command: string, args?: Record<string, unknown>) => Promise<unknown> } }).__TAURI_INTERNALS__;
+    const internals = (
+      window as unknown as { __TAURI_INTERNALS__: { invoke: (command: string, args?: Record<string, unknown>) => Promise<unknown> } }
+    ).__TAURI_INTERNALS__;
     const original = internals.invoke.bind(internals);
-    internals.invoke = (command, args) => command === 'ssh_connections_list' ? Promise.resolve([]) : original(command, args);
+    internals.invoke = (command, args) => (command === 'ssh_connections_list' ? Promise.resolve([]) : original(command, args));
   });
   await page.getByTestId('ssh-row-ssh-1').dblclick();
   await expect(page.getByTestId('ssh-session-recovery')).toBeVisible();
@@ -284,12 +303,20 @@ test('deleted profiles report unavailable instead of remaining in a connecting s
 
 test('block mode has no top toolbar and opens status from the existing host chip', async ({ page }) => {
   await setupTauriMock(page);
-  await page.addInitScript(() => localStorage.setItem('vrykell-agent-settings', JSON.stringify({ version: 8, state: { global: { sshOpenMode: 'block' }, overrides: {} } })));
+  await page.addInitScript(() =>
+    localStorage.setItem(
+      'vrykell-agent-settings',
+      JSON.stringify({ version: 8, state: { global: { sshOpenMode: 'block' }, overrides: {} } }),
+    ),
+  );
   await page.goto('/');
   await page.locator('[data-dock-btn="ssh"]').click();
   await page.getByTestId('ssh-row-ssh-1').dblclick();
   await expect(page.getByPlaceholder(/输入命令/).last()).toBeVisible();
-  const pane = page.locator('.terminal-pane').filter({ has: page.getByTestId('ssh-status-toggle') }).last();
+  const pane = page
+    .locator('.terminal-pane')
+    .filter({ has: page.getByTestId('ssh-status-toggle') })
+    .last();
   await expect(pane.locator('.ssh-status-toolbar')).toHaveCount(0);
   await expect(pane.getByTestId('ssh-session-toolbar')).toHaveCount(0);
   const entry = pane.getByTestId('ssh-status-toggle');
@@ -301,7 +328,9 @@ test('block mode has no top toolbar and opens status from the existing host chip
   await entry.click();
   const panel = page.getByTestId('ssh-status-panel');
   await expect(panel).toContainText('Linux 6.8');
-  await expect.poll(async () => Math.round((await panel.boundingBox())!.y - (await page.locator('.workspace-body').boundingBox())!.y)).toBe(0);
+  await expect
+    .poll(async () => Math.round((await panel.boundingBox())!.y - (await page.locator('.workspace-body').boundingBox())!.y))
+    .toBe(0);
   await expectDockedStatus(page);
   const editor = pane.locator('[data-terminal-input]');
   const editorBox = (await editor.boundingBox())!;

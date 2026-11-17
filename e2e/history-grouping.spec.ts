@@ -2,11 +2,12 @@ import { expect, test, type Locator, type Page } from '@playwright/test';
 import { ensureTabsOpen, setupTauriMock } from './tauri-mock';
 import { fillHistorySearch } from './history-search';
 
-const markerColor = (card: Locator) => card.locator('.history-group-marker').evaluate(element => getComputedStyle(element, '::before').backgroundColor);
+const markerColor = (card: Locator) =>
+  card.locator('.history-group-marker').evaluate((element) => getComputedStyle(element, '::before').backgroundColor);
 
 async function expectStableRecordHover(record: Locator) {
   const content = record.locator('.sidebar-row-content');
-  const background = await content.evaluate(element => getComputedStyle(element).backgroundColor);
+  const background = await content.evaluate((element) => getComputedStyle(element).backgroundColor);
   await record.hover();
   await expect(record.locator('.sidebar-row-action')).toHaveCSS('opacity', '1');
   await expect(content).toHaveCSS('background-color', background);
@@ -18,17 +19,23 @@ async function expectStableRecordHover(record: Locator) {
 async function expectResponsiveTimestamp(card: Locator) {
   const timestamp = card.locator('time');
   await expect(timestamp).toHaveAttribute('datetime', /^\d{4}-/);
-  if (await card.evaluate(element => element.clientWidth <= 480)) await expect(timestamp).toBeHidden();
+  if (await card.evaluate((element) => element.clientWidth <= 480)) await expect(timestamp).toBeHidden();
   else await expect(timestamp).toBeVisible();
 }
 
 async function seedSessionHistory(page: Page) {
   await page.evaluate(() => {
-    const internal = (window as unknown as { __TAURI_INTERNALS__: { invoke: (command: string, args: Record<string, unknown>) => Promise<unknown> } }).__TAURI_INTERNALS__;
+    const internal = (
+      window as unknown as { __TAURI_INTERNALS__: { invoke: (command: string, args: Record<string, unknown>) => Promise<unknown> } }
+    ).__TAURI_INTERNALS__;
     const original = internal.invoke;
     const now = Date.now();
-    const local = (id: string, shellType: string, cwd: string) => JSON.stringify({ layout: { type: 'leaf', terminal: { id, kind: 'local', shellType, cwd } } });
-    const remote = (id: string, host: string) => JSON.stringify({ layout: { type: 'leaf', terminal: { id, kind: 'ssh', cwd: '/srv/app', ssh: { host, user: 'dev' }, openMode: 'classic' } } });
+    const local = (id: string, shellType: string, cwd: string) =>
+      JSON.stringify({ layout: { type: 'leaf', terminal: { id, kind: 'local', shellType, cwd } } });
+    const remote = (id: string, host: string) =>
+      JSON.stringify({
+        layout: { type: 'leaf', terminal: { id, kind: 'ssh', cwd: '/srv/app', ssh: { host, user: 'dev' }, openMode: 'classic' } },
+      });
     const items = [
       { id: 'local', title: 'Local Bash', cwd: '/srv/app', payload: local('local#0', 'bash', '/srv/app') },
       { id: 'cmd', title: 'Local CMD', cwd: 'C:/work', payload: local('cmd#0', 'cmd', 'C:/work') },
@@ -36,10 +43,24 @@ async function seedSessionHistory(page: Page) {
       { id: 'remote-a', title: 'Deploy Alpha', cwd: '', payload: remote('remote-a#0', 'alpha.test') },
       { id: 'remote-b', title: 'Deploy Beta', cwd: '', payload: remote('remote-b#0', 'beta.test') },
       { id: 'remote-unknown', title: 'Missing directory', cwd: '', payload: remote('remote-unknown#0', 'unknown.test') },
-    ].map((item, index) => ({ status: 'historical', kind: 'local', created_at: now, closed_at: now - index * 1000, block_count: 1, sort_order: index, group_id: 'old-group', ...item }));
+    ].map((item, index) => ({
+      status: 'historical',
+      kind: 'local',
+      created_at: now,
+      closed_at: now - index * 1000,
+      block_count: 1,
+      sort_order: index,
+      group_id: 'old-group',
+      ...item,
+    }));
     internal.invoke = async (command, args) => {
       if (command === 'list_sessions') return items;
-      if (command === 'history_page') return { ...await original(command, args) as Record<string, unknown>, sessions: (args.request as { source: string }).source === 'conversation' ? [] : items, nextCursor: null };
+      if (command === 'history_page')
+        return {
+          ...((await original(command, args)) as Record<string, unknown>),
+          sessions: (args.request as { source: string }).source === 'conversation' ? [] : items,
+          nextCursor: null,
+        };
       return original(command, args);
     };
   });
@@ -72,7 +93,10 @@ test('session grouping separates remote directories and combines connection filt
   await page.screenshot({ path: testInfo.outputPath('history-toolbar-narrow-tooltip.png'), animations: 'disabled' });
   await page.setViewportSize({ width: 1240, height: 700 });
   await groupBy.click();
-  await expect(page.getByTestId('unified-history-group-menu').getByRole('button', { name: '按天', exact: true })).toHaveAttribute('aria-pressed', 'true');
+  await expect(page.getByTestId('unified-history-group-menu').getByRole('button', { name: '按天', exact: true })).toHaveAttribute(
+    'aria-pressed',
+    'true',
+  );
   await expect(page.getByTestId('unified-history-group-menu').getByRole('button', { name: '终端启动模式', exact: true })).toHaveCount(0);
   await page.getByTestId('unified-history-group-menu').getByRole('button', { name: '终端类型', exact: true }).click();
   await expect(page.getByTestId('history-group-card-terminal:bash')).toBeVisible();
@@ -100,20 +124,28 @@ test('session grouping separates remote directories and combines connection filt
   await expect(page.locator('.history-group-card')).toHaveCount(2);
   const groupNames = () => page.locator('.history-group-title-text').allTextContents();
   const names = await groupNames();
-  for (const [sort, ids] of [['标题正序', ['unified-history-session:remote-a', 'unified-history-session:remote-z']], ['标题倒序', ['unified-history-session:remote-z', 'unified-history-session:remote-a']]] as const) {
+  for (const [sort, ids] of [
+    ['标题正序', ['unified-history-session:remote-a', 'unified-history-session:remote-z']],
+    ['标题倒序', ['unified-history-session:remote-z', 'unified-history-session:remote-a']],
+  ] as const) {
     await page.getByTestId('unified-history-sort').click();
     await page.getByTestId('unified-history-sort-menu').getByRole('button', { name: sort, exact: true }).click();
-    await expect.poll(() => alpha.locator('.history-row').evaluateAll(rows => rows.map(row => row.getAttribute('data-testid')))).toEqual([...ids]);
+    await expect
+      .poll(() => alpha.locator('.history-row').evaluateAll((rows) => rows.map((row) => row.getAttribute('data-testid'))))
+      .toEqual([...ids]);
     expect(await groupNames()).toEqual(names);
   }
   expect(await markerColor(alpha)).toBe(color);
   await groupBy.click();
   await page.getByTestId('unified-history-group-menu').getByRole('button', { name: '终端类型', exact: true }).click();
   await expect(page.getByTestId('history-group-card-terminal:ssh').locator('.history-row')).toHaveCount(3);
-  if (!await page.getByTestId('unified-history-search').isVisible()) await page.getByTestId('history-search-toggle').click();
+  if (!(await page.getByTestId('unified-history-search').isVisible())) await page.getByTestId('history-search-toggle').click();
   await expect(page.getByTestId('unified-history-search')).toHaveValue('Deploy');
   await page.getByTestId('unified-history-filter').click();
-  await expect(page.getByTestId('unified-history-filter-menu').getByRole('button', { name: 'SSH', exact: true })).toHaveAttribute('aria-pressed', 'true');
+  await expect(page.getByTestId('unified-history-filter-menu').getByRole('button', { name: 'SSH', exact: true })).toHaveAttribute(
+    'aria-pressed',
+    'true',
+  );
 });
 
 test('AI history groups by working directory and conversation type and uses settings card colors', async ({ page }) => {
@@ -123,18 +155,33 @@ test('AI history groups by working directory and conversation type and uses sett
   await page.locator('[data-dock-btn="settings"]').click();
   const settingsCard = page.locator('.settings-group-panel').first();
   await expect(settingsCard).toBeVisible();
-  const settingsStyle = await settingsCard.evaluate(element => {
+  const settingsStyle = await settingsCard.evaluate((element) => {
     const style = getComputedStyle(element);
     return { background: style.backgroundColor, border: style.borderTopColor, radius: style.borderTopLeftRadius };
   });
 
   await page.evaluate(() => {
     const now = Date.now();
-    localStorage.setItem('e2e-conversations', JSON.stringify([
-      { id: 'history-local', title: 'Project conversation', created_at: now - 1000, updated_at: now, environment: JSON.stringify({ paneId: 't1', label: 'Project terminal', kind: 'local', cwd: '/home/e2e/project' }) },
-      { id: 'history-discussion', title: 'Planning discussion', created_at: now - 2000, updated_at: now - 2000, environment: 'null' },
-      { id: 'history-no-cwd', title: 'Local session without directory', created_at: now - 3000, updated_at: now - 3000, environment: JSON.stringify({ paneId: 't1', label: 'Local terminal', kind: 'local', cwd: '' }) },
-    ]));
+    localStorage.setItem(
+      'e2e-conversations',
+      JSON.stringify([
+        {
+          id: 'history-local',
+          title: 'Project conversation',
+          created_at: now - 1000,
+          updated_at: now,
+          environment: JSON.stringify({ paneId: 't1', label: 'Project terminal', kind: 'local', cwd: '/home/e2e/project' }),
+        },
+        { id: 'history-discussion', title: 'Planning discussion', created_at: now - 2000, updated_at: now - 2000, environment: 'null' },
+        {
+          id: 'history-no-cwd',
+          title: 'Local session without directory',
+          created_at: now - 3000,
+          updated_at: now - 3000,
+          environment: JSON.stringify({ paneId: 't1', label: 'Local terminal', kind: 'local', cwd: '' }),
+        },
+      ]),
+    );
   });
   await page.reload();
   await expect(page.locator('[data-terminal-input]')).toBeVisible();
@@ -147,7 +194,7 @@ test('AI history groups by working directory and conversation type and uses sett
   const card = page.locator('.history-group-card').first();
   await expect(card).toBeVisible();
   await expectResponsiveTimestamp(card);
-  const historyStyle = await card.evaluate(element => {
+  const historyStyle = await card.evaluate((element) => {
     const style = getComputedStyle(element);
     return { background: style.backgroundColor, border: style.borderTopColor, radius: style.borderTopLeftRadius };
   });
@@ -169,8 +216,14 @@ test('AI history groups by working directory and conversation type and uses sett
   const color = await markerColor(localCard);
   expect(color).not.toBe(await markerColor(discussionCard));
   for (const selector of ['.history-group-count', '.sidebar-row-title', '.history-row-icon']) {
-    const localColor = await localCard.locator(selector).first().evaluate(element => getComputedStyle(element).color);
-    const discussionColor = await discussionCard.locator(selector).first().evaluate(element => getComputedStyle(element).color);
+    const localColor = await localCard
+      .locator(selector)
+      .first()
+      .evaluate((element) => getComputedStyle(element).color);
+    const discussionColor = await discussionCard
+      .locator(selector)
+      .first()
+      .evaluate((element) => getComputedStyle(element).color);
     expect(localColor).toBe(discussionColor);
     expect(localColor).not.toBe(color);
   }
@@ -220,7 +273,7 @@ test('session date basis survives title sorting, regrouping and reopening', asyn
   await page.getByTestId('workspace-area-terminal').click();
   await page.getByTestId('tab-history-btn').click();
   const search = page.getByTestId('unified-history-search');
-  if (!await search.isVisible()) await page.getByTestId('history-search-toggle').first().click();
+  if (!(await search.isVisible())) await page.getByTestId('history-search-toggle').first().click();
   await expect(search).toHaveValue('Deploy');
   await expect(page.locator('.history-row')).toHaveCount(3);
 });
@@ -231,11 +284,20 @@ test('AI remote directory grouping retains the selected date basis and search af
   await expect(page.locator('[data-terminal-input]')).toBeVisible();
   await page.evaluate(() => {
     const now = Date.now();
-    const environment = JSON.stringify({ paneId: 'old-remote', label: 'Remote terminal', kind: 'ssh', cwd: '/srv/app', ssh: { host: 'alpha.test', user: 'dev' } });
-    localStorage.setItem('e2e-conversations', JSON.stringify([
-      { id: 'old-created', title: 'Deploy Alpha', created_at: now - 40 * 86400000, updated_at: now, environment },
-      { id: 'new-created', title: 'Deploy Zebra', created_at: now, updated_at: now, environment },
-    ]));
+    const environment = JSON.stringify({
+      paneId: 'old-remote',
+      label: 'Remote terminal',
+      kind: 'ssh',
+      cwd: '/srv/app',
+      ssh: { host: 'alpha.test', user: 'dev' },
+    });
+    localStorage.setItem(
+      'e2e-conversations',
+      JSON.stringify([
+        { id: 'old-created', title: 'Deploy Alpha', created_at: now - 40 * 86400000, updated_at: now, environment },
+        { id: 'new-created', title: 'Deploy Zebra', created_at: now, updated_at: now, environment },
+      ]),
+    );
   });
   await page.reload();
   await expect(page.locator('[data-terminal-input]')).toBeVisible();
@@ -280,18 +342,18 @@ test('card metadata stays outside the collapse button at normal and maximum UI f
   await ensureTabsOpen(page);
   await page.getByTestId('tab-history-btn').click();
   for (const size of [13, 18]) {
-    await page.evaluate(async uiFontSize => {
+    await page.evaluate(async (uiFontSize) => {
       const path = '/src/config/typography.ts';
-      const { useTypographyStore } = await import(path) as typeof import('../src/config/typography');
+      const { useTypographyStore } = (await import(path)) as typeof import('../src/config/typography');
       useTypographyStore.getState().update({ uiFontSize });
     }, size);
     const card = page.locator('.history-group-card').first();
     const toggle = card.locator('.history-group-toggle');
     await toggle.hover();
     await expect(toggle).toHaveCSS('width', '28px');
-    expect(await card.locator('.history-group-count').evaluate(element => element.closest('button') === null)).toBe(true);
-    expect(await card.locator('time').evaluate(element => element.closest('button') === null)).toBe(true);
-    const fits = await toggle.evaluate(element => {
+    expect(await card.locator('.history-group-count').evaluate((element) => element.closest('button') === null)).toBe(true);
+    expect(await card.locator('time').evaluate((element) => element.closest('button') === null)).toBe(true);
+    const fits = await toggle.evaluate((element) => {
       const outer = element.getBoundingClientRect();
       const icon = element.querySelector('svg')!.getBoundingClientRect();
       return icon.left >= outer.left + 4 && icon.right <= outer.right - 4 && icon.top >= outer.top + 4 && icon.bottom <= outer.bottom - 4;

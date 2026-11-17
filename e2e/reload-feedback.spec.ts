@@ -13,7 +13,10 @@ test('theme reload spins until loading completes and honors reduced motion', asy
     };
     const original = scope.__TAURI_INTERNALS__.invoke;
     scope.__TAURI_INTERNALS__.invoke = async (cmd, args) => {
-      if (cmd === 'get_theme_config') await new Promise<void>(resolve => { scope.__finishThemeReload = resolve; });
+      if (cmd === 'get_theme_config')
+        await new Promise<void>((resolve) => {
+          scope.__finishThemeReload = resolve;
+        });
       return original(cmd, args);
     };
   });
@@ -37,10 +40,13 @@ test('terminal context chips retain spacing without separator dots', async ({ pa
   await expect(page.getByPlaceholder(/输入命令/)).toBeVisible();
   await page.evaluate(async () => {
     const path = '/src/features/terminal/stores/blocks.ts';
-    const { useBlockStore } = await import(path) as typeof import('../src/features/terminal/stores/blocks');
+    const { useBlockStore } = (await import(path)) as typeof import('../src/features/terminal/stores/blocks');
     const state = useBlockStore.getState();
     for (const [paneId, blocks] of Object.entries(state.byTab)) {
-      state.setBlocks(paneId, blocks.map(block => ({ ...block, gitBranch: 'dev' })));
+      state.setBlocks(
+        paneId,
+        blocks.map((block) => ({ ...block, gitBranch: 'dev' })),
+      );
     }
   });
   const status = page.locator('.terminal-input-status:visible').first();
@@ -49,7 +55,7 @@ test('terminal context chips retain spacing without separator dots', async ({ pa
   await expect(status).not.toContainText('·');
   await expect(status).toHaveCSS('gap', '6px');
   const chips = await status.locator('.terminal-chip').all();
-  const bounds = await Promise.all(chips.map(chip => chip.boundingBox()));
+  const bounds = await Promise.all(chips.map((chip) => chip.boundingBox()));
   for (let index = 1; index < bounds.length; index++) {
     expect(bounds[index]!.x - bounds[index - 1]!.x - bounds[index - 1]!.width).toBeGreaterThanOrEqual(5);
   }

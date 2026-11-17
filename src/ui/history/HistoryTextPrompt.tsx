@@ -9,7 +9,18 @@ import { useFloatingPanelPosition } from '../hooks/useFloatingPanelPosition';
 import type { MenuAnchor } from '@ui/menus/ContextMenu';
 
 /** Floating single-value editor used by history notes; Enter (or Ctrl+Enter in the text area) saves. */
-export default function HistoryTextPrompt({ anchor, label, placeholder, value, multiline = false, allowEmpty = true, saveLabel, onSave, onClose, testId }: {
+export default function HistoryTextPrompt({
+  anchor,
+  label,
+  placeholder,
+  value,
+  multiline = false,
+  allowEmpty = true,
+  saveLabel,
+  onSave,
+  onClose,
+  testId,
+}: {
   anchor: MenuAnchor;
   label: string;
   placeholder: string;
@@ -25,11 +36,17 @@ export default function HistoryTextPrompt({ anchor, label, placeholder, value, m
   const ref = useRef<HTMLDivElement>(null);
   const [text, setText] = useState(value);
   useExclusiveMenu(ref, onClose);
-  const close = () => { anchor.trigger?.focus(); onClose(); };
+  const close = () => {
+    anchor.trigger?.focus();
+    onClose();
+  };
 
   useEffect(() => {
     const onKey = (event: globalThis.KeyboardEvent) => {
-      if (event.key === 'Escape') { anchor.trigger?.focus(); onClose(); }
+      if (event.key === 'Escape') {
+        anchor.trigger?.focus();
+        onClose();
+      }
     };
     document.addEventListener('keydown', onKey);
     return () => document.removeEventListener('keydown', onKey);
@@ -50,16 +67,53 @@ export default function HistoryTextPrompt({ anchor, label, placeholder, value, m
     }
   };
 
-  return createPortal(<div ref={ref} role="dialog" aria-label={label} data-testid={testId} className="workspace-floating history-text-prompt" style={{ ...position, width, maxWidth: 'calc(100vw - 16px)', maxHeight: 'calc(100vh - 16px)', overflowY: 'auto' }}>
-    <div className="history-prompt-label">{label}</div>
-    {multiline
-      ? <TextArea autoFocus autoSizeMaxHeight={180} className="history-prompt-input" rows={3} aria-label={label} placeholder={placeholder}
-        value={text} onChange={event => setText(event.target.value)} onKeyDown={onKeyDown} />
-      : <InlineRenameInput autoFocus className="history-prompt-input" aria-label={label} placeholder={placeholder}
-        value={text} onChange={event => setText(event.target.value)} onKeyDown={onKeyDown} />}
-    <div className="history-prompt-actions">
-      <OutlineButton className="history-prompt-action" data-testid={`${testId}-cancel`} onClick={close}>{t('Cancel')}</OutlineButton>
-      <button type="button" className="history-prompt-action" data-primary disabled={!allowEmpty && !text.trim()} data-testid={`${testId}-save`} onClick={save}>{saveLabel}</button>
-    </div>
-  </div>, document.body);
+  return createPortal(
+    <div
+      ref={ref}
+      role="dialog"
+      aria-label={label}
+      data-testid={testId}
+      className="workspace-floating history-text-prompt"
+      style={{ ...position, width, maxWidth: 'calc(100vw - 16px)', maxHeight: 'calc(100vh - 16px)', overflowY: 'auto' }}>
+      <div className="history-prompt-label">{label}</div>
+      {multiline ? (
+        <TextArea
+          autoFocus
+          autoSizeMaxHeight={180}
+          className="history-prompt-input"
+          rows={3}
+          aria-label={label}
+          placeholder={placeholder}
+          value={text}
+          onChange={(event) => setText(event.target.value)}
+          onKeyDown={onKeyDown}
+        />
+      ) : (
+        <InlineRenameInput
+          autoFocus
+          className="history-prompt-input"
+          aria-label={label}
+          placeholder={placeholder}
+          value={text}
+          onChange={(event) => setText(event.target.value)}
+          onKeyDown={onKeyDown}
+        />
+      )}
+      <div className="history-prompt-actions">
+        <OutlineButton className="history-prompt-action" data-testid={`${testId}-cancel`} onClick={close}>
+          {t('Cancel')}
+        </OutlineButton>
+        <button
+          type="button"
+          className="history-prompt-action"
+          data-primary
+          disabled={!allowEmpty && !text.trim()}
+          data-testid={`${testId}-save`}
+          onClick={save}>
+          {saveLabel}
+        </button>
+      </div>
+    </div>,
+    document.body,
+  );
 }

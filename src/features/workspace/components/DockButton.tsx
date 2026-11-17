@@ -25,25 +25,36 @@ export default function DockButton({ panelId, active, side, fixed = false, onCli
   const label = t(`dock.${panelId}`);
   const action = active ? t('dock.close') : t('dock.open');
   const Icon = panelId === 'chat' ? AiSessionIcon : def.icon;
-  const accessibleLabel = panelId === 'settings' ? t(active ? 'Close settings' : 'Open settings') : t('{{action}} {{panel}}', { action, panel: label });
+  const accessibleLabel =
+    panelId === 'settings' ? t(active ? 'Close settings' : 'Open settings') : t('{{action}} {{panel}}', { action, panel: label });
 
   if (side === 'left') {
-    return <SidebarItem compact title={label} icon={<Icon size={iconSizes.row} />} active={active}
-      tooltip={accessibleLabel} testId={`dock-${panelId}`} tabIndex={0}
-      dataAttributes={{
-        'data-dock-btn': panelId,
-        'data-dock-fixed': fixed ? 'true' : undefined,
-        role: 'button',
-        'aria-label': label,
-        'aria-pressed': String(active),
-      }}
-      onClick={onClick} onPointerDown={onPointerDown}
-      onKeyDown={event => {
-        if (event.key === 'Enter' || event.key === ' ') {
-          event.preventDefault();
-          onClick?.();
-        }
-      }} />;
+    return (
+      <SidebarItem
+        compact
+        title={label}
+        icon={<Icon size={iconSizes.row} />}
+        active={active}
+        tooltip={accessibleLabel}
+        testId={`dock-${panelId}`}
+        tabIndex={0}
+        dataAttributes={{
+          'data-dock-btn': panelId,
+          'data-dock-fixed': fixed ? 'true' : undefined,
+          role: 'button',
+          'aria-label': label,
+          'aria-pressed': String(active),
+        }}
+        onClick={onClick}
+        onPointerDown={onPointerDown}
+        onKeyDown={(event) => {
+          if (event.key === 'Enter' || event.key === ' ') {
+            event.preventDefault();
+            onClick?.();
+          }
+        }}
+      />
+    );
   }
 
   return (
@@ -60,8 +71,7 @@ export default function DockButton({ panelId, active, side, fixed = false, onCli
         className: panelId === 'settings' ? 'activity-button workspace-settings' : 'activity-button',
         draggable: false,
         onPointerDown,
-      }}
-    >
+      }}>
       <Icon size={iconSizes.navigation} />
     </ToolbarBtn>
   );

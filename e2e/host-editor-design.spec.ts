@@ -2,97 +2,134 @@ import { expect, test } from '@playwright/test';
 import { setupTauriMock, emitPtyOutput, expectAnyTermContains } from './tauri-mock';
 import { gotoSetting } from './settings';
 
-for (const theme of ['dark', 'light']) test(`host editor and toolbars match the prototype in ${theme}`, async ({ page }, info) => {
-  await setupTauriMock(page, {});
-  await page.addInitScript(theme => { localStorage.setItem('vrykell-theme-mode', theme); localStorage.setItem('vrykell-startup-mode', 'empty'); }, theme);
-  await page.goto('/');
-  await page.evaluate(() => { document.documentElement.dataset.nativeMaterial = 'fallback'; });
-  const terminal = page.getByTestId('start-page');
-  await expect(terminal.getByTestId('terminal-start-new')).toBeVisible();
-  await page.screenshot({ path: info.outputPath(`terminal-${theme}.png`), animations: 'disabled' });
-  await page.getByTestId('workspace-area-ai').click();
-  const ai = page.getByTestId('ai-start-page');
-  await expect(ai.getByTestId('ai-start-new-conversation')).toBeVisible();
-  await page.getByTestId('ai-start-agents').click();
-  const picker = page.getByRole('dialog', { name: 'ACP', exact: true });
-  await expect(picker).toHaveClass(/new-tab-dialog/);
-  await expect(picker).toHaveAttribute('aria-modal', 'false');
-  await page.keyboard.press('Escape');
-  await expect(ai.getByTestId('ai-start-new-conversation')).toBeVisible();
-  await page.screenshot({ path: info.outputPath(`ai-${theme}.png`), animations: 'disabled' });
-  await page.getByTestId('workspace-area-ssh').click();
-  for (const width of [1240, 780, 560]) {
-    await page.setViewportSize({ width, height: 860 });
-    const controls = await page.locator('.ssh-host-primary-actions > *').evaluateAll(elements => elements.map(element => { const box = element.getBoundingClientRect(); return box.y + box.height / 2; }));
-    expect(Math.max(...controls) - Math.min(...controls)).toBeLessThan(2);
-    expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBe(width);
-    await page.screenshot({ path: info.outputPath(`hosts-${theme}-${width}.png`), animations: 'disabled' });
-  }
-  await page.getByTestId('ssh-new-btn').click();
-  await expect(page.getByTestId('ssh-host-editor')).toBeVisible();
-  const addVariable = page.getByTestId('ssh-env-add'); const addForward = page.getByTestId('ssh-forward-add');
-  await expect(page.getByTestId('ssh-host-editor').getByText('暂无转发规则，添加规则以映射端口。', { exact: true })).toHaveCount(0);
-  const addStyles = async (button: typeof addVariable) => button.evaluate(element => {
-    const style = getComputedStyle(element); return { color: style.color, padding: style.padding, justifyContent: style.justifyContent };
+for (const theme of ['dark', 'light'])
+  test(`host editor and toolbars match the prototype in ${theme}`, async ({ page }, info) => {
+    await setupTauriMock(page, {});
+    await page.addInitScript((theme) => {
+      localStorage.setItem('vrykell-theme-mode', theme);
+      localStorage.setItem('vrykell-startup-mode', 'empty');
+    }, theme);
+    await page.goto('/');
+    await page.evaluate(() => {
+      document.documentElement.dataset.nativeMaterial = 'fallback';
+    });
+    const terminal = page.getByTestId('start-page');
+    await expect(terminal.getByTestId('terminal-start-new')).toBeVisible();
+    await page.screenshot({ path: info.outputPath(`terminal-${theme}.png`), animations: 'disabled' });
+    await page.getByTestId('workspace-area-ai').click();
+    const ai = page.getByTestId('ai-start-page');
+    await expect(ai.getByTestId('ai-start-new-conversation')).toBeVisible();
+    await page.getByTestId('ai-start-agents').click();
+    const picker = page.getByRole('dialog', { name: 'ACP', exact: true });
+    await expect(picker).toHaveClass(/new-tab-dialog/);
+    await expect(picker).toHaveAttribute('aria-modal', 'false');
+    await page.keyboard.press('Escape');
+    await expect(ai.getByTestId('ai-start-new-conversation')).toBeVisible();
+    await page.screenshot({ path: info.outputPath(`ai-${theme}.png`), animations: 'disabled' });
+    await page.getByTestId('workspace-area-ssh').click();
+    for (const width of [1240, 780, 560]) {
+      await page.setViewportSize({ width, height: 860 });
+      const controls = await page.locator('.ssh-host-primary-actions > *').evaluateAll((elements) =>
+        elements.map((element) => {
+          const box = element.getBoundingClientRect();
+          return box.y + box.height / 2;
+        }),
+      );
+      expect(Math.max(...controls) - Math.min(...controls)).toBeLessThan(2);
+      expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBe(width);
+      await page.screenshot({ path: info.outputPath(`hosts-${theme}-${width}.png`), animations: 'disabled' });
+    }
+    await page.getByTestId('ssh-new-btn').click();
+    await expect(page.getByTestId('ssh-host-editor')).toBeVisible();
+    const addVariable = page.getByTestId('ssh-env-add');
+    const addForward = page.getByTestId('ssh-forward-add');
+    await expect(page.getByTestId('ssh-host-editor').getByText('暂无转发规则，添加规则以映射端口。', { exact: true })).toHaveCount(0);
+    const addStyles = async (button: typeof addVariable) =>
+      button.evaluate((element) => {
+        const style = getComputedStyle(element);
+        return { color: style.color, padding: style.padding, justifyContent: style.justifyContent };
+      });
+    expect(await addStyles(addForward)).toEqual(await addStyles(addVariable));
+    await expect(page.getByRole('dialog', { name: 'SSH 连接', exact: true })).toHaveCount(0);
+    await page.getByTestId('ssh-form-name').fill('prod-api-tokyo');
+    await page.getByTestId('ssh-form-host').fill('43.206.118.27');
+    await page.getByTestId('ssh-form-user').fill('deploy');
+    const favorite = page.getByRole('button', { name: '收藏主机', exact: true });
+    await favorite.hover();
+    await expect(favorite).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
+    await favorite.click();
+    const selectedFavorite = page.getByRole('button', { name: '取消收藏主机', exact: true });
+    await selectedFavorite.focus();
+    await expect(selectedFavorite).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
+    await selectedFavorite.blur();
+    await page.mouse.move(0, 0);
+    await expect(selectedFavorite).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
+    expect(await selectedFavorite.locator('svg').evaluate((element) => (element as SVGElement).style.color)).toBe('var(--favorite-color)');
+    await page.getByRole('combobox', { name: '已有分组' }).click();
+    await page.getByRole('button', { name: '新建分组…', exact: true }).click();
+    await page.getByTestId('ssh-form-group').fill('Production');
+    await page.getByTestId('ssh-form-group').press('Enter');
+    await page.getByTestId('ssh-form-tag').fill('production');
+    await page.getByTestId('ssh-form-tag').press('Enter');
+    await page.getByTestId('ssh-form-tag').fill('api');
+    await page.getByTestId('ssh-form-tag').press('Enter');
+    await page.getByRole('button', { name: '管理代理', exact: true }).click();
+    const proxy = page.getByRole('dialog', { name: '管理代理', exact: true });
+    await proxy.getByTestId('proxy-name').fill('Office proxy');
+    await proxy.getByTestId('proxy-host').fill('127.0.0.1');
+    await proxy.getByTestId('proxy-password').fill('never-return-this');
+    await proxy.getByTestId('proxy-save').click();
+    await expect(proxy.getByTestId('proxy-password')).toHaveValue('');
+    await proxy.getByRole('button', { name: '关闭', exact: true }).click();
+    await page.getByRole('combobox', { name: '代理', exact: true }).click();
+    await page.getByRole('option', { name: 'Office proxy', exact: true }).click();
+    await page.getByTestId('ssh-env-add').click();
+    await page.getByTestId('ssh-env-name-0').fill('LANG');
+    await page.getByTestId('ssh-env-value-0').fill('en_US.UTF-8');
+    await page.getByTestId('ssh-form-notes').fill('Inventory notes');
+    await page.getByTestId('ssh-form-ai-notes').fill('Do not restart the production database.');
+    for (const width of [560, 1240]) {
+      await page.setViewportSize({ width, height: 860 });
+      await page.getByTestId('ssh-form-name').scrollIntoViewIfNeeded();
+      expect(await page.getByTestId('ssh-host-editor').evaluate((element) => element.scrollWidth <= element.clientWidth)).toBe(true);
+      await page.screenshot({ path: info.outputPath(`editor-top-${theme}-${width}.png`), animations: 'disabled' });
+      await page.getByTestId('ssh-form-ai-notes').scrollIntoViewIfNeeded();
+      await page.screenshot({ path: info.outputPath(`editor-bottom-${theme}-${width}.png`), animations: 'disabled' });
+    }
+    await page.getByTestId('ssh-save-btn').click();
+    const row = page.locator('.ssh-host-list [data-testid^="ssh-row-"]').filter({ hasText: 'prod-api-tokyo' });
+    await expect(row).toBeVisible();
+    await row.click({ button: 'right' });
+    await page.getByRole('button', { name: '编辑连接', exact: true }).click();
+    await expect(page.getByTestId('ssh-form-port')).toHaveValue('22');
+    await expect(page.getByTestId('ssh-form-ai-notes')).toHaveValue('Do not restart the production database.');
+    await expect(page.getByTestId('ssh-env-name-0')).toHaveValue('LANG');
+    await page.getByRole('button', { name: '取消', exact: true }).click();
+    await page.getByTestId('workspace-sidebar-expand').click();
+    await expect(page.getByTestId('workspace-area-dashboard')).toHaveCount(0);
+    await page.getByTestId('workspace-area-ssh').click();
+    await expect(page.getByTestId('workspace-instance-bar')).toBeHidden();
+    await page.getByRole('switch', { name: '资源占用', exact: true }).click();
+    await page.getByRole('button', { name: '表格视图', exact: true }).click();
+    expect(await page.locator('.ssh-host-list').evaluate((element) => element.scrollWidth <= element.clientWidth)).toBe(true);
+    const cell = page.locator('.ssh-host-list .sidebar-row-content').first();
+    await cell.hover();
+    await expect(cell).not.toHaveCSS('border-top-left-radius', '0px');
+    await page.screenshot({ path: info.outputPath(`dashboard-${theme}.png`), animations: 'disabled' });
   });
-  expect(await addStyles(addForward)).toEqual(await addStyles(addVariable));
-  await expect(page.getByRole('dialog', { name: 'SSH 连接', exact: true })).toHaveCount(0);
-  await page.getByTestId('ssh-form-name').fill('prod-api-tokyo');
-  await page.getByTestId('ssh-form-host').fill('43.206.118.27');
-  await page.getByTestId('ssh-form-user').fill('deploy');
-  const favorite = page.getByRole('button', { name: '收藏主机', exact: true });
-  await favorite.hover(); await expect(favorite).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
-  await favorite.click();
-  const selectedFavorite = page.getByRole('button', { name: '取消收藏主机', exact: true });
-  await selectedFavorite.focus(); await expect(selectedFavorite).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
-  await selectedFavorite.blur(); await page.mouse.move(0, 0); await expect(selectedFavorite).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
-  expect(await selectedFavorite.locator('svg').evaluate(element => (element as SVGElement).style.color)).toBe('var(--favorite-color)');
-  await page.getByRole('combobox', { name: '已有分组' }).click(); await page.getByRole('button', { name: '新建分组…', exact: true }).click();
-  await page.getByTestId('ssh-form-group').fill('Production'); await page.getByTestId('ssh-form-group').press('Enter');
-  await page.getByTestId('ssh-form-tag').fill('production'); await page.getByTestId('ssh-form-tag').press('Enter');
-  await page.getByTestId('ssh-form-tag').fill('api'); await page.getByTestId('ssh-form-tag').press('Enter');
-  await page.getByRole('button', { name: '管理代理', exact: true }).click();
-  const proxy = page.getByRole('dialog', { name: '管理代理', exact: true });
-  await proxy.getByTestId('proxy-name').fill('Office proxy'); await proxy.getByTestId('proxy-host').fill('127.0.0.1');
-  await proxy.getByTestId('proxy-password').fill('never-return-this'); await proxy.getByTestId('proxy-save').click();
-  await expect(proxy.getByTestId('proxy-password')).toHaveValue('');
-  await proxy.getByRole('button', { name: '关闭', exact: true }).click();
-  await page.getByRole('combobox', { name: '代理', exact: true }).click(); await page.getByRole('option', { name: 'Office proxy', exact: true }).click();
-  await page.getByTestId('ssh-env-add').click(); await page.getByTestId('ssh-env-name-0').fill('LANG'); await page.getByTestId('ssh-env-value-0').fill('en_US.UTF-8');
-  await page.getByTestId('ssh-form-notes').fill('Inventory notes'); await page.getByTestId('ssh-form-ai-notes').fill('Do not restart the production database.');
-  for (const width of [560, 1240]) {
-    await page.setViewportSize({ width, height: 860 });
-    await page.getByTestId('ssh-form-name').scrollIntoViewIfNeeded();
-    expect(await page.getByTestId('ssh-host-editor').evaluate(element => element.scrollWidth <= element.clientWidth)).toBe(true);
-    await page.screenshot({ path: info.outputPath(`editor-top-${theme}-${width}.png`), animations: 'disabled' });
-    await page.getByTestId('ssh-form-ai-notes').scrollIntoViewIfNeeded();
-    await page.screenshot({ path: info.outputPath(`editor-bottom-${theme}-${width}.png`), animations: 'disabled' });
-  }
-  await page.getByTestId('ssh-save-btn').click();
-  const row = page.locator('.ssh-host-list [data-testid^="ssh-row-"]').filter({ hasText: 'prod-api-tokyo' });
-  await expect(row).toBeVisible();
-  await row.click({ button: 'right' }); await page.getByRole('button', { name: '编辑连接', exact: true }).click();
-  await expect(page.getByTestId('ssh-form-port')).toHaveValue('22');
-  await expect(page.getByTestId('ssh-form-ai-notes')).toHaveValue('Do not restart the production database.');
-  await expect(page.getByTestId('ssh-env-name-0')).toHaveValue('LANG');
-  await page.getByRole('button', { name: '取消', exact: true }).click();
-  await page.getByTestId('workspace-sidebar-expand').click();
-  await expect(page.getByTestId('workspace-area-dashboard')).toHaveCount(0);
-  await page.getByTestId('workspace-area-ssh').click();
-  await expect(page.getByTestId('workspace-instance-bar')).toBeHidden();
-  await page.getByRole('switch', { name: '资源占用', exact: true }).click();
-  await page.getByRole('button', { name: '表格视图', exact: true }).click();
-  expect(await page.locator('.ssh-host-list').evaluate(element => element.scrollWidth <= element.clientWidth)).toBe(true);
-  const cell = page.locator('.ssh-host-list .sidebar-row-content').first(); await cell.hover();
-  await expect(cell).not.toHaveCSS('border-top-left-radius', '0px');
-  await page.screenshot({ path: info.outputPath(`dashboard-${theme}.png`), animations: 'disabled' });
-});
 
 test('classic cursors default to steady and persist independent blinking settings', async ({ page }) => {
-  await setupTauriMock(page, {}); await page.goto('/');
+  await setupTauriMock(page, {});
+  await page.goto('/');
   await expect(page.getByPlaceholder(/输入命令/)).toBeVisible();
-  await emitPtyOutput(page, '\x1b]133;C\x07\x1b[?1049hSTATIC TUI'); await expectAnyTermContains(page, 'STATIC TUI');
-  const blinking = () => page.evaluate(() => [...(window as unknown as { __vrykellTerms: Map<string, { options: { cursorBlink: boolean } }> }).__vrykellTerms.values()].some(terminal => terminal.options.cursorBlink));
+  await emitPtyOutput(page, '\x1b]133;C\x07\x1b[?1049hSTATIC TUI');
+  await expectAnyTermContains(page, 'STATIC TUI');
+  const blinking = () =>
+    page.evaluate(() =>
+      [...(window as unknown as { __vrykellTerms: Map<string, { options: { cursorBlink: boolean } }> }).__vrykellTerms.values()].some(
+        (terminal) => terminal.options.cursorBlink,
+      ),
+    );
   expect(await blinking()).toBe(false);
   await gotoSetting(page, '字体与显示');
   await expect(page.locator('.settings-close')).toHaveCount(0);
@@ -101,32 +138,54 @@ test('classic cursors default to steady and persist independent blinking setting
   await expect(page.locator('html')).toHaveCSS('--terminal-ime-cursor-animation', 'none');
   await page.getByRole('switch', { name: '输入法光标闪烁', exact: true }).click();
   await expect(page.locator('html')).not.toHaveCSS('--terminal-ime-cursor-animation', 'none');
-  await page.reload(); await gotoSetting(page, '字体与显示');
+  await page.reload();
+  await gotoSetting(page, '字体与显示');
   await expect(page.getByRole('switch', { name: '终端光标闪烁', exact: true })).toHaveAttribute('aria-checked', 'true');
   await expect(page.getByRole('switch', { name: '输入法光标闪烁', exact: true })).toHaveAttribute('aria-checked', 'true');
 });
 
 test('agent menus retain full-width rows, searchable models and fixed navigation icons', async ({ page }, info) => {
-  await setupTauriMock(page, {}); await page.goto('/');
+  await setupTauriMock(page, {});
+  await page.goto('/');
   await page.getByTestId('workspace-area-ai').click();
   const icon = page.getByTestId('workspace-area-ai').locator('svg').first();
-  const initialIcon = await icon.evaluate(element => element.outerHTML);
+  const initialIcon = await icon.evaluate((element) => element.outerHTML);
   const topIcon = page.locator('[data-dock-btn="chat"] svg').first();
-  const initialTopIcon = await topIcon.evaluate(element => element.outerHTML);
+  const initialTopIcon = await topIcon.evaluate((element) => element.outerHTML);
   await page.getByTestId('ai-start-agents').click();
   await page.getByTestId('acp-launcher-Fake ACP').click();
   await expect(page.getByTestId('harness-selector-model')).toBeVisible();
-  expect(await icon.evaluate(element => element.outerHTML)).toBe(initialIcon);
-  expect(await topIcon.evaluate(element => element.outerHTML)).toBe(initialTopIcon);
+  expect(await icon.evaluate((element) => element.outerHTML)).toBe(initialIcon);
+  expect(await topIcon.evaluate((element) => element.outerHTML)).toBe(initialTopIcon);
   await page.evaluate(async () => {
     const path = '/src/features/chat/stores/harness.ts';
-    const { useHarnessStore } = await import(path) as typeof import('../src/features/chat/stores/harness');
+    const { useHarnessStore } = (await import(path)) as typeof import('../src/features/chat/stores/harness');
     const [id, entry] = Object.entries(useHarnessStore.getState().byTab).find(([, session]) => !!session.sessionId)!;
-    useHarnessStore.setState(state => ({ byTab: { ...state.byTab, [id]: { ...entry, models: { currentModelId: 'model-30', availableModels: Array.from({ length: 48 }, (_, index) => ({ modelId: `model-${index}`, name: `Provider/Model ${index}`, description: `Model description ${index}` })) } } } }));
+    useHarnessStore.setState((state) => ({
+      byTab: {
+        ...state.byTab,
+        [id]: {
+          ...entry,
+          models: {
+            currentModelId: 'model-30',
+            availableModels: Array.from({ length: 48 }, (_, index) => ({
+              modelId: `model-${index}`,
+              name: `Provider/Model ${index}`,
+              description: `Model description ${index}`,
+            })),
+          },
+        },
+      },
+    }));
   });
   await page.getByTestId('harness-selector-model').click();
   const options = page.getByRole('listbox');
-  const boxes = await options.getByRole('option').evaluateAll(elements => elements.slice(0, 3).map(element => { const box = element.getBoundingClientRect(); return { y: box.y, height: box.height, width: box.width }; }));
+  const boxes = await options.getByRole('option').evaluateAll((elements) =>
+    elements.slice(0, 3).map((element) => {
+      const box = element.getBoundingClientRect();
+      return { y: box.y, height: box.height, width: box.width };
+    }),
+  );
   expect(boxes[1].y).toBeGreaterThanOrEqual(boxes[0].y + boxes[0].height - 1);
   expect(boxes[0].width).toBeGreaterThan(300);
   await page.screenshot({ path: info.outputPath('agent-model-menu.png'), animations: 'disabled' });

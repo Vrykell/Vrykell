@@ -17,17 +17,34 @@ import SettingsDialog from './SettingsDialog';
 import CustomProviderFields, { type CustomProviderDraft } from './CustomProviderFields';
 
 const metaStyle: CSSProperties = {
-  display: 'flex', alignItems: 'center', gap: 6, marginTop: 3,
-  fontSize: 'calc(10px * var(--ui-font-scale))', color: 'var(--text-muted)',
+  display: 'flex',
+  alignItems: 'center',
+  gap: 6,
+  marginTop: 3,
+  fontSize: 'calc(10px * var(--ui-font-scale))',
+  color: 'var(--text-muted)',
 };
 
 const nameStyle: CSSProperties = {
-  display: 'block', fontSize: 'calc(12px * var(--ui-font-scale))',
-  fontWeight: 'var(--fw-semibold)', color: 'var(--text-primary)',
-  overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+  display: 'block',
+  fontSize: 'calc(12px * var(--ui-font-scale))',
+  fontWeight: 'var(--fw-semibold)',
+  color: 'var(--text-primary)',
+  overflow: 'hidden',
+  textOverflow: 'ellipsis',
+  whiteSpace: 'nowrap',
 };
 
-export default function ProviderDialog({ open, rows, selectedId, flags, onSelect, onAddPreset, onAddCustom, onClose }: {
+export default function ProviderDialog({
+  open,
+  rows,
+  selectedId,
+  flags,
+  onSelect,
+  onAddPreset,
+  onAddCustom,
+  onClose,
+}: {
   open: boolean;
   rows: ProviderRow<ModelProfile>[];
   selectedId: string | null;
@@ -50,8 +67,7 @@ export default function ProviderDialog({ open, rows, selectedId, flags, onSelect
       title={view === 'list' ? t('Provider') : t('Add provider')}
       width={480}
       onBack={view !== 'list' ? () => setView(view === 'custom' ? 'presets' : 'list') : undefined}
-      onClose={onClose}
-    >
+      onClose={onClose}>
       {view === 'list' ? (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
           {rows.map((row) => {
@@ -69,8 +85,7 @@ export default function ProviderDialog({ open, rows, selectedId, flags, onSelect
                 onClick={() => {
                   onSelect(row.id);
                   onClose();
-                }}
-              >
+                }}>
                 <span className="provider-option-mark">
                   <Mark size={iconSizes.row} style={{ color: modelHue(row.kind, '', row.baseUrl) }} />
                 </span>
@@ -78,12 +93,16 @@ export default function ProviderDialog({ open, rows, selectedId, flags, onSelect
                   <span style={nameStyle}>{row.name || providerLabel(row.kind)}</span>
                   <span style={metaStyle}>
                     {providerLabel(row.kind)}
-                    <span style={{
-                      display: 'inline-flex', alignItems: 'center', gap: 4,
-                      padding: '1px 6px', borderRadius: 4,
-                      background: hasKey ? 'var(--hover)' : 'transparent',
-                      border: hasKey ? 'none' : '1px solid var(--border)',
-                    }}>
+                    <span
+                      style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: 4,
+                        padding: '1px 6px',
+                        borderRadius: 4,
+                        background: hasKey ? 'var(--hover)' : 'transparent',
+                        border: hasKey ? 'none' : '1px solid var(--border)',
+                      }}>
                       <span className="provider-key-dot" data-empty={hasKey ? undefined : 'true'} aria-hidden="true" />
                       {hasKey ? t('Configured') : t('Not configured')}
                     </span>
@@ -97,16 +116,29 @@ export default function ProviderDialog({ open, rows, selectedId, flags, onSelect
             type="button"
             className="provider-option-row provider-option-add"
             data-testid="provider-dialog-add"
-            onClick={() => setView('presets')}
-          >
-            <span className="provider-option-mark"><Plus size={iconSizes.compact} /></span>
+            onClick={() => setView('presets')}>
+            <span className="provider-option-mark">
+              <Plus size={iconSizes.compact} />
+            </span>
             <span className="provider-option-name">{t('Add provider')}</span>
           </button>
         </div>
-      ) : view === 'custom' && onAddCustom ? <CustomProviderFields onAdd={async draft => { await onAddCustom(draft); onClose(); }} /> : (
+      ) : view === 'custom' && onAddCustom ? (
+        <CustomProviderFields
+          onAdd={async (draft) => {
+            await onAddCustom(draft);
+            onClose();
+          }}
+        />
+      ) : (
         <>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))', gap: 6 }}>
-            {onAddCustom && <button type="button" className="settings-preset-cell" data-testid="provider-custom" onClick={() => setView('custom')}><Plus size={15} /><span>{t('Custom provider')}</span></button>}
+            {onAddCustom && (
+              <button type="button" className="settings-preset-cell" data-testid="provider-custom" onClick={() => setView('custom')}>
+                <Plus size={15} />
+                <span>{t('Custom provider')}</span>
+              </button>
+            )}
             {MODEL_PRESETS.map((preset) => {
               const Mark = modelMark(preset.provider, preset.model, preset.baseUrl);
               return (
@@ -120,8 +152,7 @@ export default function ProviderDialog({ open, rows, selectedId, flags, onSelect
                   onClick={() => {
                     onAddPreset(preset);
                     setView('list');
-                  }}
-                >
+                  }}>
                   <Mark size={15} aria-hidden="true" />
                   <span>{preset.name}</span>
                 </button>
@@ -129,7 +160,9 @@ export default function ProviderDialog({ open, rows, selectedId, flags, onSelect
             })}
           </div>
           <span style={{ color: 'var(--text-muted)', fontSize: 'var(--fs-micro)' }}>
-            {t('Vendor names, endpoints and marks identify the services they name so a model can be filled in quickly; the app ships no third-party program or key.')}
+            {t(
+              'Vendor names, endpoints and marks identify the services they name so a model can be filled in quickly; the app ships no third-party program or key.',
+            )}
           </span>
         </>
       )}

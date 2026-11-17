@@ -49,20 +49,27 @@ function ProviderTable({ rows }: { rows: ProviderUsageRow[] }) {
                   {t('No usage was recorded in this range.')}
                 </td>
               </tr>
-            ) : paged.rows.map((row) => (
-              <tr key={row.provider} style={usageTable.row} data-testid="usage-provider-row" data-provider={row.provider}>
-                <td style={{ ...usageTable.td, ...usageTable.primary }} title={row.provider}>
-                  <VendorDot provider={row.provider} />{row.provider}
-                </td>
-                <td style={usageTable.td}>{formatTokens(row.turns)}</td>
-                <td style={usageTable.td} title={formatTokens(row.totalTokens)}>{formatCompact(row.totalTokens)}</td>
-                <td style={usageTable.td} title={formatTokens(row.inputTokens - row.cachedInputTokens)}>
-                  {formatCompact(Math.max(0, row.inputTokens - row.cachedInputTokens))}
-                </td>
-                <td style={usageTable.td} title={formatTokens(row.outputTokens)}>{formatCompact(row.outputTokens)}</td>
-                <td style={usageTable.td}>{hitRateLabel(row.cachedInputTokens, row.inputTokens)}</td>
-              </tr>
-            ))}
+            ) : (
+              paged.rows.map((row) => (
+                <tr key={row.provider} style={usageTable.row} data-testid="usage-provider-row" data-provider={row.provider}>
+                  <td style={{ ...usageTable.td, ...usageTable.primary }} title={row.provider}>
+                    <VendorDot provider={row.provider} />
+                    {row.provider}
+                  </td>
+                  <td style={usageTable.td}>{formatTokens(row.turns)}</td>
+                  <td style={usageTable.td} title={formatTokens(row.totalTokens)}>
+                    {formatCompact(row.totalTokens)}
+                  </td>
+                  <td style={usageTable.td} title={formatTokens(row.inputTokens - row.cachedInputTokens)}>
+                    {formatCompact(Math.max(0, row.inputTokens - row.cachedInputTokens))}
+                  </td>
+                  <td style={usageTable.td} title={formatTokens(row.outputTokens)}>
+                    {formatCompact(row.outputTokens)}
+                  </td>
+                  <td style={usageTable.td}>{hitRateLabel(row.cachedInputTokens, row.inputTokens)}</td>
+                </tr>
+              ))
+            )}
           </tbody>
         </table>
       </div>
@@ -96,21 +103,30 @@ function ModelTable({ rows }: { rows: ModelUsageRow[] }) {
                   {t('No usage was recorded in this range.')}
                 </td>
               </tr>
-            ) : paged.rows.map((row) => (
-              <tr key={row.key} style={usageTable.row} data-testid="usage-model-row" data-model={row.model}>
-                <td style={{ ...usageTable.td, ...usageTable.mono, ...usageTable.primary }} title={row.model}>
-                  <VendorDot provider={row.provider} model={row.model} />{row.model}
-                </td>
-                <td style={usageTable.td} title={row.provider}>{row.provider}</td>
-                <td style={usageTable.td}>{formatTokens(row.turns)}</td>
-                <td style={usageTable.td} title={formatTokens(row.totalTokens)}>{formatCompact(row.totalTokens)}</td>
-                <td style={usageTable.td} title={formatTokens(row.inputTokens - row.cachedInputTokens)}>
-                  {formatCompact(Math.max(0, row.inputTokens - row.cachedInputTokens))}
-                </td>
-                <td style={usageTable.td} title={formatTokens(row.outputTokens)}>{formatCompact(row.outputTokens)}</td>
-                <td style={usageTable.td}>{hitRateLabel(row.cachedInputTokens, row.inputTokens)}</td>
-              </tr>
-            ))}
+            ) : (
+              paged.rows.map((row) => (
+                <tr key={row.key} style={usageTable.row} data-testid="usage-model-row" data-model={row.model}>
+                  <td style={{ ...usageTable.td, ...usageTable.mono, ...usageTable.primary }} title={row.model}>
+                    <VendorDot provider={row.provider} model={row.model} />
+                    {row.model}
+                  </td>
+                  <td style={usageTable.td} title={row.provider}>
+                    {row.provider}
+                  </td>
+                  <td style={usageTable.td}>{formatTokens(row.turns)}</td>
+                  <td style={usageTable.td} title={formatTokens(row.totalTokens)}>
+                    {formatCompact(row.totalTokens)}
+                  </td>
+                  <td style={usageTable.td} title={formatTokens(row.inputTokens - row.cachedInputTokens)}>
+                    {formatCompact(Math.max(0, row.inputTokens - row.cachedInputTokens))}
+                  </td>
+                  <td style={usageTable.td} title={formatTokens(row.outputTokens)}>
+                    {formatCompact(row.outputTokens)}
+                  </td>
+                  <td style={usageTable.td}>{hitRateLabel(row.cachedInputTokens, row.inputTokens)}</td>
+                </tr>
+              ))
+            )}
           </tbody>
         </table>
       </div>

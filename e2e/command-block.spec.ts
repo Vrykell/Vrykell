@@ -56,11 +56,12 @@ test('keeps a streamed code block colored instead of flashing to plain text', as
     const observe = () => {
       new MutationObserver(() => {
         // Only follow the second reply's block; the first one warms up the editor runtime.
-        const code = [...document.querySelectorAll('.md-code-block code')].find(node => node.textContent?.includes('const value'));
+        const code = [...document.querySelectorAll('.md-code-block code')].find((node) => node.textContent?.includes('const value'));
         if (code) frames.push({ colored: code.querySelector('[data-code-token]') !== null });
       }).observe(document.body, { childList: true, characterData: true, subtree: true });
     };
-    if (document.body) observe(); else document.addEventListener('DOMContentLoaded', observe, { once: true });
+    if (document.body) observe();
+    else document.addEventListener('DOMContentLoaded', observe, { once: true });
   });
   await setupTauriMock(page);
   await page.goto('/');
@@ -73,25 +74,29 @@ test('keeps a streamed code block colored instead of flashing to plain text', as
   await expect(page.locator('.md-code-block [data-code-token="keyword.ts"]').first()).toBeVisible({ timeout: 15_000 });
 
   await expect(input).toBeEnabled();
-  await page.evaluate(reply => { (window as unknown as { __AI_REPLY__?: string }).__AI_REPLY__ = reply; }, streamed);
+  await page.evaluate((reply) => {
+    (window as unknown as { __AI_REPLY__?: string }).__AI_REPLY__ = reply;
+  }, streamed);
   await input.fill('show me the code');
   await input.press('Enter');
   const code = page.locator('.md-code-block code').filter({ hasText: 'const value29' });
   await expect(code).toHaveCount(1, { timeout: 15_000 });
   await page.waitForTimeout(250);
 
-  const frames = await page.evaluate(() => (window as unknown as { __CODE_TOKEN_FRAMES__?: { colored: boolean }[] }).__CODE_TOKEN_FRAMES__ ?? []);
-  const firstColored = frames.findIndex(frame => frame.colored);
+  const frames = await page.evaluate(
+    () => (window as unknown as { __CODE_TOKEN_FRAMES__?: { colored: boolean }[] }).__CODE_TOKEN_FRAMES__ ?? [],
+  );
+  const firstColored = frames.findIndex((frame) => frame.colored);
   expect(firstColored).toBeGreaterThanOrEqual(0);
   // After the first coloring pass, every mutation of the streaming block keeps its tokens.
-  expect(frames.slice(firstColored + 1).filter(frame => !frame.colored)).toEqual([]);
+  expect(frames.slice(firstColored + 1).filter((frame) => !frame.colored)).toEqual([]);
 });
 
 for (const mode of ['dark', 'light'] as const) {
   test(`code and table surfaces share the neutral palette in ${mode}`, async ({ page }, info) => {
     await mockAnthropic(page, '```\n17:32:10  400\n17:32:24  400  interval 14s\n```\n\n| Status | Count |\n| --- | --- |\n| Ready | 2 |');
     await setupTauriMock(page);
-    await page.addInitScript(theme => localStorage.setItem('vrykell-theme-mode', theme), mode);
+    await page.addInitScript((theme) => localStorage.setItem('vrykell-theme-mode', theme), mode);
     await page.goto('/');
     await expect(page.locator('html')).toHaveAttribute('data-theme', mode);
     await page.locator('[data-dock-btn="chat"]').click();
@@ -110,7 +115,7 @@ for (const mode of ['dark', 'light'] as const) {
     });
     for (const width of [1240, 760]) {
       await page.setViewportSize({ width, height: 800 });
-      const colors = await frame.evaluate(element => {
+      const colors = await frame.evaluate((element) => {
         const root = getComputedStyle(document.documentElement);
         const probe = document.createElement('div');
         element.append(probe);
@@ -128,7 +133,7 @@ for (const mode of ['dark', 'light'] as const) {
           header: getComputedStyle(header).backgroundColor,
           table: getComputedStyle(table).backgroundColor,
           tableHeader: getComputedStyle(table.querySelector('th')!).backgroundColor,
-          borders: [element, header, table].map(node => getComputedStyle(node).borderBottomColor),
+          borders: [element, header, table].map((node) => getComputedStyle(node).borderBottomColor),
           fits: element.getBoundingClientRect().right <= window.innerWidth,
         };
       });

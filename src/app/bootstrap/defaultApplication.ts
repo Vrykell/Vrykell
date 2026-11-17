@@ -22,7 +22,7 @@ let restoreTask: ReturnType<typeof createSharedStartupTask> | undefined;
 function closeStalePtySessions(): Promise<void> {
   staleSessionsClosed ??= ptyCloseAll()
     .then(() => undefined)
-    .catch(error => {
+    .catch((error) => {
       console.warn('[terminal] failed to close stale PTY sessions:', error);
     });
   return staleSessionsClosed;
@@ -34,35 +34,43 @@ export function startDefaultApplication(): () => void {
     console.warn(`[application] ${message}:`, error);
     useToastStore.getState().addToast(`${message}：${String((error as Error)?.message ?? error)}`, 'error');
   };
-  return createApplicationBootstrap({
-    configureAgentStream: () => {
-      setDefaultStream(agentStream);
-      void useChatStore.getState().loadConversations();
-    },
-    refreshAiConfig,
-    refreshToolPolicy,
-    subscribeAutoTitle: initAutoTitle,
-    restoreWorkspace: () => {
-      restoreTask ??= createSharedStartupTask(async () => {
-        // A page reload keeps the backend and its PTY sessions alive; terminate the
-        // previous page's shells before the restored tabs start their own.
-        await closeStalePtySessions();
-        const launchDirectory = await getShellLaunchDirectory().catch(error => {
-          reportFailure(t('Could not open the requested directory'), error);
-          return null;
+  return createApplicationBootstrap(
+    {
+      configureAgentStream: () => {
+        setDefaultStream(agentStream);
+        void useChatStore.getState().loadConversations();
+      },
+      refreshAiConfig,
+      refreshToolPolicy,
+      subscribeAutoTitle: initAutoTitle,
+      restoreWorkspace: () => {
+        restoreTask ??= createSharedStartupTask(async () => {
+          // A page reload keeps the backend and its PTY sessions alive; terminate the
+          // previous page's shells before the restored tabs start their own.
+          await closeStalePtySessions();
+          const launchDirectory = await getShellLaunchDirectory().catch((error) => {
+            reportFailure(t('Could not open the requested directory'), error);
+            return null;
+          });
+          await restoreWorkspace({ onError: reportFailure, launchDirectory });
+          const mode = launchDirectory ? 'default' : useStartupSettings.getState().mode;
+          const restore = () =>
+            restoreWorkbench(mode, (error) =>
+              reportWorkbenchFailure(error, () => {
+                void restore();
+              }),
+            );
+          await restore();
+          // Subscribe after the explicit launch is placed so queued redirects get their own tab.
+          await initForwardedLaunch(reportFailure);
         });
-        await restoreWorkspace({ onError: reportFailure, launchDirectory });
-        const mode = launchDirectory ? 'default' : useStartupSettings.getState().mode;
-        const restore = () => restoreWorkbench(mode, error => reportWorkbenchFailure(error, () => { void restore(); }));
-        await restore();
-        // Subscribe after the explicit launch is placed so queued redirects get their own tab.
-        await initForwardedLaunch(reportFailure);
-      });
-      return restoreTask();
+        return restoreTask();
+      },
+      loadWorkspaceDirs: () => useWorkspaceDirsStore.getState().load(),
+      hydrateHistory: () => useHistoryStore.getState().hydrate(),
     },
-    loadWorkspaceDirs: () => useWorkspaceDirsStore.getState().load(),
-    hydrateHistory: () => useHistoryStore.getState().hydrate(),
-  }, {
-    onError: (taskName, error) => reportFailure(t('Startup task "{{task}}" failed', { task: taskName }), error),
-  });
+    {
+      onError: (taskName, error) => reportFailure(t('Startup task "{{task}}" failed', { task: taskName }), error),
+    },
+  );
 }

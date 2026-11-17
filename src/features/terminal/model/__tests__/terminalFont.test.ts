@@ -1,6 +1,12 @@
 import { useTypographyStore } from '@config/typography';
 import { afterEach, describe, expect, it } from 'vitest';
-import { cellHeightFromLineBox, getTerminalFontOptions, measureTerminalDomCellHeight, snapLetterSpacing, snapshotLetterSpacing } from '../terminalFont';
+import {
+  cellHeightFromLineBox,
+  getTerminalFontOptions,
+  measureTerminalDomCellHeight,
+  snapLetterSpacing,
+  snapshotLetterSpacing,
+} from '../terminalFont';
 
 describe('terminal cell width snapping', () => {
   it('absorbs the fractional part of the measured advance', () => {

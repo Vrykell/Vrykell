@@ -1,7 +1,7 @@
 {
   "name": "vrykell",
   "private": true,
-  "version": "0.3.0",
+  "version": "0.3.1",
   "license": "Apache-2.0",
   "repository": {
     "type": "git",
@@ -23,6 +23,8 @@
     "test:workbench": "vitest run --config config/vitest.workbench.ts src/features/workspace src/core/__tests__/paneLayout.test.ts src/core/__tests__/paneTree.test.ts src/features/chat/__tests__/useAiWorkspaceTabs.test.tsx src/ui/layout/__tests__/resourcePlacements.test.ts src/ui/layout/__tests__/ResourceContent.test.tsx src/app/bootstrap/__tests__/sharedStartupTask.test.ts --coverage",
     "test:e2e": "playwright test",
     "check:architecture": "node scripts/check-architecture.mjs",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
     "licenses:generate": "node scripts/generate-third-party-notices.mjs",
     "licenses:check": "node scripts/generate-third-party-notices.mjs --check"
   },
@@ -87,6 +89,7 @@
     "@vitejs/plugin-react": "^4.6.0",
     "@vitest/coverage-v8": "^4.1.12",
     "jsdom": "^30.0.1",
+    "prettier": "^3.10.1",
     "typescript": "~5.8.3",
     "unplugin-icons": "^24.0.0",
     "vite": "^7.3.7",

@@ -9,7 +9,10 @@ function Navigation() {
   return <SettingsNavigation navigation={useSettingsNavigation()} />;
 }
 
-afterEach(() => { cleanup(); useSettingsNavigationStore.setState({ selected: 'ai-model' }); });
+afterEach(() => {
+  cleanup();
+  useSettingsNavigationStore.setState({ selected: 'ai-model' });
+});
 
 it('keeps the complete directory visible after selecting a page', () => {
   render(<Navigation />);

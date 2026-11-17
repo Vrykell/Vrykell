@@ -1,4 +1,15 @@
-import { forwardRef, useEffect, useId, useLayoutEffect, useRef, useState, type ButtonHTMLAttributes, type CSSProperties, type KeyboardEvent, type ReactNode } from 'react';
+import {
+  forwardRef,
+  useEffect,
+  useId,
+  useLayoutEffect,
+  useRef,
+  useState,
+  type ButtonHTMLAttributes,
+  type CSSProperties,
+  type KeyboardEvent,
+  type ReactNode,
+} from 'react';
 import { createPortal } from 'react-dom';
 import { iconSizes, Check, ChevronDown, Plus } from '@ui/icons';
 import '@ui/fields/Select.css';
@@ -6,10 +17,23 @@ import { useListNavigationMode } from '../hooks/useListNavigationMode';
 import { t } from '@i18n';
 
 /** Shared field trigger for option lists and richer selection dropdowns. */
-export const SelectTrigger = forwardRef<HTMLButtonElement, ButtonHTMLAttributes<HTMLButtonElement>>(function SelectTrigger({ children, className, onClick, onKeyDown, ...props }, ref) {
-  return <button {...props} ref={ref} type="button" data-subtle onClick={onClick} onKeyDown={onKeyDown} className={className ? `ui-select ${className}` : 'ui-select'}>
-    {children}<ChevronDown size={iconSizes.compact} aria-hidden="true" className="ui-select-chevron" />
-  </button>;
+export const SelectTrigger = forwardRef<HTMLButtonElement, ButtonHTMLAttributes<HTMLButtonElement>>(function SelectTrigger(
+  { children, className, onClick, onKeyDown, ...props },
+  ref,
+) {
+  return (
+    <button
+      {...props}
+      ref={ref}
+      type="button"
+      data-subtle
+      onClick={onClick}
+      onKeyDown={onKeyDown}
+      className={className ? `ui-select ${className}` : 'ui-select'}>
+      {children}
+      <ChevronDown size={iconSizes.compact} aria-hidden="true" className="ui-select-chevron" />
+    </button>
+  );
 });
 
 export interface SelectOption<Value extends string | number> {
@@ -52,9 +76,20 @@ interface SelectProps<Value extends string | number> {
 
 /** A controlled select with a themed, viewport-aware listbox. */
 export default function Select<Value extends string | number>({
-  value, options, onChange, disabled = false, placeholder = t('Select an option'), style, id, action, triggerClassName,
-  'aria-label': label, 'aria-describedby': description, 'data-testid': testId,
-  'data-tip': tip, 'data-tip-description': tipDescription,
+  value,
+  options,
+  onChange,
+  disabled = false,
+  placeholder = t('Select an option'),
+  style,
+  id,
+  action,
+  triggerClassName,
+  'aria-label': label,
+  'aria-describedby': description,
+  'data-testid': testId,
+  'data-tip': tip,
+  'data-tip-description': tipDescription,
 }: SelectProps<Value>) {
   const listId = useId();
   const trigger = useRef<HTMLButtonElement>(null);
@@ -66,13 +101,13 @@ export default function Select<Value extends string | number>({
   const [active, setActive] = useState(-1);
   const [position, setPosition] = useState<CSSProperties>({});
   const [placement, setPlacement] = useState('bottom');
-  const selected = options.findIndex(option => option.value === value);
-  const enabled = options.map((option, index) => option.disabled ? -1 : index).filter(index => index >= 0);
+  const selected = options.findIndex((option) => option.value === value);
+  const enabled = options.map((option, index) => (option.disabled ? -1 : index)).filter((index) => index >= 0);
   const unavailable = disabled || enabled.length === 0;
   const expanded = open && !unavailable;
   const actionIndex = action ? options.length : -1;
   const navigable = actionIndex >= 0 ? [...enabled, actionIndex] : enabled;
-  const activeIndex = navigable.includes(active) ? active : enabled[0] ?? actionIndex;
+  const activeIndex = navigable.includes(active) ? active : (enabled[0] ?? actionIndex);
 
   const show = (last = false, keyboard = false) => {
     if (unavailable) return;
@@ -95,7 +130,9 @@ export default function Select<Value extends string | number>({
     if (option.value !== value) onChange(option.value);
   };
 
-  useEffect(() => { if (unavailable) setOpen(false); }, [unavailable]);
+  useEffect(() => {
+    if (unavailable) setOpen(false);
+  }, [unavailable]);
   useLayoutEffect(() => {
     if (!expanded) return;
     const update = () => {
@@ -113,7 +150,9 @@ export default function Select<Value extends string | number>({
       setPosition({
         left: Math.max(gutter, Math.min(rect.left, window.innerWidth - width - gutter)),
         top: flip ? rect.top - gap : rect.bottom + gap,
-        width, maxHeight, transform: flip ? 'translateY(-100%)' : undefined,
+        width,
+        maxHeight,
+        transform: flip ? 'translateY(-100%)' : undefined,
       });
     };
     update();
@@ -173,46 +212,98 @@ export default function Select<Value extends string | number>({
       const text = (now - search.current.time < 700 ? search.current.text : '') + key.toLocaleLowerCase();
       search.current = { text, time: now };
       const start = expanded ? activeIndex : selected;
-      const matches = [...enabled.filter(index => index > start), ...enabled.filter(index => index <= start)];
-      const next = matches.find(index => options[index].label.toLocaleLowerCase().startsWith(text));
+      const matches = [...enabled.filter((index) => index > start), ...enabled.filter((index) => index <= start)];
+      const next = matches.find((index) => options[index].label.toLocaleLowerCase().startsWith(text));
       if (next !== undefined) setActive(next);
     }
   };
 
-  return <>
-    <SelectTrigger {...navigation.props} ref={trigger} id={id} data-testid={testId} data-tip={tip} data-tip-description={tipDescription} className={triggerClassName} style={style}
-      role="combobox" aria-label={label} aria-describedby={description} aria-haspopup="listbox"
-      aria-expanded={expanded} aria-controls={expanded ? listId : undefined}
-      aria-activedescendant={expanded ? `${listId}-${activeIndex}` : undefined} disabled={unavailable}
-      onClick={() => expanded ? setOpen(false) : show()} onKeyDown={onKeyDown} onBlur={() => setOpen(false)}>
-      {options[selected]?.icon && <span className="ui-select-icon" aria-hidden="true">{options[selected]!.icon}</span>}
-      {options[selected]?.swatch && <span className="ui-select-swatch" aria-hidden="true"
-        style={{ background: options[selected]!.swatch }} />}
-      <span className="ui-select-value">{options[selected]?.triggerLabel ?? options[selected]?.label ?? placeholder}</span>
-      {options[selected]?.badge && <span className="ui-select-badge">{options[selected]!.badge}</span>}
-    </SelectTrigger>
-    {expanded && createPortal(<div {...navigation.props} ref={menu}
-      className="workspace-floating ui-select-menu" style={position} data-placement={placement} data-floating-for={listId}
-      onPointerDown={event => event.preventDefault()}>
-      <div id={listId} role="listbox" aria-label={label} className="ui-select-options">
-        {options.map((option, index) => <div key={option.value} id={`${listId}-${index}`} role="option"
-          aria-selected={index === selected} aria-disabled={option.disabled || undefined}
-          className="ui-select-option" data-active={navigation.keyboardNavigation && index === activeIndex}
-          onPointerMove={() => { if (navigation.pointerMoved.current && !option.disabled) setActive(index); }} onClick={() => choose(index)}>
-          {option.icon && <span className="ui-select-icon" aria-hidden="true">{option.icon}</span>}
-          {option.swatch && <span className="ui-select-swatch" aria-hidden="true" style={{ background: option.swatch }} />}
-          <span className="ui-select-option-label">{option.label}</span>
-          {option.badge && <span className="ui-select-badge">{option.badge}</span>}
-          {index === selected && <Check size={iconSizes.compact} aria-hidden="true" className="ui-select-check" />}
-        </div>)}
-      </div>
-      {action && <button type="button" id={`${listId}-${actionIndex}`} className="ui-select-action"
-        data-active={navigation.keyboardNavigation && activeIndex === actionIndex}
-        onPointerMove={() => { if (navigation.pointerMoved.current) setActive(actionIndex); }}
-        onClick={() => choose(actionIndex)}>
-        <Plus size={iconSizes.compact} aria-hidden="true" />
-        <span>{action.label}</span>
-      </button>}
-    </div>, document.body)}
-  </>;
+  return (
+    <>
+      <SelectTrigger
+        {...navigation.props}
+        ref={trigger}
+        id={id}
+        data-testid={testId}
+        data-tip={tip}
+        data-tip-description={tipDescription}
+        className={triggerClassName}
+        style={style}
+        role="combobox"
+        aria-label={label}
+        aria-describedby={description}
+        aria-haspopup="listbox"
+        aria-expanded={expanded}
+        aria-controls={expanded ? listId : undefined}
+        aria-activedescendant={expanded ? `${listId}-${activeIndex}` : undefined}
+        disabled={unavailable}
+        onClick={() => (expanded ? setOpen(false) : show())}
+        onKeyDown={onKeyDown}
+        onBlur={() => setOpen(false)}>
+        {options[selected]?.icon && (
+          <span className="ui-select-icon" aria-hidden="true">
+            {options[selected]!.icon}
+          </span>
+        )}
+        {options[selected]?.swatch && (
+          <span className="ui-select-swatch" aria-hidden="true" style={{ background: options[selected]!.swatch }} />
+        )}
+        <span className="ui-select-value">{options[selected]?.triggerLabel ?? options[selected]?.label ?? placeholder}</span>
+        {options[selected]?.badge && <span className="ui-select-badge">{options[selected]!.badge}</span>}
+      </SelectTrigger>
+      {expanded &&
+        createPortal(
+          <div
+            {...navigation.props}
+            ref={menu}
+            className="workspace-floating ui-select-menu"
+            style={position}
+            data-placement={placement}
+            data-floating-for={listId}
+            onPointerDown={(event) => event.preventDefault()}>
+            <div id={listId} role="listbox" aria-label={label} className="ui-select-options">
+              {options.map((option, index) => (
+                <div
+                  key={option.value}
+                  id={`${listId}-${index}`}
+                  role="option"
+                  aria-selected={index === selected}
+                  aria-disabled={option.disabled || undefined}
+                  className="ui-select-option"
+                  data-active={navigation.keyboardNavigation && index === activeIndex}
+                  onPointerMove={() => {
+                    if (navigation.pointerMoved.current && !option.disabled) setActive(index);
+                  }}
+                  onClick={() => choose(index)}>
+                  {option.icon && (
+                    <span className="ui-select-icon" aria-hidden="true">
+                      {option.icon}
+                    </span>
+                  )}
+                  {option.swatch && <span className="ui-select-swatch" aria-hidden="true" style={{ background: option.swatch }} />}
+                  <span className="ui-select-option-label">{option.label}</span>
+                  {option.badge && <span className="ui-select-badge">{option.badge}</span>}
+                  {index === selected && <Check size={iconSizes.compact} aria-hidden="true" className="ui-select-check" />}
+                </div>
+              ))}
+            </div>
+            {action && (
+              <button
+                type="button"
+                id={`${listId}-${actionIndex}`}
+                className="ui-select-action"
+                data-active={navigation.keyboardNavigation && activeIndex === actionIndex}
+                onPointerMove={() => {
+                  if (navigation.pointerMoved.current) setActive(actionIndex);
+                }}
+                onClick={() => choose(actionIndex)}>
+                <Plus size={iconSizes.compact} aria-hidden="true" />
+                <span>{action.label}</span>
+              </button>
+            )}
+          </div>,
+          document.body,
+        )}
+    </>
+  );
 }

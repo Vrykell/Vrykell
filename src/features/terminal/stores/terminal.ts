@@ -91,7 +91,9 @@ export function getTerminalScreen(paneId: string): TerminalScreen | null {
   const ts = useTerminalStore.getState();
   const scene = ts.scenes[paneId] ?? 'classic';
   const dims = ts.dims[paneId] ?? { cols: 80, rows: 24 };
-  const term = ts.manualFullscreen[paneId] ? termInstances.get(`block:${paneId}`) ?? termInstances.get(paneId) : termInstances.get(paneId);
+  const term = ts.manualFullscreen[paneId]
+    ? (termInstances.get(`block:${paneId}`) ?? termInstances.get(paneId))
+    : termInstances.get(paneId);
   if (!term) return null;
   const buf = term.buffer.active;
   const cols = term.cols || dims.cols;
@@ -105,9 +107,7 @@ export function getTerminalScreen(paneId: string): TerminalScreen | null {
     lines.push(line ? line.translateToString(true) : '');
   }
   while (lines.length > 0 && lines[lines.length - 1]!.trim() === '') lines.pop();
-  const content = lines
-    .map((l, i) => `${String(i + 1).padStart(2, ' ')}│${l}`)
-    .join('\n');
+  const content = lines.map((l, i) => `${String(i + 1).padStart(2, ' ')}│${l}`).join('\n');
   return {
     scene,
     cols,
@@ -162,25 +162,26 @@ export const useTerminalStore = create<TerminalState>((set, get) => ({
   sessions: {},
   shellTypes: {},
   startupStates: {},
-  setStartupState: (paneId, status) => set(s => ({ startupStates: { ...s.startupStates, [paneId]: status } })),
+  setStartupState: (paneId, status) => set((s) => ({ startupStates: { ...s.startupStates, [paneId]: status } })),
   pendingCommands: {},
   dims: {},
   visible: true,
   manualFullscreen: {},
   scenes: {} as Record<string, Scene>,
-  setManualFullscreen: (paneId, active) => set(state => {
-    if (!!state.manualFullscreen[paneId] === active) return state;
-    const manualFullscreen = { ...state.manualFullscreen };
-    if (active) manualFullscreen[paneId] = true; else delete manualFullscreen[paneId];
-    terminalDebug('manual-fullscreen-state', { paneId, active });
-    return { manualFullscreen };
-  }),
+  setManualFullscreen: (paneId, active) =>
+    set((state) => {
+      if (!!state.manualFullscreen[paneId] === active) return state;
+      const manualFullscreen = { ...state.manualFullscreen };
+      if (active) manualFullscreen[paneId] = true;
+      else delete manualFullscreen[paneId];
+      terminalDebug('manual-fullscreen-state', { paneId, active });
+      return { manualFullscreen };
+    }),
   keyboardTarget: 'input',
   setKeyboardTarget: (t) => set({ keyboardTarget: t }),
   focusedPaneId: null,
   setFocusedPane: (paneId) => set({ focusedPaneId: paneId }),
-  setScene: (tabId, scene) =>
-    set((s) => ({ scenes: { ...s.scenes, [tabId]: scene } })),
+  setScene: (tabId, scene) => set((s) => ({ scenes: { ...s.scenes, [tabId]: scene } })),
   setSession: (tabId, sessionId) => {
     const queued = get().pendingCommands[tabId] ?? [];
     set((s) => {
@@ -192,29 +193,30 @@ export const useTerminalStore = create<TerminalState>((set, get) => ({
       };
     });
     if (queued.length > 0) {
-      const data = queued
-        .map(command => terminalCommandPayload(tabId, command))
-        .join('');
+      const data = queued.map((command) => terminalCommandPayload(tabId, command)).join('');
       terminalDebug('queued-command-flush', { tabId, sessionId, count: queued.length, chars: data.length });
       writeTerminalInput(sessionId, data)
         .then(() => terminalDebug('queued-command-write-complete', { tabId, sessionId, chars: data.length }))
-        .catch((error) => terminalDebug('queued-command-write-error', {
-          tabId,
-          sessionId,
-          errorType: error instanceof Error ? error.name : typeof error,
-        }));
+        .catch((error) =>
+          terminalDebug('queued-command-write-error', {
+            tabId,
+            sessionId,
+            errorType: error instanceof Error ? error.name : typeof error,
+          }),
+        );
     }
   },
-  clearSession: (tabId, expectedSessionId) => set((s) => {
-    if (expectedSessionId && s.sessions[tabId] !== expectedSessionId) return s;
-    const sessions = { ...s.sessions };
-    const shellTypes = { ...s.shellTypes };
-    const pendingCommands = { ...s.pendingCommands };
-    delete sessions[tabId];
-    delete shellTypes[tabId];
-    delete pendingCommands[tabId];
-    return { sessions, shellTypes, pendingCommands, startupStates: { ...s.startupStates, [tabId]: 'closed' } };
-  }),
+  clearSession: (tabId, expectedSessionId) =>
+    set((s) => {
+      if (expectedSessionId && s.sessions[tabId] !== expectedSessionId) return s;
+      const sessions = { ...s.sessions };
+      const shellTypes = { ...s.shellTypes };
+      const pendingCommands = { ...s.pendingCommands };
+      delete sessions[tabId];
+      delete shellTypes[tabId];
+      delete pendingCommands[tabId];
+      return { sessions, shellTypes, pendingCommands, startupStates: { ...s.startupStates, [tabId]: 'closed' } };
+    }),
   queueCommand: (tabId, command) => {
     const sessionId = get().sessions[tabId];
     if (sessionId) {
@@ -231,18 +233,19 @@ export const useTerminalStore = create<TerminalState>((set, get) => ({
     }));
   },
   setDims: (tabId, cols, rows) =>
-    set((s) => s.dims[tabId]?.cols === cols && s.dims[tabId]?.rows === rows ? s : { dims: { ...s.dims, [tabId]: { cols, rows } } }),
+    set((s) => (s.dims[tabId]?.cols === cols && s.dims[tabId]?.rows === rows ? s : { dims: { ...s.dims, [tabId]: { cols, rows } } })),
   dropTab: (tabId) =>
     set((s) => {
       if (
-        !(tabId in s.sessions)
-        && !(tabId in s.pendingCommands)
-        && !(tabId in s.dims)
-        && !(tabId in s.scenes)
-        && !(tabId in s.startupStates)
-        && !(tabId in s.manualFullscreen)
-        && !(tabId in s.shellTypes)
-      ) return s;
+        !(tabId in s.sessions) &&
+        !(tabId in s.pendingCommands) &&
+        !(tabId in s.dims) &&
+        !(tabId in s.scenes) &&
+        !(tabId in s.startupStates) &&
+        !(tabId in s.manualFullscreen) &&
+        !(tabId in s.shellTypes)
+      )
+        return s;
       const sessions = { ...s.sessions };
       const shellTypes = { ...s.shellTypes };
       const pendingCommands = { ...s.pendingCommands };
@@ -262,7 +265,7 @@ export const useTerminalStore = create<TerminalState>((set, get) => ({
   toggle: () => set((s) => ({ visible: !s.visible })),
   stageCommand: (paneId, command) => {
     const workspace = useWorkspaceStore.getState();
-    const owner = workspace.tabs.find(tab => isSessionTab(tab) && layoutLeaves(tab.layout).some(pane => pane.id === paneId));
+    const owner = workspace.tabs.find((tab) => isSessionTab(tab) && layoutLeaves(tab.layout).some((pane) => pane.id === paneId));
     if (owner && owner.id !== workspace.activeId) workspace.activate(owner.id);
     set({ visible: true, focusedPaneId: paneId, keyboardTarget: 'input' });
     useInputStore.getState().stageText(paneId, command.replace(/\r\n|\r/g, '\n'));

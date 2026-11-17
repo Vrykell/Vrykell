@@ -13,8 +13,17 @@ vi.mock('@platform/clipboard', () => ({ writeClipboardText: mocks.copy }));
 vi.mock('../hooks/useTerminalSession', () => ({ clearSessionBlocks: mocks.clear }));
 
 const block: TermBlock = {
-  id: 'b1', command: 'git status', status: 'done', exitCode: 0, startedAt: 0, endedAt: 1400,
-  wasLongRunning: false, outputHtml: '', outputText: 'clean', outputRaw: '', linesTruncated: 0,
+  id: 'b1',
+  command: 'git status',
+  status: 'done',
+  exitCode: 0,
+  startedAt: 0,
+  endedAt: 1400,
+  wasLongRunning: false,
+  outputHtml: '',
+  outputText: 'clean',
+  outputRaw: '',
+  linesTruncated: 0,
 };
 const chat = useChatStore.getState();
 const terminal = useTerminalStore.getState();
@@ -37,14 +46,14 @@ afterEach(() => {
 
 function open(output = 'clean') {
   const close = vi.fn();
-  render(<BlockMenu block={block} paneId="pane" anchor={{ kind: 'pointer', x: 0, y: 0 }}
-    onClose={close} getOutputText={() => output} />);
+  render(<BlockMenu block={block} paneId="pane" anchor={{ kind: 'pointer', x: 0, y: 0 }} onClose={close} getOutputText={() => output} />);
   return close;
 }
 
 describe('command action menu', () => {
   it.each([
-    ['复制命令', 'git status'], ['复制输出', 'clean'],
+    ['复制命令', 'git status'],
+    ['复制输出', 'clean'],
   ])('copies the requested text through %s and closes', async (label, expected) => {
     const close = open();
     fireEvent.click(screen.getByRole('menuitem', { name: label }));
@@ -66,7 +75,12 @@ describe('command action menu', () => {
     expect(mocks.send).not.toHaveBeenCalled();
     const id = useAiWorkspace.getState().sideSelected.slice(5);
     expect(useChatStore.getState().activeConversationId).toBe(chat.activeConversationId);
-    expect(useComposerDrafts.getState().byTab[id]?.references?.[0]).toMatchObject({ paneId: 'pane', command: 'git status', output, exitCode: 0 });
+    expect(useComposerDrafts.getState().byTab[id]?.references?.[0]).toMatchObject({
+      paneId: 'pane',
+      command: 'git status',
+      output,
+      exitCode: 0,
+    });
   });
 
   it('clears only the selected pane and displays elapsed time starting at zero', () => {

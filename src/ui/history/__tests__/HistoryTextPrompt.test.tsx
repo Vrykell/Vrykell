@@ -9,8 +9,19 @@ const anchor = { x: 20, y: 20 };
 function renderPrompt(overrides: Partial<Parameters<typeof HistoryTextPrompt>[0]> = {}) {
   const onSave = vi.fn();
   const onClose = vi.fn();
-  render(<HistoryTextPrompt anchor={anchor} label="Note" placeholder="Write a note" value="" saveLabel="Save"
-    onSave={onSave} onClose={onClose} testId="prompt" {...overrides} />);
+  render(
+    <HistoryTextPrompt
+      anchor={anchor}
+      label="Note"
+      placeholder="Write a note"
+      value=""
+      saveLabel="Save"
+      onSave={onSave}
+      onClose={onClose}
+      testId="prompt"
+      {...overrides}
+    />,
+  );
   return { onSave, onClose };
 }
 

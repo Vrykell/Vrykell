@@ -1,7 +1,13 @@
 import { beforeEach, expect, it, vi } from 'vitest';
 import { registerEditorCloseGuard } from '@core/editor';
 import { useWorkspaceStore } from '../stores/workspace';
-import { compositionTabs, detachCompositionPane, mergeCompositionTab, selectCompositionTab, useUnifiedWorkspace } from '../stores/unifiedWorkspace';
+import {
+  compositionTabs,
+  detachCompositionPane,
+  mergeCompositionTab,
+  selectCompositionTab,
+  useUnifiedWorkspace,
+} from '../stores/unifiedWorkspace';
 import { workspacePaneIds } from '../model/workspaceResources';
 import { createUnifiedResource } from '../services/unifiedWorkspace';
 import { closeContainer } from '../services/workbench';
@@ -25,7 +31,7 @@ it('uses the start page only when no content tab exists, including after closing
   expect(useUnifiedWorkspace.getState().startActive).toBe(true);
   createUnifiedResource('conversation');
   expect(compositionTabs()).toHaveLength(1);
-  expect(compositionTabs().every(tab => tab.layout)).toBe(true);
+  expect(compositionTabs().every((tab) => tab.layout)).toBe(true);
   expect(useUnifiedWorkspace.getState().startActive).toBe(false);
   closeContainer(compositionTabs()[0]!.id);
   expect(compositionTabs()).toHaveLength(1);
@@ -37,9 +43,10 @@ it('keeps available resources out of Start and prunes only explicitly opened ref
   const store = useUnifiedWorkspace.getState();
   store.reconcile(['file:first', 'file:second']);
   expect(useUnifiedWorkspace.getState().startActive).toBe(true);
-  store.show('file:first'); store.show('file:second');
+  store.show('file:first');
+  store.show('file:second');
   expect(compositionTabs()).toHaveLength(2);
-  expect(compositionTabs().every(tab => tab.layout)).toBe(true);
+  expect(compositionTabs().every((tab) => tab.layout)).toBe(true);
   expect(useUnifiedWorkspace.getState().startActive).toBe(false);
   store.reconcile([]);
   expect(compositionTabs()).toHaveLength(1);
@@ -47,7 +54,8 @@ it('keeps available resources out of Start and prunes only explicitly opened ref
 });
 
 it('switches complete independent layouts without discarding sibling resources', () => {
-  createUnifiedResource('conversation'); createUnifiedResource('document', 'row');
+  createUnifiedResource('conversation');
+  createUnifiedResource('document', 'row');
   const first = compositionTabs()[0]!;
   const original = first.layout;
 
@@ -63,7 +71,8 @@ it('switches complete independent layouts without discarding sibling resources',
 });
 
 it('moves and merges panes through existing tabs without closing their content owners', () => {
-  createUnifiedResource('conversation'); createUnifiedResource('document', 'row');
+  createUnifiedResource('conversation');
+  createUnifiedResource('document', 'row');
   const owners = useWorkspaceStore.getState().tabs;
   const source = useUnifiedWorkspace.getState().activeTabId;
   const ids = workspacePaneIds(useUnifiedWorkspace.getState().layout!);
@@ -80,28 +89,37 @@ it('moves and merges panes through existing tabs without closing their content o
 });
 
 it('does not close any member until the document close guard completes', () => {
-  createUnifiedResource('conversation'); createUnifiedResource('document', 'row');
+  createUnifiedResource('conversation');
+  createUnifiedResource('document', 'row');
   const tab = compositionTabs()[0]!;
   let confirm: (() => void) | undefined;
-  const unregister = registerEditorCloseGuard((_files, complete) => { confirm = complete; return true; });
+  const unregister = registerEditorCloseGuard((_files, complete) => {
+    confirm = complete;
+    return true;
+  });
   closeContainer(tab.id);
   expect(compositionTabs()[0]).toBe(tab);
   expect(useAiWorkspace.getState().nativeTabs).toHaveLength(1);
   expect(confirm).toBeTypeOf('function');
-  confirm!(); unregister();
+  confirm!();
+  unregister();
   expect(useAiWorkspace.getState().nativeTabs).toHaveLength(0);
-  expect(useWorkspaceStore.getState().tabs.some(tab => tab.kind === 'editor')).toBe(false);
+  expect(useWorkspaceStore.getState().tabs.some((tab) => tab.kind === 'editor')).toBe(false);
   expect(useWorkbenchStore.getState().lastClosed).toMatchObject({ scope: 'unified', restoreSnapshot: { members: expect.any(Array) } });
 });
 
 it('restores a historical composition into a tab without replacing an unrelated active layout', () => {
   createUnifiedResource('conversation');
   const unrelated = compositionTabs()[0]!;
-  useUnifiedWorkspace.getState().restore({ type: 'pane', id: 'saved', resourceId: 'file:saved' }, 'saved', { id: 'workspace:historic', createdAt: 1 });
+  useUnifiedWorkspace
+    .getState()
+    .restore({ type: 'pane', id: 'saved', resourceId: 'file:saved' }, 'saved', { id: 'workspace:historic', createdAt: 1 });
   expect(compositionTabs()).toHaveLength(2);
   expect(compositionTabs()[0]).toBe(unrelated);
   const restored = useUnifiedWorkspace.getState().activeTabId;
-  useUnifiedWorkspace.getState().restore({ type: 'pane', id: 'saved', resourceId: 'file:saved' }, 'saved', { id: 'workspace:historic', createdAt: 1 });
+  useUnifiedWorkspace
+    .getState()
+    .restore({ type: 'pane', id: 'saved', resourceId: 'file:saved' }, 'saved', { id: 'workspace:historic', createdAt: 1 });
   expect(useUnifiedWorkspace.getState().activeTabId).toBe(restored);
   expect(compositionTabs()).toHaveLength(2);
 });

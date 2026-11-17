@@ -41,7 +41,11 @@ export const useSearchHistoryStore = create<SearchHistoryState>((set, get) => ({
   },
 
   clear: () => {
-    try { localStorage.removeItem(STORAGE_KEY); } catch { /* ignore */ }
+    try {
+      localStorage.removeItem(STORAGE_KEY);
+    } catch {
+      /* ignore */
+    }
     set({ items: [] });
   },
 }));

@@ -5,4 +5,3 @@ import './sources/files';
 import './sources/settings';
 import './sources/actions';
 import './sources/session';
-

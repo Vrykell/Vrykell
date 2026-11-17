@@ -51,7 +51,7 @@ export function watchShellCommandCompletion(paneId: string): ShellCommandComplet
   let startMarker: IMarker | undefined;
   let completed: { exitCode: number; output: string } | null = null;
   const listeners = new Set<() => void>();
-  const handler = terminal.parser.registerOscHandler(777, data => {
+  const handler = terminal.parser.registerOscHandler(777, (data) => {
     const [id, status] = data.split(';');
     if (id !== token) return false;
     if (status === 'start') {
@@ -87,10 +87,19 @@ export function watchShellCommandCompletion(paneId: string): ShellCommandComplet
   });
   return {
     // Keep execution and status capture in one shell statement, before prompt hooks can run.
-    wrap: command => `printf '\\033]777;${token};start\\007'; ${posixScriptCommand(command)}; printf '\\033]777;${token};%s\\007' "$?"\n`,
+    wrap: (command) => `printf '\\033]777;${token};start\\007'; ${posixScriptCommand(command)}; printf '\\033]777;${token};%s\\007' "$?"\n`,
     result: () => completed,
-    subscribe: listener => { listeners.add(listener); return () => { listeners.delete(listener); }; },
-    dispose: () => { handler.dispose(); startMarker?.dispose(); listeners.clear(); },
+    subscribe: (listener) => {
+      listeners.add(listener);
+      return () => {
+        listeners.delete(listener);
+      };
+    },
+    dispose: () => {
+      handler.dispose();
+      startMarker?.dispose();
+      listeners.clear();
+    },
   };
 }
 
@@ -101,7 +110,10 @@ export function watchShellCommandCompletion(paneId: string): ShellCommandComplet
 export function retainCompletionForReadiness(paneId: string, completion: ShellCommandCompletion): void {
   clearCompletionReadiness(paneId);
   const terminal = termInstances.get(paneId);
-  if (!terminal) { completion.dispose(); return; }
+  if (!terminal) {
+    completion.dispose();
+    return;
+  }
   const entry: CompletionRecovery = { terminal, ready: false, dispose: () => {} };
   let unsubscribe = () => {};
   let expiry: ReturnType<typeof setTimeout> | null = null;

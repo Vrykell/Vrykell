@@ -7,11 +7,39 @@ import TerminalPanel from '../components/TerminalPanel';
 import { useWorkspaceNavigation } from '@features/workspace/stores/navigation';
 import { useWorkspaceStore } from '@features/workspace/stores/workspace';
 
-const { closeSession, reconnect, stopReconnect, sessionView } = vi.hoisted(() => ({ closeSession: vi.fn(), reconnect: vi.fn(), stopReconnect: vi.fn(), sessionView: { sshAuthenticated: false, sshLog: [] as { time: number; text: string }[], retry: { phase: 'idle', attempt: 0, seconds: 0 }, status: 'ready', frame: { html: 'Password:', plainText: 'Password:', cols: 80, rows: 24 } } }));
-vi.mock('../hooks/useTerminalSession', () => ({ useTerminalSession: () => ({ ref: createRef<HTMLDivElement>(), closeSession, reconnect, stopReconnect, sshAuthenticated: sessionView.sshAuthenticated, sshLog: sessionView.sshLog, retry: sessionView.retry, status: sessionView.status, frame: sessionView.frame }) }));
+const { closeSession, reconnect, stopReconnect, sessionView } = vi.hoisted(() => ({
+  closeSession: vi.fn(),
+  reconnect: vi.fn(),
+  stopReconnect: vi.fn(),
+  sessionView: {
+    sshAuthenticated: false,
+    sshLog: [] as { time: number; text: string }[],
+    retry: { phase: 'idle', attempt: 0, seconds: 0 },
+    status: 'ready',
+    frame: { html: 'Password:', plainText: 'Password:', cols: 80, rows: 24 },
+  },
+}));
+vi.mock('../hooks/useTerminalSession', () => ({
+  useTerminalSession: () => ({
+    ref: createRef<HTMLDivElement>(),
+    closeSession,
+    reconnect,
+    stopReconnect,
+    sshAuthenticated: sessionView.sshAuthenticated,
+    sshLog: sessionView.sshLog,
+    retry: sessionView.retry,
+    status: sessionView.status,
+    frame: sessionView.frame,
+  }),
+}));
 vi.mock('@platform/pty', () => ({ ptyWrite: vi.fn().mockResolvedValue(undefined) }));
-const workspace = useWorkspaceStore.getState(); const navigation = useWorkspaceNavigation.getState();
-afterEach(() => { cleanup(); useWorkspaceStore.setState(workspace, true); useWorkspaceNavigation.setState(navigation, true); });
+const workspace = useWorkspaceStore.getState();
+const navigation = useWorkspaceNavigation.getState();
+afterEach(() => {
+  cleanup();
+  useWorkspaceStore.setState(workspace, true);
+  useWorkspaceNavigation.setState(navigation, true);
+});
 beforeEach(() => {
   vi.mocked(ptyWrite).mockClear();
   closeSession.mockReset().mockResolvedValue(undefined);
@@ -60,7 +88,9 @@ describe('SSH connection input', () => {
   it('opens status from the connection card and exposes a themed hover hint', () => {
     const toggle = vi.fn();
     const ready = vi.fn();
-    const view = render(<TerminalPanel paneId="p" tabId="t" onReady={() => {}} connectionInput onSessionStatusClick={toggle} onSessionStatusReady={ready} />);
+    const view = render(
+      <TerminalPanel paneId="p" tabId="t" onReady={() => {}} connectionInput onSessionStatusClick={toggle} onSessionStatusReady={ready} />,
+    );
     const entry = screen.getByTestId('ssh-status-toggle');
     expect(entry).toContainElement(screen.getByRole('status'));
     expect(entry).toHaveAttribute('data-tip', '查看 SSH 连接状态与资源');
@@ -68,7 +98,9 @@ describe('SSH connection input', () => {
     expect(ready).toHaveBeenCalledWith(entry);
     fireEvent.click(entry);
     expect(toggle).toHaveBeenCalledOnce();
-    view.rerender(<TerminalPanel paneId="p" tabId="t" onReady={() => {}} connectionInput onSessionStatusClick={toggle} sessionStatusOpen />);
+    view.rerender(
+      <TerminalPanel paneId="p" tabId="t" onReady={() => {}} connectionInput onSessionStatusClick={toggle} sessionStatusOpen />,
+    );
     expect(entry).toHaveAttribute('aria-expanded', 'true');
     expect(entry).toHaveAttribute('data-tip', '关闭 SSH 状态');
   });
@@ -229,7 +261,12 @@ describe('SSH connection input', () => {
   });
   it('ignores repeated cancellation and submit attempts while closing', async () => {
     let finish!: () => void;
-    closeSession.mockImplementationOnce(() => new Promise<void>(resolve => { finish = resolve; }));
+    closeSession.mockImplementationOnce(
+      () =>
+        new Promise<void>((resolve) => {
+          finish = resolve;
+        }),
+    );
     useTerminalStore.setState({ sessions: { p: 'session' } });
     render(<TerminalPanel paneId="p" tabId="t" onReady={() => {}} connectionInput />);
     fireEvent.click(screen.getByRole('button', { name: '取消认证' }));

@@ -12,7 +12,13 @@ beforeEach(() => vi.resetAllMocks());
 describe('repository loading', () => {
   it('ignores a previous directory response after the target changes', async () => {
     let finish: (value: GitSnapshot) => void = () => {};
-    vi.mocked(getGitSnapshot).mockImplementationOnce(() => new Promise(resolve => { finish = resolve; }))
+    vi.mocked(getGitSnapshot)
+      .mockImplementationOnce(
+        () =>
+          new Promise((resolve) => {
+            finish = resolve;
+          }),
+      )
       .mockResolvedValueOnce(snapshot('/second'));
     const { result, rerender } = renderHook(({ cwd }) => useGitRepository({ cwd }, true), { initialProps: { cwd: '/first' } });
     rerender({ cwd: '/second' });
@@ -23,7 +29,9 @@ describe('repository loading', () => {
 
   it('does not load a closed panel and exposes failures for retry', async () => {
     vi.mocked(getGitSnapshot).mockRejectedValueOnce(new Error('offline')).mockResolvedValueOnce(null);
-    const { result, rerender } = renderHook(({ visible }) => useGitRepository({ cwd: '/repo' }, visible), { initialProps: { visible: false } });
+    const { result, rerender } = renderHook(({ visible }) => useGitRepository({ cwd: '/repo' }, visible), {
+      initialProps: { visible: false },
+    });
     expect(getGitSnapshot).not.toHaveBeenCalled();
     rerender({ visible: true });
     await waitFor(() => expect(result.current.error).toBe('offline'));

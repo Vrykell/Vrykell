@@ -16,9 +16,7 @@ import { approvingToolContext } from '../../../test-utils/approvingToolContext';
 usePermissions.setState({ levels: { web_search: 'allow' } });
 const CTX: ToolContext = approvingToolContext();
 
-type Exec = (
-  args: Record<string, unknown>,
-) => Promise<string | { ok: boolean; error?: string }>;
+type Exec = (args: Record<string, unknown>) => Promise<string | { ok: boolean; error?: string }>;
 const execOf = (t: unknown): Exec => {
   const e = (t as { execute: (a: unknown, o: unknown) => Promise<never> }).execute;
   return (args) => e(args, {});

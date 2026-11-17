@@ -17,13 +17,14 @@ interface PanelTerminalState {
 }
 
 /** Session-scoped bindings; a closed or replaced pane falls back to the focused terminal. */
-export const usePanelTerminalStore = create<PanelTerminalState>(set => ({
+export const usePanelTerminalStore = create<PanelTerminalState>((set) => ({
   bindings: {},
-  bind: (panel, binding) => set(state => ({ bindings: { ...state.bindings, [panel]: binding } })),
-  clear: panel => set(state => {
-    if (!state.bindings[panel]) return state;
-    const bindings = { ...state.bindings };
-    delete bindings[panel];
-    return { bindings };
-  }),
+  bind: (panel, binding) => set((state) => ({ bindings: { ...state.bindings, [panel]: binding } })),
+  clear: (panel) =>
+    set((state) => {
+      if (!state.bindings[panel]) return state;
+      const bindings = { ...state.bindings };
+      delete bindings[panel];
+      return { bindings };
+    }),
 }));

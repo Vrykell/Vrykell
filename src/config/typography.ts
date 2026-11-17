@@ -7,11 +7,28 @@ export const DEFAULT_TERMINAL_FONT_SIZE = 14;
 export const DEFAULT_CHAT_FONT_SIZE = 14;
 export const DEFAULT_TERMINAL_FONT_WEIGHT = 400;
 export const DEFAULT_TERMINAL_LINE_HEIGHT = 1;
-const monoFontFamilies = ['Sarasa Term SC', 'Sarasa Mono SC', 'Maple Mono NF CN', 'Maple Mono', 'Cascadia Code', 'JetBrains Mono', 'NSimSun'] as const;
+const monoFontFamilies = [
+  'Sarasa Term SC',
+  'Sarasa Mono SC',
+  'Maple Mono NF CN',
+  'Maple Mono',
+  'Cascadia Code',
+  'JetBrains Mono',
+  'NSimSun',
+] as const;
 export const TERMINAL_FONT_PRESETS = ['system', 'system-default', ...monoFontFamilies] as const;
-export type TerminalFontPreset = typeof TERMINAL_FONT_PRESETS[number];
-export const UI_FONT_PRESETS = ['system', 'Noto Sans SC', 'Inter', 'Segoe UI', 'Microsoft YaHei UI', 'PingFang SC', 'Noto Sans CJK SC', ...monoFontFamilies] as const;
-export type UiFontPreset = typeof UI_FONT_PRESETS[number];
+export type TerminalFontPreset = (typeof TERMINAL_FONT_PRESETS)[number];
+export const UI_FONT_PRESETS = [
+  'system',
+  'Noto Sans SC',
+  'Inter',
+  'Segoe UI',
+  'Microsoft YaHei UI',
+  'PingFang SC',
+  'Noto Sans CJK SC',
+  ...monoFontFamilies,
+] as const;
+export type UiFontPreset = (typeof UI_FONT_PRESETS)[number];
 const fallbackFonts = `"${BUNDLED_MONO_FONT}", "Cascadia Mono", "Cascadia Code", Menlo, Monaco, "JetBrains Mono", "Sarasa Mono SC", "Noto Sans Mono CJK SC", "Noto Sans Mono", "DejaVu Sans Mono", "Symbols Nerd Font Mono", monospace, "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji"`;
 
 export function terminalFontFamily(preset: TerminalFontPreset): string {
@@ -20,12 +37,12 @@ export function terminalFontFamily(preset: TerminalFontPreset): string {
 }
 
 function boundedFontPreset(value: unknown): TerminalFontPreset {
-  return TERMINAL_FONT_PRESETS.find(preset => preset === value) ?? 'system';
+  return TERMINAL_FONT_PRESETS.find((preset) => preset === value) ?? 'system';
 }
 
 export function uiFontFamily(preset: UiFontPreset): string {
   if (preset === 'system') return 'system-ui, -apple-system, "Segoe UI", "Microsoft YaHei UI", "PingFang SC", sans-serif';
-  const monoPreset = monoFontFamilies.find(font => font === preset);
+  const monoPreset = monoFontFamilies.find((font) => font === preset);
   if (monoPreset) return terminalFontFamily(monoPreset);
   const fallback = '"Noto Sans SC", -apple-system, "Segoe UI", "Microsoft YaHei UI", "PingFang SC", sans-serif';
   return preset === 'Noto Sans SC' ? fallback : `"${preset}", ${fallback}`;
@@ -36,8 +53,7 @@ function boundedNumber(value: unknown, fallback: number, min: number, max: numbe
 }
 
 export function boundedFontSize(value: unknown, fallback: number, max = 24): number {
-  return typeof value === 'number' && Number.isFinite(value)
-    ? Math.max(10, Math.min(max, Math.round(value))) : fallback;
+  return typeof value === 'number' && Number.isFinite(value) ? Math.max(10, Math.min(max, Math.round(value))) : fallback;
 }
 
 /** Terminal renderer choice: WebGL joins half blocks, DOM keeps cleaner edges. */
@@ -91,7 +107,7 @@ const defaults: TypographyPreferences = {
 
 function sanitize(values: Partial<TypographyPreferences>): TypographyPreferences {
   return {
-    uiFontPreset: UI_FONT_PRESETS.find(font => font === values.uiFontPreset) ?? 'Noto Sans SC',
+    uiFontPreset: UI_FONT_PRESETS.find((font) => font === values.uiFontPreset) ?? 'Noto Sans SC',
     uiFontSize: boundedFontSize(values.uiFontSize, DEFAULT_UI_FONT_SIZE, 18),
     terminalFontSize: boundedFontSize(values.terminalFontSize, DEFAULT_TERMINAL_FONT_SIZE),
     chatFontSize: boundedFontSize(values.chatFontSize, DEFAULT_CHAT_FONT_SIZE),
@@ -111,21 +127,35 @@ function sanitize(values: Partial<TypographyPreferences>): TypographyPreferences
 }
 
 export function terminalTypographyChanged(state: TypographyPreferences, previous: TypographyPreferences): boolean {
-  return state.terminalFontSize !== previous.terminalFontSize || state.terminalFontPreset !== previous.terminalFontPreset
-    || state.terminalFontWeight !== previous.terminalFontWeight || state.terminalLineHeight !== previous.terminalLineHeight;
+  return (
+    state.terminalFontSize !== previous.terminalFontSize ||
+    state.terminalFontPreset !== previous.terminalFontPreset ||
+    state.terminalFontWeight !== previous.terminalFontWeight ||
+    state.terminalLineHeight !== previous.terminalLineHeight
+  );
 }
 
-export const useTypographyStore = create<TypographyState>()(persist((set) => ({
-  ...defaults,
-  update: patch => set(state => sanitize({ ...state, ...patch })),
-  reset: () => set(state => ({ ...defaults, commandHighlighting: state.commandHighlighting, commandTitleCollapsed: state.commandTitleCollapsed })),
-}), {
-  name: 'vrykell-typography',
-  merge: (saved, current) => {
-    const values = saved as Partial<TypographyState> | undefined;
-    return { ...current, ...sanitize(values ?? {}) };
-  },
-}));
+export const useTypographyStore = create<TypographyState>()(
+  persist(
+    (set) => ({
+      ...defaults,
+      update: (patch) => set((state) => sanitize({ ...state, ...patch })),
+      reset: () =>
+        set((state) => ({
+          ...defaults,
+          commandHighlighting: state.commandHighlighting,
+          commandTitleCollapsed: state.commandTitleCollapsed,
+        })),
+    }),
+    {
+      name: 'vrykell-typography',
+      merge: (saved, current) => {
+        const values = saved as Partial<TypographyState> | undefined;
+        return { ...current, ...sanitize(values ?? {}) };
+      },
+    },
+  ),
+);
 
 function applyTypography(state: TypographyState): void {
   if (typeof document === 'undefined') return;
@@ -142,7 +172,10 @@ function applyTypography(state: TypographyState): void {
   root.setProperty('--terminal-font-family', terminalFontFamily(state.terminalFontPreset));
   root.setProperty('--terminal-font-weight', String(state.terminalFontWeight));
   root.setProperty('--terminal-bold-weight', String(Math.max(700, state.terminalFontWeight)));
-  root.setProperty('--terminal-input-row-height', `${Math.ceil(Math.max(22, state.terminalFontSize * 16 / 14) * state.terminalLineHeight)}px`);
+  root.setProperty(
+    '--terminal-input-row-height',
+    `${Math.ceil(Math.max(22, (state.terminalFontSize * 16) / 14) * state.terminalLineHeight)}px`,
+  );
   root.setProperty('--terminal-command-weight', String(Math.min(900, state.terminalFontWeight + 100)));
   root.setProperty('--terminal-ime-cursor-animation', state.compositionCursorBlink ? 'cursor-blink 1s step-end infinite' : 'none');
   // `--terminal-row-height` is the terminal cell height: it belongs to the resolved font, so the

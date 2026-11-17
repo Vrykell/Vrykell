@@ -2,7 +2,11 @@ import { afterEach, expect, it } from 'vitest';
 import { contrast, resolveThemePreset, themePresets } from '../presets';
 import { applyTheme, cacheThemePresets, getPresetPalette, paletteToCssVars, setThemeOverrides, themes } from '../tokens';
 
-afterEach(() => { localStorage.removeItem('vrykell-theme-presets'); setThemeOverrides({}); applyTheme('dark'); });
+afterEach(() => {
+  localStorage.removeItem('vrykell-theme-presets');
+  setThemeOverrides({});
+  applyTheme('dark');
+});
 
 it('preserves every original token and falls back for unknown or mismatched presets', () => {
   for (const mode of ['dark', 'light'] as const) {
@@ -10,7 +14,7 @@ it('preserves every original token and falls back for unknown or mismatched pres
     expect(getPresetPalette(mode, 'missing')).toBe(themes[mode]);
     expect(getPresetPalette(mode, mode === 'dark' ? 'alucard' : 'dracula')).toBe(themes[mode]);
   }
-  expect(new Set(themePresets.map(preset => preset.id)).size).toBe(11);
+  expect(new Set(themePresets.map((preset) => preset.id)).size).toBe(11);
   expect(resolveThemePreset('dark', 'alucard').id).toBe('default-dark');
 });
 
@@ -21,7 +25,7 @@ it('offers a near-black palette with darker surfaces and readable secondary text
   const brightness = (hex: string) => [1, 3, 5].reduce((sum, index) => sum + parseInt(hex.slice(index, index + 2), 16), 0);
   for (const role of ['canvas', 'sidebarBg', 'cardBg', 'fieldBg', 'codeBg', 'xtermBg'] as const) {
     expect(brightness(palette[role])).toBeLessThan(brightness(themes.dark[role]));
-    const channels = [1, 3, 5].map(index => parseInt(palette[role].slice(index, index + 2), 16));
+    const channels = [1, 3, 5].map((index) => parseInt(palette[role].slice(index, index + 2), 16));
     expect(new Set(channels).size).toBe(1);
   }
   expect(contrast(palette.textMuted, palette.fieldBg)).toBeGreaterThanOrEqual(4.5);
@@ -39,7 +43,7 @@ it('offers a near-black palette with darker surfaces and readable secondary text
 });
 
 it('maps each scheme across application, editor and terminal with readable controls', () => {
-  for (const preset of themePresets.filter(item => item.seed)) {
+  for (const preset of themePresets.filter((item) => item.seed)) {
     const palette = getPresetPalette(preset.mode, preset.id);
     expect(palette.xtermBg).toBe(preset.seed!.terminalBackground ?? preset.seed!.background);
     expect(palette.canvas).toBe(preset.seed!.background);
@@ -52,8 +56,16 @@ it('maps each scheme across application, editor and terminal with readable contr
     expect(contrast(palette.errorText, palette.error)).toBeGreaterThanOrEqual(4.5);
     expect(contrast(palette.segmentedText, palette.segmentedThumb)).toBeGreaterThanOrEqual(4.5);
     const divider = palette.resizeDivider.match(/[\d.]+/g)!.map(Number);
-    const background = [1, 3, 5].map(index => parseInt(palette.canvas.slice(index, index + 2), 16));
-    const painted = '#' + background.map((value, index) => Math.round(value * (1 - divider[3]) + divider[index] * divider[3]).toString(16).padStart(2, '0')).join('');
+    const background = [1, 3, 5].map((index) => parseInt(palette.canvas.slice(index, index + 2), 16));
+    const painted =
+      '#' +
+      background
+        .map((value, index) =>
+          Math.round(value * (1 - divider[3]) + divider[index] * divider[3])
+            .toString(16)
+            .padStart(2, '0'),
+        )
+        .join('');
     expect(contrast(painted, palette.canvas)).toBeLessThan(1.2);
     expect(Object.keys(paletteToCssVars(palette))).toEqual(Object.keys(paletteToCssVars(themes[preset.mode])));
   }
@@ -69,30 +81,48 @@ it('remembers independent mode choices and retains custom overrides when switchi
   applyTheme('light');
   expect(document.documentElement.dataset.themePreset).toBe('catppuccin-latte');
   expect(document.documentElement.style.getPropertyValue('--xterm-bg')).toBe('#EFF1F5');
-  cacheThemePresets({}); setThemeOverrides({}); applyTheme('dark');
+  cacheThemePresets({});
+  setThemeOverrides({});
+  applyTheme('dark');
   expect(document.documentElement.style.getPropertyValue('--canvas')).toBe(themes.dark.canvas);
 });
 
 it('gives bright schemes independent surface separation and readable colored terminal text', () => {
-  for (const preset of themePresets.filter(item => item.mode === 'light' && item.seed)) {
+  for (const preset of themePresets.filter((item) => item.mode === 'light' && item.seed)) {
     const palette = getPresetPalette('light', preset.id);
     expect(contrast(palette.canvas, palette.cardBg)).toBeGreaterThanOrEqual(1.12);
     expect(contrast(palette.textPrimary, palette.canvas)).toBeGreaterThanOrEqual(7);
     for (const color of [palette.textSecondary, palette.textMuted, palette.cmdProgram, palette.cmdPath, palette.cmdString]) {
       expect(contrast(color, palette.hover)).toBeGreaterThanOrEqual(4.5);
     }
-    for (const color of [palette.xtermBlack, palette.xtermRed, palette.xtermGreen, palette.xtermYellow,
-      palette.xtermBlue, palette.xtermMagenta, palette.xtermCyan, palette.xtermWhite]) {
+    for (const color of [
+      palette.xtermBlack,
+      palette.xtermRed,
+      palette.xtermGreen,
+      palette.xtermYellow,
+      palette.xtermBlue,
+      palette.xtermMagenta,
+      palette.xtermCyan,
+      palette.xtermWhite,
+    ]) {
       expect(contrast(color, palette.xtermBg)).toBeGreaterThanOrEqual(4.5);
     }
   }
 });
 
 it('keeps light preset group swatches visible without applying the text-contrast floor', () => {
-  for (const preset of themePresets.filter(item => item.mode === 'light' && item.seed)) {
+  for (const preset of themePresets.filter((item) => item.mode === 'light' && item.seed)) {
     const palette = getPresetPalette('light', preset.id);
-    for (const color of [palette.groupBlue, palette.groupGreen, palette.groupViolet, palette.groupAmber,
-      palette.groupCyan, palette.groupRose, palette.groupOrange, palette.groupCoral]) {
+    for (const color of [
+      palette.groupBlue,
+      palette.groupGreen,
+      palette.groupViolet,
+      palette.groupAmber,
+      palette.groupCyan,
+      palette.groupRose,
+      palette.groupOrange,
+      palette.groupCoral,
+    ]) {
       expect(contrast(color, palette.surface)).toBeGreaterThanOrEqual(2);
     }
   }

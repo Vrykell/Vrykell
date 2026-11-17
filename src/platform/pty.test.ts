@@ -10,7 +10,10 @@ vi.mock('@tauri-apps/api/event', () => ({ listen: listenMock }));
 import { ptySpawn, ptyWrite, ptyResize, ptyClose, ptyCloseAll, onPtyOutput, ptyInputEpoch } from '@platform/pty';
 
 describe('pty IPC wrapper', () => {
-  beforeEach(() => { invokeMock.mockReset(); listenMock.mockReset(); });
+  beforeEach(() => {
+    invokeMock.mockReset();
+    listenMock.mockReset();
+  });
 
   it('pty_spawn passes camelCase arguments and returns the id', async () => {
     invokeMock.mockResolvedValue('sess-1');
@@ -68,14 +71,16 @@ describe('pty IPC wrapper', () => {
   });
 
   it('rejects native foreground changes before the webview receives their output', async () => {
-    listenMock.mockResolvedValue(() => {}); await onPtyOutput(vi.fn());
+    listenMock.mockResolvedValue(() => {});
+    await onPtyOutput(vi.fn());
     listenMock.mock.calls[0][1]({ payload: { id: 'guarded', events: [], inputEpoch: 4 } });
     invokeMock.mockResolvedValueOnce(4);
     await expect(ptyInputEpoch('guarded')).resolves.toBe(4);
     invokeMock.mockResolvedValueOnce(5);
     await expect(ptyInputEpoch('guarded')).rejects.toThrow('terminal input target changed');
     await expect(ptyInputEpoch('unobserved')).rejects.toThrow('terminal input target changed');
-    invokeMock.mockResolvedValueOnce(undefined); await ptyWrite('guarded', 'paste', 4);
+    invokeMock.mockResolvedValueOnce(undefined);
+    await ptyWrite('guarded', 'paste', 4);
     expect(invokeMock).toHaveBeenLastCalledWith('pty_write', { id: 'guarded', data: 'paste', expectedEpoch: 4 });
   });
 });

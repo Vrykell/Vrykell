@@ -135,8 +135,12 @@ export const acpHandshake = (name: string) => invoke<AgentDescription>('acp_hand
 /** Start a harness and open a session in `cwd` (an empty `cwd` gets a fresh folder in the app's
  *  default ACP workspace). Passing `resumeSessionId` reopens that session and replays its
  *  conversation instead. */
-export const acpOpen = (name: string, cwd: string, resumeSessionId?: string, appTools?: Array<{ name: string; description?: string; inputSchema: Record<string, unknown> }>) =>
-  invoke<HarnessOpenResult>('acp_open', { name, cwd, resumeSessionId: resumeSessionId ?? null, appTools: appTools ?? null });
+export const acpOpen = (
+  name: string,
+  cwd: string,
+  resumeSessionId?: string,
+  appTools?: Array<{ name: string; description?: string; inputSchema: Record<string, unknown> }>,
+) => invoke<HarnessOpenResult>('acp_open', { name, cwd, resumeSessionId: resumeSessionId ?? null, appTools: appTools ?? null });
 
 export const acpAppToolResult = (sessionId: string, requestId: string, payload: unknown) =>
   invoke<void>('acp_app_tool_result', { sessionId, requestId, payload });
@@ -170,13 +174,26 @@ export const acpAnswerPermission = (sessionId: string, toolCallId: string, optio
   invoke<void>('acp_answer_permission', { sessionId, toolCallId, optionId });
 
 export interface AcpQuestionField {
-  key: string; title: string; description: string; kind: 'string' | 'number' | 'integer' | 'boolean' | 'array'; required: boolean;
+  key: string;
+  title: string;
+  description: string;
+  kind: 'string' | 'number' | 'integer' | 'boolean' | 'array';
+  required: boolean;
   options: Array<{ value: string; label: string; description: string }>;
   default: string | number | boolean | string[] | null;
-  minimum: number | null; maximum: number | null; minLength: number; maxLength: number; minItems: number; maxItems: number;
+  minimum: number | null;
+  maximum: number | null;
+  minLength: number;
+  maxLength: number;
+  minItems: number;
+  maxItems: number;
 }
-export interface AcpQuestion { requestId: string; form: { message: string; fields: AcpQuestionField[] } }
-export type AcpQuestionResponse = { action: 'accept'; content: Record<string, string | number | boolean | string[]> } | { action: 'decline' | 'cancel' };
+export interface AcpQuestion {
+  requestId: string;
+  form: { message: string; fields: AcpQuestionField[] };
+}
+export type AcpQuestionResponse =
+  { action: 'accept'; content: Record<string, string | number | boolean | string[]> } | { action: 'decline' | 'cancel' };
 export const acpAnswerElicitation = (sessionId: string, requestId: string, response: AcpQuestionResponse) =>
   invoke<void>('acp_answer_elicitation', { sessionId, requestId, response });
 
@@ -207,8 +224,7 @@ export const acpTranscriptGet = (harness: string, sessionId: string) =>
   invoke<AcpTranscriptDetail | null>('acp_transcript_get', { harness, sessionId });
 
 /** Delete the local copy; an agent's own history is not touched. */
-export const acpTranscriptDelete = (harness: string, sessionId: string) =>
-  invoke<void>('acp_transcript_delete', { harness, sessionId });
+export const acpTranscriptDelete = (harness: string, sessionId: string) => invoke<void>('acp_transcript_delete', { harness, sessionId });
 
 /** Merge adjacent text deltas while preserving every boundary in delivery order. */
 export function batchAcpEvents(handler: (event: AcpSessionEvent) => void) {
@@ -216,38 +232,68 @@ export function batchAcpEvents(handler: (event: AcpSessionEvent) => void) {
   let timer: ReturnType<typeof setTimeout> | undefined;
   const chunk = (event: AcpSessionEvent) => {
     const params = event.payload.params;
-    const update = (params && typeof params === 'object' ? (params as Record<string, unknown>).update : event.payload.update) as Record<string, unknown> | undefined;
+    const update = (params && typeof params === 'object' ? (params as Record<string, unknown>).update : event.payload.update) as
+      Record<string, unknown> | undefined;
     const content = update?.content as Record<string, unknown> | undefined;
-    return event.kind === 'update' && ['agent_message_chunk', 'agent_thought_chunk', 'user_message_chunk'].includes(String(update?.sessionUpdate))
-      && content?.type === 'text' && typeof content.text === 'string' ? { update: update!, content, text: content.text } : undefined;
+    return event.kind === 'update' &&
+      ['agent_message_chunk', 'agent_thought_chunk', 'user_message_chunk'].includes(String(update?.sessionUpdate)) &&
+      content?.type === 'text' &&
+      typeof content.text === 'string'
+      ? { update: update!, content, text: content.text }
+      : undefined;
   };
-  const clear = () => { clearTimeout(timer); timer = undefined; };
-  const flush = () => { clear(); const event = pending; pending = undefined; if (event) handler(event); };
+  const clear = () => {
+    clearTimeout(timer);
+    timer = undefined;
+  };
+  const flush = () => {
+    clear();
+    const event = pending;
+    pending = undefined;
+    if (event) handler(event);
+  };
   return {
     push(event: AcpSessionEvent) {
       const next = chunk(event);
       const previous = pending && chunk(pending);
-      if (pending && previous && next && pending.sessionId === event.sessionId
-        && previous.update.sessionUpdate === next.update.sessionUpdate && previous.text.length + next.text.length <= 64_000
-        && JSON.stringify({ ...previous.update, content: { ...previous.content, text: undefined } })
-          === JSON.stringify({ ...next.update, content: { ...next.content, text: undefined } })) {
+      if (
+        pending &&
+        previous &&
+        next &&
+        pending.sessionId === event.sessionId &&
+        previous.update.sessionUpdate === next.update.sessionUpdate &&
+        previous.text.length + next.text.length <= 64_000 &&
+        JSON.stringify({ ...previous.update, content: { ...previous.content, text: undefined } }) ===
+          JSON.stringify({ ...next.update, content: { ...next.content, text: undefined } })
+      ) {
         previous.content.text = previous.text + next.text;
         return;
       }
       flush();
-      if (!next) { handler(event); return; }
+      if (!next) {
+        handler(event);
+        return;
+      }
       const update = { ...next.update, content: { ...next.content } };
       const params = event.payload.params;
-      pending = { ...event, payload: params && typeof params === 'object'
-        ? { ...event.payload, params: { ...params, update } } : { ...event.payload, update } };
+      pending = {
+        ...event,
+        payload: params && typeof params === 'object' ? { ...event.payload, params: { ...params, update } } : { ...event.payload, update },
+      };
       timer = setTimeout(flush, 50);
     },
-    dispose() { clear(); pending = undefined; },
+    dispose() {
+      clear();
+      pending = undefined;
+    },
   };
 }
 
 export async function onAcpSession(handler: (event: AcpSessionEvent) => void): Promise<UnlistenFn> {
   const batch = batchAcpEvents(handler);
-  const unlisten = await listen<AcpSessionEvent>('acp://session', event => batch.push(event.payload));
-  return () => { batch.dispose(); unlisten(); };
+  const unlisten = await listen<AcpSessionEvent>('acp://session', (event) => batch.push(event.payload));
+  return () => {
+    batch.dispose();
+    unlisten();
+  };
 }

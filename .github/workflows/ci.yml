@@ -40,6 +40,7 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm audit --audit-level=moderate --registry=https://registry.npmjs.org
+      - run: npm run format:check
       - run: npx tsc --noEmit
       - run: npm run test -- --maxWorkers=4 --testTimeout=15000
       - run: npm run check:architecture

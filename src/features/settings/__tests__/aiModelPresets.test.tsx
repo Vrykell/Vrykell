@@ -19,24 +19,35 @@ vi.mock('@platform/diagnostics', () => ({ invoke: invokeMock }));
 const DEEPSEEK = MODEL_PRESETS.find((preset) => preset.name === 'DeepSeek')!;
 
 const SEED = {
-  id: 'm0', name: 'Seeded', provider: 'openai-compatible' as const,
-  baseUrl: 'https://api.openai.com/v1', model: 'gpt-4o-mini',
+  id: 'm0',
+  name: 'Seeded',
+  provider: 'openai-compatible' as const,
+  baseUrl: 'https://api.openai.com/v1',
+  model: 'gpt-4o-mini',
 };
 
 beforeEach(() => {
   invokeMock.mockReset();
   invokeMock.mockResolvedValue({});
   useAiConfigStore.setState({
-    models: [{ ...SEED }], activeModel: 'm0',
-    provider: 'openai-compatible', baseUrl: SEED.baseUrl, model: SEED.model,
+    models: [{ ...SEED }],
+    activeModel: 'm0',
+    provider: 'openai-compatible',
+    baseUrl: SEED.baseUrl,
+    model: SEED.model,
   });
 });
 
 describe('AiModelPage presets', () => {
   it('uses shared sync feedback and suppresses duplicate endpoint requests', async () => {
     let finish!: (models: string[]) => void;
-    invokeMock.mockImplementation((command: string) => command === 'provider_fetch_models'
-      ? new Promise<string[]>(resolve => { finish = resolve; }) : Promise.resolve({}));
+    invokeMock.mockImplementation((command: string) =>
+      command === 'provider_fetch_models'
+        ? new Promise<string[]>((resolve) => {
+            finish = resolve;
+          })
+        : Promise.resolve({}),
+    );
     render(<AiModelPage />);
     const sync = await screen.findByTestId('model-sync');
     fireEvent.click(sync);
@@ -44,8 +55,10 @@ describe('AiModelPage presets', () => {
     expect(sync).toHaveAttribute('aria-disabled', 'true');
     fireEvent.click(sync);
     expect(invokeMock.mock.calls.filter(([command]) => command === 'provider_fetch_models')).toHaveLength(1);
-    await act(async () => { finish(['extra-model']); });
-    await waitFor(() => expect(useAiConfigStore.getState().models.some(model => model.model === 'extra-model')).toBe(true));
+    await act(async () => {
+      finish(['extra-model']);
+    });
+    await waitFor(() => expect(useAiConfigStore.getState().models.some((model) => model.model === 'extra-model')).toBe(true));
     await waitFor(() => expect(sync).toHaveAttribute('aria-busy', 'false'), { timeout: 2000 });
   });
   it('fills a new model row from the preset and makes it active', async () => {

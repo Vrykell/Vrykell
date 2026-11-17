@@ -48,7 +48,7 @@ export function blockBackgroundValue(color: string): string {
 /** The preset of one block type matching a stored colour, or null for a custom value. */
 export function blockColorPreset(group: BlockColorGroup, value: string): BlockColorPreset | null {
   const normalized = value.trim().toLowerCase();
-  return BLOCK_COLOR_PRESETS[group].find(preset => preset.value.toLowerCase() === normalized) ?? null;
+  return BLOCK_COLOR_PRESETS[group].find((preset) => preset.value.toLowerCase() === normalized) ?? null;
 }
 
 /**
@@ -58,6 +58,6 @@ export function blockColorPreset(group: BlockColorGroup, value: string): BlockCo
  * value came from a custom theme.
  */
 export function blockColorOptions(group: BlockColorGroup, value: string): { key: string | null; value: string }[] {
-  const presets = BLOCK_COLOR_PRESETS[group].map(preset => ({ key: preset.name, value: preset.value }));
+  const presets = BLOCK_COLOR_PRESETS[group].map((preset) => ({ key: preset.name, value: preset.value }));
   return blockColorPreset(group, value) ? presets : [...presets, { key: null, value }];
 }

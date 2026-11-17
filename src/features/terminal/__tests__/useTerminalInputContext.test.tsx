@@ -59,10 +59,9 @@ describe('useTerminalInputContext', () => {
       useTerminalStore.setState({ scenes: { [paneId]: 'altScreen' }, focusedPaneId: paneId, sessions: {} });
     });
 
-    const { result, rerender } = renderHook(
-      ({ isLongRunning }) => useTerminalInputContext({ paneId, isLongRunning }),
-      { initialProps: { isLongRunning: false } },
-    );
+    const { result, rerender } = renderHook(({ isLongRunning }) => useTerminalInputContext({ paneId, isLongRunning }), {
+      initialProps: { isLongRunning: false },
+    });
     expect(result.current.visible).toBe(false);
 
     act(() => useTerminalStore.setState({ scenes: { [paneId]: 'classic' } }));

@@ -9,14 +9,19 @@ const run: ToolRun = { toolCallId: 'question', toolName: 'ask_user', state: 'inp
 
 it('leaves failed, refused and cancelled question feedback to the owning status card', () => {
   for (const state of ['error', 'denied', 'cancelled'] as const) {
-    const view = render(<ToolQuestion run={{ ...run, state, error: 'Question ended', output: JSON.stringify({ ok: false, error: 'Question ended' }) }} />);
+    const view = render(
+      <ToolQuestion run={{ ...run, state, error: 'Question ended', output: JSON.stringify({ ok: false, error: 'Question ended' }) }} />,
+    );
     expect(view.container).toBeEmptyDOMElement();
     view.unmount();
   }
 });
 
 it('answers an option inside the owning transcript without a permission prompt', async () => {
-  const pending = requestUserAnswer(questionKey('owner', run.toolCallId), { question: 'Which target?', options: ['Preview', 'Production'] });
+  const pending = requestUserAnswer(questionKey('owner', run.toolCallId), {
+    question: 'Which target?',
+    options: ['Preview', 'Production'],
+  });
   render(<ToolQuestion run={run} conversationId="owner" />);
   expect(screen.getByText('Which target?')).toBeVisible();
   expect(screen.getByRole('textbox', { name: '你的回答' })).toHaveClass('text-input-field');
@@ -29,7 +34,17 @@ it('answers an option inside the owning transcript without a permission prompt',
 });
 
 it('restores the selected option without making the saved question interactive', () => {
-  render(<ToolQuestion run={{ ...run, state: 'done', input: { options: ['Preview', 'Production'] }, output: JSON.stringify({ ok: true, answered: true, answer: 'Production' }) }} conversationId="owner" />);
+  render(
+    <ToolQuestion
+      run={{
+        ...run,
+        state: 'done',
+        input: { options: ['Preview', 'Production'] },
+        output: JSON.stringify({ ok: true, answered: true, answer: 'Production' }),
+      }}
+      conversationId="owner"
+    />,
+  );
   expect(screen.getByTestId('tool-question-result')).toHaveTextContent('Production');
   expect(screen.queryByText('Preview')).toBeNull();
   expect(screen.queryByRole('button')).toBeNull();
@@ -59,8 +74,14 @@ it('does not resurrect a persisted request or expose another conversation’s li
   expect(screen.queryByRole('textbox')).toBeNull();
   expect(screen.getByTestId('tool-question-result')).toHaveTextContent('此问题已失效');
   expect(screen.queryByText('Private question')).toBeNull();
-  controller.abort(); await pending;
-  view.rerender(<ToolQuestion run={{ ...run, state: 'done', output: JSON.stringify({ ok: true, answered: true, answer: 'Saved answer' }) }} conversationId="owner" />);
+  controller.abort();
+  await pending;
+  view.rerender(
+    <ToolQuestion
+      run={{ ...run, state: 'done', output: JSON.stringify({ ok: true, answered: true, answer: 'Saved answer' }) }}
+      conversationId="owner"
+    />,
+  );
   expect(screen.getByText('Saved answer')).toBeVisible();
   expect(useUserQuestions.getState().pending).toEqual({});
 });

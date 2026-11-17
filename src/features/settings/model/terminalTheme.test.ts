@@ -10,7 +10,11 @@ const { invokeMock, convertFileSrcMock } = vi.hoisted(() => ({
 vi.mock('@tauri-apps/api/core', () => ({ invoke: invokeMock, convertFileSrc: convertFileSrcMock }));
 
 import {
-  useTerminalThemeStore, applyCachedWallpaper, reapplyXtermTheme, applyTerminalTheme, getThemePath,
+  useTerminalThemeStore,
+  applyCachedWallpaper,
+  reapplyXtermTheme,
+  applyTerminalTheme,
+  getThemePath,
 } from '@features/settings/model/terminalTheme';
 
 const baseConfig = { opacity: 1, backgroundImage: null, vars: {} };
@@ -28,7 +32,9 @@ describe('terminalTheme store', () => {
     await useTerminalThemeStore.getState().update({ darkPreset: 'dracula', lightPreset: 'alucard' });
     applyTerminalTheme(useTerminalThemeStore.getState().config, 'light');
     expect(document.documentElement.dataset.themePreset).toBe('alucard');
-    expect(invokeMock).toHaveBeenCalledWith('set_theme_config', { config: expect.objectContaining({ darkPreset: 'dracula', lightPreset: 'alucard' }) });
+    expect(invokeMock).toHaveBeenCalledWith('set_theme_config', {
+      config: expect.objectContaining({ darkPreset: 'dracula', lightPreset: 'alucard' }),
+    });
     invokeMock.mockRejectedValue(new Error('disk unavailable'));
     await expect(useTerminalThemeStore.getState().update({ lightPreset: 'nord-light' })).rejects.toThrow('disk unavailable');
     expect(document.documentElement.dataset.themePreset).toBe('nord-light');
@@ -68,9 +74,12 @@ describe('terminalTheme store', () => {
     await s.update({ backgroundImage: '/b/new.jpg' });
     expect(useTerminalThemeStore.getState().wallpaperDataUrl).toBe('asset:///new.jpg');
     expect(localStorage.getItem('vrykell-wallpaper-url')).toBe('asset:///new.jpg');
-    expect(invokeMock).toHaveBeenLastCalledWith('set_theme_config', expect.objectContaining({
-      config: expect.objectContaining({ backgroundImage: '/b/new.jpg' }),
-    }));
+    expect(invokeMock).toHaveBeenLastCalledWith(
+      'set_theme_config',
+      expect.objectContaining({
+        config: expect.objectContaining({ backgroundImage: '/b/new.jpg' }),
+      }),
+    );
     invokeMock.mockRejectedValueOnce(new Error('boom'));
     await useTerminalThemeStore.getState().update({ opacity: 0.3 });
     expect(useTerminalThemeStore.getState().config.opacity).toBe(0.3);
@@ -79,7 +88,12 @@ describe('terminalTheme store', () => {
   it('update: does not apply the wallpaper URL before the backend authorization completes', async () => {
     convertFileSrcMock.mockReturnValue('asset:///late.jpg');
     let release: () => void = () => {};
-    invokeMock.mockImplementation(() => new Promise<void>(resolve => { release = () => resolve(); }));
+    invokeMock.mockImplementation(
+      () =>
+        new Promise<void>((resolve) => {
+          release = () => resolve();
+        }),
+    );
     const pending = useTerminalThemeStore.getState().update({ backgroundImage: '/c/late.jpg' });
     expect(useTerminalThemeStore.getState().wallpaperDataUrl).toBeNull();
     release();

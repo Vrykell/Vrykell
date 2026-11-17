@@ -9,7 +9,9 @@ export function useFileDirectoryShortcuts(enabled: boolean, terminal?: () => voi
       if (!action || document.querySelector('[role="dialog"], [role="menu"], [role="listbox"], [data-settings-open="true"]')) return;
       const run = action === 'terminal' ? terminal : panel;
       if (!run) return;
-      event.preventDefault(); event.stopImmediatePropagation(); run();
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      run();
     };
     window.addEventListener('keydown', onKey, true);
     return () => window.removeEventListener('keydown', onKey, true);

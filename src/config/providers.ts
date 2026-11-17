@@ -31,9 +31,10 @@ export interface ProviderDefinition {
 export const PROVIDERS: ProviderDefinition[] = providerData as ProviderDefinition[];
 
 /** Default endpoint per family, keyed by the family identifier. */
-export const DEFAULT_BASE_URLS = Object.fromEntries(
-  PROVIDERS.map((provider) => [provider.kind, provider.defaultBaseUrl]),
-) as Record<ProviderKind, string>;
+export const DEFAULT_BASE_URLS = Object.fromEntries(PROVIDERS.map((provider) => [provider.kind, provider.defaultBaseUrl])) as Record<
+  ProviderKind,
+  string
+>;
 
 /** The definition of one family; unknown identifiers fall back to the first entry. */
 export function providerDefinition(kind: ProviderKind): ProviderDefinition {

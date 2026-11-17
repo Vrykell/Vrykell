@@ -4,53 +4,57 @@ import { pickPlacementZone } from './placement';
 import { gotoSetting } from './settings';
 import { openWorkspaceActions } from './workbench';
 
-for (const theme of ['dark', 'light']) test(`keeps layouts inside tabs and shows Start only when empty in ${theme}`, async ({ page }, info) => {
-  await setupTauriMock(page, {});
-  await page.addInitScript(theme => {
-    localStorage.setItem('vrykell-startup-mode', 'empty');
-    localStorage.setItem('vrykell-theme-mode', theme);
-  }, theme);
-  await page.goto('/'); await page.getByTestId('workspace-area-unified').click();
-  const workspace = page.getByTestId('unified-workspace'); const bar = page.getByTestId('workspace-instance-bar');
-  await expect(workspace.getByTestId('unified-start-page')).toBeVisible();
-  await workspace.getByTestId('unified-start-page').getByRole('button', { name: '新对话', exact: true }).click();
-  await expect(bar.getByRole('tab')).toHaveCount(1);
-  await expect(bar.getByRole('tab', { name: '开始', exact: true })).toHaveCount(0);
-  await expect(workspace.getByTestId('unified-start-page')).toHaveCount(0);
-  await workspace.locator('[data-chat-composer]').fill('first task draft');
-  const first = await workspace.locator('[data-chat-composer]').elementHandle();
-  await bar.getByRole('button', { name: '新建工作区标签', exact: true }).click();
-  await page.getByRole('menuitem', { name: '新对话', exact: true }).click();
-  await expect(bar.getByRole('tab')).toHaveCount(2);
-  await workspace.locator('[data-chat-composer]').fill('second task draft');
-  await bar.getByRole('tab').nth(0).click();
-  await expect(workspace.locator('[data-chat-composer]')).toHaveValue('first task draft');
-  await bar.getByRole('tab').nth(1).click();
-  await expect(workspace.locator('[data-chat-composer]')).toHaveValue('second task draft');
-  await page.keyboard.press('Control+d');
-  await page.getByRole('menuitem', { name: '新对话', exact: true }).click();
-  await pickPlacementZone(page, workspace.locator('.unified-pane').first(), 'right');
-  await expect(bar.getByRole('tab')).toHaveCount(1);
-  await expect(workspace.locator('.unified-pane')).toHaveCount(2);
-  await openWorkspaceActions(page);
-  await expect(page.getByRole('menuitem', { name: '放大当前窗格', exact: true })).toHaveCount(0);
-  await page.keyboard.press('Escape');
-  await expect(workspace.locator('.unified-pane')).toHaveCount(2);
-  expect(await first!.evaluate(element => element.isConnected && element.getAttribute('data-chat-composer') !== null)).toBe(true);
-  await openWorkspaceActions(page);
-  await page.getByRole('menuitem', { name: '将窗格移至新标签页', exact: true }).click();
-  await expect(bar.getByRole('tab')).toHaveCount(2);
-  await expect(workspace.locator('.unified-pane')).toHaveCount(1);
-  await page.setViewportSize({ width: 760, height: 800 });
-  await page.screenshot({ path: info.outputPath(`composition-tabs-${theme}.png`) });
-  await bar.getByRole('button', { name: '关闭标签', exact: true }).last().click();
-  await bar.getByRole('button', { name: '关闭标签', exact: true }).last().click();
-  await expect(workspace.getByTestId('unified-start-page')).toBeVisible();
-  await expect(bar.getByRole('tab', { name: '开始', exact: true })).toBeVisible();
-});
+for (const theme of ['dark', 'light'])
+  test(`keeps layouts inside tabs and shows Start only when empty in ${theme}`, async ({ page }, info) => {
+    await setupTauriMock(page, {});
+    await page.addInitScript((theme) => {
+      localStorage.setItem('vrykell-startup-mode', 'empty');
+      localStorage.setItem('vrykell-theme-mode', theme);
+    }, theme);
+    await page.goto('/');
+    await page.getByTestId('workspace-area-unified').click();
+    const workspace = page.getByTestId('unified-workspace');
+    const bar = page.getByTestId('workspace-instance-bar');
+    await expect(workspace.getByTestId('unified-start-page')).toBeVisible();
+    await workspace.getByTestId('unified-start-page').getByRole('button', { name: '新对话', exact: true }).click();
+    await expect(bar.getByRole('tab')).toHaveCount(1);
+    await expect(bar.getByRole('tab', { name: '开始', exact: true })).toHaveCount(0);
+    await expect(workspace.getByTestId('unified-start-page')).toHaveCount(0);
+    await workspace.locator('[data-chat-composer]').fill('first task draft');
+    const first = await workspace.locator('[data-chat-composer]').elementHandle();
+    await bar.getByRole('button', { name: '新建工作区标签', exact: true }).click();
+    await page.getByRole('menuitem', { name: '新对话', exact: true }).click();
+    await expect(bar.getByRole('tab')).toHaveCount(2);
+    await workspace.locator('[data-chat-composer]').fill('second task draft');
+    await bar.getByRole('tab').nth(0).click();
+    await expect(workspace.locator('[data-chat-composer]')).toHaveValue('first task draft');
+    await bar.getByRole('tab').nth(1).click();
+    await expect(workspace.locator('[data-chat-composer]')).toHaveValue('second task draft');
+    await page.keyboard.press('Control+d');
+    await page.getByRole('menuitem', { name: '新对话', exact: true }).click();
+    await pickPlacementZone(page, workspace.locator('.unified-pane').first(), 'right');
+    await expect(bar.getByRole('tab')).toHaveCount(1);
+    await expect(workspace.locator('.unified-pane')).toHaveCount(2);
+    await openWorkspaceActions(page);
+    await expect(page.getByRole('menuitem', { name: '放大当前窗格', exact: true })).toHaveCount(0);
+    await page.keyboard.press('Escape');
+    await expect(workspace.locator('.unified-pane')).toHaveCount(2);
+    expect(await first!.evaluate((element) => element.isConnected && element.getAttribute('data-chat-composer') !== null)).toBe(true);
+    await openWorkspaceActions(page);
+    await page.getByRole('menuitem', { name: '将窗格移至新标签页', exact: true }).click();
+    await expect(bar.getByRole('tab')).toHaveCount(2);
+    await expect(workspace.locator('.unified-pane')).toHaveCount(1);
+    await page.setViewportSize({ width: 760, height: 800 });
+    await page.screenshot({ path: info.outputPath(`composition-tabs-${theme}.png`) });
+    await bar.getByRole('button', { name: '关闭标签', exact: true }).last().click();
+    await bar.getByRole('button', { name: '关闭标签', exact: true }).last().click();
+    await expect(workspace.getByTestId('unified-start-page')).toBeVisible();
+    await expect(bar.getByRole('tab', { name: '开始', exact: true })).toBeVisible();
+  });
 
 test('starts ACP in the side panel and moves the same connection back to the workspace', async ({ page }, info) => {
-  await setupTauriMock(page, {}); await page.goto('/');
+  await setupTauriMock(page, {});
+  await page.goto('/');
   const originalSpawns = await page.evaluate(() => (window as unknown as { __PTY_SPAWNS__: unknown[] }).__PTY_SPAWNS__.length);
   await page.locator('[data-dock-btn="chat"]').click();
   const sidebar = page.getByTestId('ai-sidebar-content');
@@ -63,10 +67,12 @@ test('starts ACP in the side panel and moves the same connection back to the wor
   await launcher.getByTestId('acp-launcher-directory').fill('/work/sidebar');
   await launcher.getByTestId('acp-launcher-Fake ACP').click();
   const input = sidebar.locator('[data-chat-composer]');
-  await expect(input).toBeVisible(); await input.fill('side agent draft');
+  await expect(input).toBeVisible();
+  await input.fill('side agent draft');
   const host = await input.elementHandle();
   await expect(page.getByTestId('workspace-area-terminal')).toHaveAttribute('aria-current', 'page');
-  if (!await page.getByRole('dialog', { name: '会话设置', exact: true }).isVisible()) await sidebar.getByRole('button', { name: '会话设置', exact: true }).click();
+  if (!(await page.getByRole('dialog', { name: '会话设置', exact: true }).isVisible()))
+    await sidebar.getByRole('button', { name: '会话设置', exact: true }).click();
   await expect(page.getByTestId('harness-execution-target')).toBeVisible();
   await page.keyboard.press('Escape');
   const lead = (await sidebar.locator('.chat-composer-lead').boundingBox())!;
@@ -77,54 +83,74 @@ test('starts ACP in the side panel and moves the same connection back to the wor
   await page.getByTestId('ai-return-to-workspace').click();
   await expect(page.getByTestId('workspace-area-ai')).toHaveAttribute('aria-current', 'page');
   await expect(page.locator('[data-chat-composer]:visible')).toHaveValue('side agent draft');
-  expect(await host!.evaluate(element => element.isConnected)).toBe(true);
+  expect(await host!.evaluate((element) => element.isConnected)).toBe(true);
   expect(await page.evaluate(() => (window as unknown as { __PTY_SPAWNS__: unknown[] }).__PTY_SPAWNS__.length)).toBe(originalSpawns);
 });
 
-for (const theme of ['dark', 'light']) test(`uses one blue shell identity in launchers and settings in ${theme}`, async ({ page }, info) => {
-  await setupTauriMock(page, { shells: [{ id: 'powershell', label: 'Windows PowerShell', default: true }, { id: 'pwsh', label: 'PowerShell 7', default: false }] });
-  await page.addInitScript(theme => localStorage.setItem('vrykell-theme-mode', theme), theme);
-  await page.goto('/'); await page.getByTestId('tab-new-btn').click();
-  const picker = page.getByRole('dialog', { name: '新建标签页', exact: true });
-  const profile = picker.getByTestId('new-tab-option-shell:powershell');
-  const mark = profile.locator('[data-shell-mark="powershell"]');
-  await expect(mark).toBeVisible();
-  const paint = await mark.evaluate(element => ({ color: getComputedStyle(element).color, fill: getComputedStyle(element.querySelector('path')!).fill }));
-  expect(paint.fill).toBe(paint.color);
-  const channels = paint.fill.match(/\d+/g)!.map(Number);
-  expect(channels[2]).toBeGreaterThan(channels[0]!);
-  await page.keyboard.press('Escape');
-  await gotoSetting(page, 'Windows PowerShell');
-  const header = page.locator('.settings-page-header [data-shell-mark="powershell"]');
-  await expect(header).toBeVisible();
-  const all = page.locator('[data-shell-mark="powershell"]:visible');
-  expect(await all.count()).toBeGreaterThanOrEqual(2);
-  for (const icon of await all.all()) {
-    expect(await icon.locator('path').first().getAttribute('fill')).toBe('currentColor');
-    expect(await icon.locator('[id]').count()).toBe(0);
-  }
-  await page.setViewportSize({ width: 760, height: 800 });
-  await page.screenshot({ path: info.outputPath(`blue-shell-${theme}.png`) });
-});
+for (const theme of ['dark', 'light'])
+  test(`uses one blue shell identity in launchers and settings in ${theme}`, async ({ page }, info) => {
+    await setupTauriMock(page, {
+      shells: [
+        { id: 'powershell', label: 'Windows PowerShell', default: true },
+        { id: 'pwsh', label: 'PowerShell 7', default: false },
+      ],
+    });
+    await page.addInitScript((theme) => localStorage.setItem('vrykell-theme-mode', theme), theme);
+    await page.goto('/');
+    await page.getByTestId('tab-new-btn').click();
+    const picker = page.getByRole('dialog', { name: '新建标签页', exact: true });
+    const profile = picker.getByTestId('new-tab-option-shell:powershell');
+    const mark = profile.locator('[data-shell-mark="powershell"]');
+    await expect(mark).toBeVisible();
+    const paint = await mark.evaluate((element) => ({
+      color: getComputedStyle(element).color,
+      fill: getComputedStyle(element.querySelector('path')!).fill,
+    }));
+    expect(paint.fill).toBe(paint.color);
+    const channels = paint.fill.match(/\d+/g)!.map(Number);
+    expect(channels[2]).toBeGreaterThan(channels[0]!);
+    await page.keyboard.press('Escape');
+    await gotoSetting(page, 'Windows PowerShell');
+    const header = page.locator('.settings-page-header [data-shell-mark="powershell"]');
+    await expect(header).toBeVisible();
+    const all = page.locator('[data-shell-mark="powershell"]:visible');
+    expect(await all.count()).toBeGreaterThanOrEqual(2);
+    for (const icon of await all.all()) {
+      expect(await icon.locator('path').first().getAttribute('fill')).toBe('currentColor');
+      expect(await icon.locator('[id]').count()).toBe(0);
+    }
+    await page.setViewportSize({ width: 760, height: 800 });
+    await page.screenshot({ path: info.outputPath(`blue-shell-${theme}.png`) });
+  });
 
-for (const placement of ['main', 'side']) test(`creates and binds an execution terminal from the agent selector in ${placement}`, async ({ page }) => {
-  await setupTauriMock(page, {}); await page.goto('/');
-  await page.getByTestId('workspace-area-ai').click(); await page.getByTestId('harness-add-session').click();
-  await page.getByTestId('acp-launcher-Fake ACP').click();
-  if (placement === 'side') await page.getByTestId('ai-relocate').click();
-  const scope = placement === 'side' ? page.getByTestId('ai-sidebar-content') : page.locator('[data-testid="harness-page"]:visible');
-  await page.getByRole('button', { name: '会话设置', exact: true }).click();
-  const target = page.getByTestId('harness-execution-target');
-  const before = await page.evaluate(() => (window as unknown as { __PTY_SPAWNS__: unknown[] }).__PTY_SPAWNS__.length);
-  await target.click(); await page.getByRole('button', { name: '新终端', exact: true }).click();
-  const picker = page.getByRole('dialog', { name: '新建标签页', exact: true });
-  await expect(picker).toBeVisible();
-  expect(await page.evaluate(() => (window as unknown as { __PTY_SPAWNS__: unknown[] }).__PTY_SPAWNS__.length)).toBe(before);
-  await picker.getByTestId('new-tab-option-shell:bash').click();
-  await expect(scope).toBeVisible(); await expect(target).toContainText('本地终端');
-  await target.click();
-  await expect(page.getByRole('option', { name: 'Bash', exact: true })).toHaveAttribute('aria-selected', 'true');
-  await page.keyboard.press('Escape');
-  await expect(page.getByTestId(placement === 'side' ? 'workspace-area-terminal' : 'workspace-area-ai')).toHaveAttribute('aria-current', 'page');
-  await expect.poll(() => page.evaluate(() => (window as unknown as { __PTY_SPAWNS__: unknown[] }).__PTY_SPAWNS__.length)).toBe(before + 1);
-});
+for (const placement of ['main', 'side'])
+  test(`creates and binds an execution terminal from the agent selector in ${placement}`, async ({ page }) => {
+    await setupTauriMock(page, {});
+    await page.goto('/');
+    await page.getByTestId('workspace-area-ai').click();
+    await page.getByTestId('harness-add-session').click();
+    await page.getByTestId('acp-launcher-Fake ACP').click();
+    if (placement === 'side') await page.getByTestId('ai-relocate').click();
+    const scope = placement === 'side' ? page.getByTestId('ai-sidebar-content') : page.locator('[data-testid="harness-page"]:visible');
+    await page.getByRole('button', { name: '会话设置', exact: true }).click();
+    const target = page.getByTestId('harness-execution-target');
+    const before = await page.evaluate(() => (window as unknown as { __PTY_SPAWNS__: unknown[] }).__PTY_SPAWNS__.length);
+    await target.click();
+    await page.getByRole('button', { name: '新终端', exact: true }).click();
+    const picker = page.getByRole('dialog', { name: '新建标签页', exact: true });
+    await expect(picker).toBeVisible();
+    expect(await page.evaluate(() => (window as unknown as { __PTY_SPAWNS__: unknown[] }).__PTY_SPAWNS__.length)).toBe(before);
+    await picker.getByTestId('new-tab-option-shell:bash').click();
+    await expect(scope).toBeVisible();
+    await expect(target).toContainText('本地终端');
+    await target.click();
+    await expect(page.getByRole('option', { name: 'Bash', exact: true })).toHaveAttribute('aria-selected', 'true');
+    await page.keyboard.press('Escape');
+    await expect(page.getByTestId(placement === 'side' ? 'workspace-area-terminal' : 'workspace-area-ai')).toHaveAttribute(
+      'aria-current',
+      'page',
+    );
+    await expect
+      .poll(() => page.evaluate(() => (window as unknown as { __PTY_SPAWNS__: unknown[] }).__PTY_SPAWNS__.length))
+      .toBe(before + 1);
+  });

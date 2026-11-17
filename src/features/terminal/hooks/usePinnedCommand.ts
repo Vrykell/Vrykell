@@ -1,7 +1,10 @@
 import { useEffect, useRef, useState, type RefObject } from 'react';
 import { flushSync } from 'react-dom';
 
-export interface PinnedCommand { id: string; remaining: number }
+export interface PinnedCommand {
+  id: string;
+  remaining: number;
+}
 
 /**
  * Select the command whose output crosses the top edge.
@@ -53,7 +56,8 @@ export function usePinnedCommand(scrollRef: RefObject<HTMLDivElement | null>) {
       const presenceChanged = (previous === null) !== (next === null);
       currentRef.current = next;
       if (previous?.id === next?.id && next) {
-        if (!pinnedElement?.isConnected) pinnedElement = scroll.parentElement?.querySelector<HTMLElement>(':scope > .pinned-command-clip > .pinned-command') ?? null;
+        if (!pinnedElement?.isConnected)
+          pinnedElement = scroll.parentElement?.querySelector<HTMLElement>(':scope > .pinned-command-clip > .pinned-command') ?? null;
         // Scroll offsets belong to this small overlay, not a render of the entire pane.
         pinnedElement?.style.setProperty('--pinned-command-remaining', `${next.remaining}px`);
         return;
@@ -79,9 +83,9 @@ export function usePinnedCommand(scrollRef: RefObject<HTMLDivElement | null>) {
     const resize = new ResizeObserver(schedule);
     resize.observe(scroll);
     if (scroll.firstElementChild) resize.observe(scroll.firstElementChild);
-    const mutation = new MutationObserver(records => {
+    const mutation = new MutationObserver((records) => {
       // Terminal row repaints do not change the ordered history block membership.
-      if (!records.some(record => record.target === scroll.firstElementChild)) return;
+      if (!records.some((record) => record.target === scroll.firstElementChild)) return;
       blocks = readBlocks();
       schedule();
     });

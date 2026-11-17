@@ -3,12 +3,21 @@ import { createPortal } from 'react-dom';
 import { t } from '@i18n';
 import OverlayScrollbar from '@ui/layout/OverlayScrollbar';
 
-const candidates = 'textarea, [style*="overflow"], .scroll-region, .settings-content, .ui-select-options, .directory-picker-list, .global-search-body, .md pre, .md table';
+const candidates =
+  'textarea, [style*="overflow"], .scroll-region, .settings-content, .ui-select-options, .directory-picker-list, .global-search-body, .md pre, .md table';
 /** A burst of input or DOM changes is scanned once it goes quiet, so typing never pays per key. */
 const RESCAN_IDLE_MS = 120;
 /** Continuous output still refreshes the scroll surfaces at this cadence instead of waiting for silence. */
 const RESCAN_MAX_WAIT_MS = 600;
-interface Surface { element: HTMLElement; ref: RefObject<HTMLElement>; host: HTMLElement; container: HTMLElement; id: string; horizontal: boolean; vertical: boolean; }
+interface Surface {
+  element: HTMLElement;
+  ref: RefObject<HTMLElement>;
+  host: HTMLElement;
+  container: HTMLElement;
+  id: string;
+  horizontal: boolean;
+  vertical: boolean;
+}
 
 /** Stacking context that owns the content, so a popup track cannot escape above other overlays. */
 export function scrollbarLayerHost(element: HTMLElement): HTMLElement {
@@ -56,7 +65,9 @@ export default function OverlayScrollbars() {
         if (!existing || existing.host !== host || existing.horizontal !== horizontal || existing.vertical !== vertical) {
           let id = element.id;
           if (!id) {
-            do { id = `overlay-scroll-surface-${++sequence}`; } while (document.getElementById(id));
+            do {
+              id = `overlay-scroll-surface-${++sequence}`;
+            } while (document.getElementById(id));
             element.id = id;
           }
           known.set(element, { element, ref: existing?.ref ?? { current: element }, host, container, id, horizontal, vertical });
@@ -64,13 +75,16 @@ export default function OverlayScrollbars() {
         if (!element.classList.contains('overlay-scroll-target')) element.classList.add('overlay-scroll-target');
       }
       let removed = false;
-      for (const [element] of known) if (!found.has(element)) {
-        element.classList.remove('overlay-scroll-target');
-        known.delete(element);
-        removed = true;
-      }
+      for (const [element] of known)
+        if (!found.has(element)) {
+          element.classList.remove('overlay-scroll-target');
+          known.delete(element);
+          removed = true;
+        }
       const next = [...known.values()];
-      setSurfaces(previous => !removed && previous.length === next.length && previous.every((item, index) => item === next[index]) ? previous : next);
+      setSurfaces((previous) =>
+        !removed && previous.length === next.length && previous.every((item, index) => item === next[index]) ? previous : next,
+      );
       window.dispatchEvent(new Event('overlay-scroll-layout'));
     };
     const schedule = () => {
@@ -92,9 +106,13 @@ export default function OverlayScrollbars() {
       if (event.target instanceof Element && event.target.closest('.monaco-editor, .xterm')) return;
       schedule();
     };
-    const observer = new MutationObserver(records => {
-      if (records.some(record => !(record.target instanceof Element
-        && record.target.closest('[data-scroll-overlay-layer], .monaco-editor, .xterm')))) schedule();
+    const observer = new MutationObserver((records) => {
+      if (
+        records.some(
+          (record) => !(record.target instanceof Element && record.target.closest('[data-scroll-overlay-layer], .monaco-editor, .xterm')),
+        )
+      )
+        schedule();
     });
     observer.observe(document.body, { subtree: true, childList: true, attributes: true, attributeFilter: ['class', 'style'] });
     document.addEventListener('input', onInput);
@@ -111,8 +129,35 @@ export default function OverlayScrollbars() {
       layers.clear();
     };
   }, []);
-  return <>{surfaces.map(surface => createPortal(<div>
-    {surface.vertical && <OverlayScrollbar floating layerHost={surface.host} scrollRef={surface.ref} controlsId={surface.id} label={t('Scroll content')} />}
-    {surface.horizontal && <OverlayScrollbar floating horizontal layerHost={surface.host} scrollRef={surface.ref} controlsId={surface.id} label={t('Scroll content horizontally')} />}
-  </div>, surface.container, surface.id))}</>;
+  return (
+    <>
+      {surfaces.map((surface) =>
+        createPortal(
+          <div>
+            {surface.vertical && (
+              <OverlayScrollbar
+                floating
+                layerHost={surface.host}
+                scrollRef={surface.ref}
+                controlsId={surface.id}
+                label={t('Scroll content')}
+              />
+            )}
+            {surface.horizontal && (
+              <OverlayScrollbar
+                floating
+                horizontal
+                layerHost={surface.host}
+                scrollRef={surface.ref}
+                controlsId={surface.id}
+                label={t('Scroll content horizontally')}
+              />
+            )}
+          </div>,
+          surface.container,
+          surface.id,
+        ),
+      )}
+    </>
+  );
 }

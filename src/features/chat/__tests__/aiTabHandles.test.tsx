@@ -24,9 +24,7 @@ it('projects conversations, agents and system pages in one ordered strip', () =>
     sideSelected: '',
     sideSessions: [],
   });
-  expect(targets.map(target => target.handle.id)).toEqual([
-    'chat:c1', 'acp:agent-1', 'page:usage', 'page:history', 'page:start-ai',
-  ]);
+  expect(targets.map((target) => target.handle.id)).toEqual(['chat:c1', 'acp:agent-1', 'page:usage', 'page:history', 'page:start-ai']);
   expect(targets[0]).toMatchObject({ kind: 'conversation', conversationId: 'c1' });
   expect(targets[0]!.handle).toMatchObject({
     label: 'Investigation',
@@ -41,12 +39,15 @@ it('removes conversation and agent rows docked to the side or selected for the s
   const targets = projectAiTabs({
     nativeTabs: ['c1', 'c2'],
     conversations,
-    connections: [{ id: 'agent-1', harness: 'Agent', cwd: '' }, { id: 'agent-2', harness: 'Other', cwd: '/other' }],
+    connections: [
+      { id: 'agent-1', harness: 'Agent', cwd: '' },
+      { id: 'agent-2', harness: 'Other', cwd: '/other' },
+    ],
     systemPages: pages,
     sideSelected: 'chat:c1',
     sideSessions: ['acp:agent-1', 'page:usage'],
   });
-  expect(targets.map(target => target.handle.id)).toEqual(['chat:c2', 'acp:agent-2', 'page:usage', 'page:history', 'page:start-ai']);
+  expect(targets.map((target) => target.handle.id)).toEqual(['chat:c2', 'acp:agent-2', 'page:usage', 'page:history', 'page:start-ai']);
   expect(targets[1]!.handle.tip).toBe('Other · /other');
 });
 
@@ -71,6 +72,6 @@ it('presents only supported resource and utility page kinds', () => {
     sideSelected: '',
     sideSessions: [],
   });
-  expect(targets.map(target => target.handle.id)).toEqual(['chat:c1', 'page:usage', 'page:history', 'page:start-ai']);
-  expect(targets.some(target => target.handle.id === 'page:editor')).toBe(false);
+  expect(targets.map((target) => target.handle.id)).toEqual(['chat:c1', 'page:usage', 'page:history', 'page:start-ai']);
+  expect(targets.some((target) => target.handle.id === 'page:editor')).toBe(false);
 });

@@ -20,10 +20,20 @@ import {
 } from '@features/agent/model/attachments';
 
 const img: AttachmentMeta = {
-  id: 'a1', kind: 'image', name: 'shot.png', mime: 'image/png', size: 1234, blobPath: '/atts/x-shot.png',
+  id: 'a1',
+  kind: 'image',
+  name: 'shot.png',
+  mime: 'image/png',
+  size: 1234,
+  blobPath: '/atts/x-shot.png',
 };
 const file: AttachmentMeta = {
-  id: 'a2', kind: 'file', name: 'log.txt', mime: 'text/plain', size: 11, textContent: 'hello world',
+  id: 'a2',
+  kind: 'file',
+  name: 'log.txt',
+  mime: 'text/plain',
+  size: 11,
+  textContent: 'hello world',
 };
 
 describe('serialization', () => {

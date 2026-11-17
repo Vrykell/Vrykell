@@ -1,7 +1,12 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 const { invokeMock } = vi.hoisted(() => ({ invokeMock: vi.fn() }));
-vi.mock('@tauri-apps/api/core', () => ({ invoke: invokeMock, Channel: class { onmessage = (_result: unknown) => {}; } }));
+vi.mock('@tauri-apps/api/core', () => ({
+  invoke: invokeMock,
+  Channel: class {
+    onmessage = (_result: unknown) => {};
+  },
+}));
 
 import {
   validateSshConnection,
@@ -30,15 +35,34 @@ import { useHostSystems } from '@config/hostSystems';
 describe('sshApi', () => {
   it('binds challenge answers to their round, redacts them and cancels without accepting late events', async () => {
     let finish!: () => void;
-    invokeMock.mockImplementation(command => command === 'ssh_authenticate_session' ? new Promise<void>(resolve => { finish = resolve; }) : Promise.resolve());
+    invokeMock.mockImplementation((command) =>
+      command === 'ssh_authenticate_session'
+        ? new Promise<void>((resolve) => {
+            finish = resolve;
+          })
+        : Promise.resolve(),
+    );
     const controller = new AbortController();
     const challenged = vi.fn<(value: SshAuthenticationChallenge, reply: SshChallengeReply) => void>();
     const pending = sshAuthenticateInteractive({ connectionId: 's1', host: 'server.test', user: 'tester' }, controller.signal, challenged);
-    const args = invokeMock.mock.calls.find(([command]) => command === 'ssh_authenticate_session')![1] as { attemptId: string; onChallenge: { onmessage: (result: SshAuthenticationChallenge) => void } };
-    const event: SshAuthenticationChallenge = { kind: 'prompts', round: 2, target: { connectionId: 's1', host: 'server.test', port: 22, user: 'tester' }, instructions: '', prompts: [{ text: 'Code', echo: false }] };
+    const args = invokeMock.mock.calls.find(([command]) => command === 'ssh_authenticate_session')![1] as {
+      attemptId: string;
+      onChallenge: { onmessage: (result: SshAuthenticationChallenge) => void };
+    };
+    const event: SshAuthenticationChallenge = {
+      kind: 'prompts',
+      round: 2,
+      target: { connectionId: 's1', host: 'server.test', port: 22, user: 'tester' },
+      instructions: '',
+      prompts: [{ text: 'Code', echo: false }],
+    };
     args.onChallenge.onmessage(event);
     await challenged.mock.calls[0][1](['private-otp-answer']);
-    expect(invokeMock).toHaveBeenCalledWith('ssh_authentication_respond', { attemptId: args.attemptId, round: 2, responses: ['private-otp-answer'] });
+    expect(invokeMock).toHaveBeenCalledWith('ssh_authentication_respond', {
+      attemptId: args.attemptId,
+      round: 2,
+      responses: ['private-otp-answer'],
+    });
     expect(JSON.stringify(diagnosticSnapshot())).not.toContain('private-otp-answer');
     controller.abort();
     expect(invokeMock).toHaveBeenCalledWith('ssh_authentication_cancel', { attemptId: args.attemptId });
@@ -59,11 +83,20 @@ describe('sshApi', () => {
   });
   it('streams file matches before completion and cancels stale requests', async () => {
     let finish!: (result: { entries: never[]; truncated: boolean; skipped: number }) => void;
-    invokeMock.mockImplementation(command => command === 'ssh_search' ? new Promise(resolve => { finish = resolve; }) : Promise.resolve());
+    invokeMock.mockImplementation((command) =>
+      command === 'ssh_search'
+        ? new Promise((resolve) => {
+            finish = resolve;
+          })
+        : Promise.resolve(),
+    );
     const controller = new AbortController();
     const progress = vi.fn();
     const pending = sshSearchFiles('s1', '/project', 'log', controller.signal, progress);
-    const args = invokeMock.mock.calls.find(([command]) => command === 'ssh_search')![1] as { requestId: string; onProgress: { onmessage: (result: unknown) => void } };
+    const args = invokeMock.mock.calls.find(([command]) => command === 'ssh_search')![1] as {
+      requestId: string;
+      onProgress: { onmessage: (result: unknown) => void };
+    };
     const first = { entries: [{ name: 'early.log', path: '/project/early.log', is_dir: false }], truncated: false, skipped: 0 };
     args.onProgress.onmessage(first);
     expect(progress).toHaveBeenCalledWith(first);
@@ -90,13 +123,23 @@ describe('sshApi', () => {
   it('validates keepalive and jump destinations before saving', () => {
     expect(validateSshConnection({ name: 'n', host: 'h', serverAliveInterval: -1 })).toContain('保活');
     expect(validateSshConnection({ name: 'n', host: 'h', jumpHost: '-oProxyCommand=bad' })).toContain('跳板机');
-    expect(validateSshConnection({ name: 'n', host: 'h', jumpHost: 'user@jump.example.com:2222', identityFile: 'C:/Keys/test key', serverAliveInterval: 30 })).toBeNull();
+    expect(
+      validateSshConnection({
+        name: 'n',
+        host: 'h',
+        jumpHost: 'user@jump.example.com:2222',
+        identityFile: 'C:/Keys/test key',
+        serverAliveInterval: 30,
+      }),
+    ).toBeNull();
   });
 
   it('accepts usable port forwards and rejects option-shaped specs', () => {
     expect(validateSshConnection({ name: 'n', host: 'h', localForwards: ['8080:localhost:80', '127.0.0.1:9000:db:5432'] })).toBeNull();
     expect(validateSshConnection({ name: 'n', host: 'h', dynamicForwards: ['1080', '[::]:1081', '[2001:db8::1]:1082'] })).toBeNull();
-    expect(validateSshConnection({ name: 'n', host: 'h', remoteForwards: ['-oProxyCommand=x', '-:8080:localhost:80'] })).toContain('远程转发');
+    expect(validateSshConnection({ name: 'n', host: 'h', remoteForwards: ['-oProxyCommand=x', '-:8080:localhost:80'] })).toContain(
+      '远程转发',
+    );
     expect(validateSshConnection({ name: 'n', host: 'h', localForwards: ['8080:localhost'] })).toContain('本地转发');
     expect(validateSshConnection({ name: 'n', host: 'h', dynamicForwards: ['70000'] })).toContain('动态转发');
   });
@@ -107,12 +150,20 @@ describe('sshApi', () => {
     const target = { connectionId: 's1', host: 'server.test', user: 'tester' };
     await sshAuthenticateSession(target, 'password', 'dummy-password-for-redaction');
     await sshAuthenticateSession(target, 'keyPassphrase', 'dummy-passphrase-for-redaction');
-    expect(invokeMock).toHaveBeenCalledWith('ssh_authenticate_session', expect.objectContaining({
-      password: 'dummy-password-for-redaction', passphrase: '',
-    }));
-    expect(invokeMock).toHaveBeenCalledWith('ssh_authenticate_session', expect.objectContaining({
-      password: '', passphrase: 'dummy-passphrase-for-redaction',
-    }));
+    expect(invokeMock).toHaveBeenCalledWith(
+      'ssh_authenticate_session',
+      expect.objectContaining({
+        password: 'dummy-password-for-redaction',
+        passphrase: '',
+      }),
+    );
+    expect(invokeMock).toHaveBeenCalledWith(
+      'ssh_authenticate_session',
+      expect.objectContaining({
+        password: '',
+        passphrase: 'dummy-passphrase-for-redaction',
+      }),
+    );
     expect(JSON.stringify(diagnosticSnapshot())).not.toContain('dummy-password-for-redaction');
     expect(JSON.stringify(diagnosticSnapshot())).not.toContain('dummy-passphrase-for-redaction');
   });
@@ -140,7 +191,12 @@ describe('sshApi', () => {
     expect(invokeMock).toHaveBeenCalledWith('ssh_connections_list');
 
     const conn = {
-      id: 's1', name: 'n', host: 'h', user: 'root', authMethod: 'password' as const, password: 'p',
+      id: 's1',
+      name: 'n',
+      host: 'h',
+      user: 'root',
+      authMethod: 'password' as const,
+      password: 'p',
     };
     await saveSshConnection(conn);
     expect(invokeMock).toHaveBeenCalledWith('ssh_connection_save', { conn });
@@ -154,12 +210,25 @@ describe('sshApi', () => {
 
   it('sshTest / sshFsList map their arguments', async () => {
     invokeMock.mockResolvedValue({ status: 'success', host: 'h', port: 2222, message: 'Connection succeeded.' });
-    await expect(sshTest({ host: 'h', port: 2222, user: 'root', password: 'pw', proxyId: 'office' })).resolves.toMatchObject({ status: 'success' });
+    await expect(sshTest({ host: 'h', port: 2222, user: 'root', password: 'pw', proxyId: 'office' })).resolves.toMatchObject({
+      status: 'success',
+    });
     const call = invokeMock.mock.calls.find(([command]) => command === 'ssh_test');
     expect(call?.[1]).toMatchObject({
-      host: 'h', port: 2222, user: 'root', password: 'pw',
-      options: { identityFile: undefined, jumpHost: undefined, serverAliveInterval: undefined, shellIntegration: undefined,
-        localForwards: undefined, remoteForwards: undefined, dynamicForwards: undefined, proxyId: 'office' },
+      host: 'h',
+      port: 2222,
+      user: 'root',
+      password: 'pw',
+      options: {
+        identityFile: undefined,
+        jumpHost: undefined,
+        serverAliveInterval: undefined,
+        shellIntegration: undefined,
+        localForwards: undefined,
+        remoteForwards: undefined,
+        dynamicForwards: undefined,
+        proxyId: 'office',
+      },
     });
     expect((call?.[1] as { options: Record<string, unknown> }).options).not.toHaveProperty('password');
 

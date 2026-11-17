@@ -23,12 +23,22 @@ const SHORTCUTS: { keys: string[]; desc: string }[] = [
 ];
 
 export function ShortcutPage() {
-  return <SettingsGroup title={t('Keyboard shortcuts')}><div className="settings-record">
-    <div className="settings-shortcuts">
-      {SHORTCUTS.map(shortcut => <div key={shortcut.desc} className="settings-shortcut-row">
-        <span>{t(shortcut.desc)}</span>
-        <span>{shortcut.keys.map(key => <KeyHint key={key} shortcut={isMacOS ? key : key.replace('Meta', 'Control')} />)}</span>
-      </div>)}
-    </div>
-  </div></SettingsGroup>;
+  return (
+    <SettingsGroup title={t('Keyboard shortcuts')}>
+      <div className="settings-record">
+        <div className="settings-shortcuts">
+          {SHORTCUTS.map((shortcut) => (
+            <div key={shortcut.desc} className="settings-shortcut-row">
+              <span>{t(shortcut.desc)}</span>
+              <span>
+                {shortcut.keys.map((key) => (
+                  <KeyHint key={key} shortcut={isMacOS ? key : key.replace('Meta', 'Control')} />
+                ))}
+              </span>
+            </div>
+          ))}
+        </div>
+      </div>
+    </SettingsGroup>
+  );
 }

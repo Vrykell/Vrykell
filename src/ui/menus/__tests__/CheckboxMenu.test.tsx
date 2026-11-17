@@ -11,11 +11,22 @@ describe('CheckboxMenu', () => {
   it('supports compact labels, footer actions and keyboard navigation without propagating Escape', () => {
     const onClose = vi.fn();
     const parentKey = vi.fn();
-    render(<div onKeyDown={parentKey}><CheckboxMenu compact title="Shortcuts" options={options.map(option => ({ ...option, displayLabel: <kbd>{option.id}</kbd> }))}
-      onToggle={vi.fn()} onClose={onClose} footer={<button>Custom</button>} /></div>);
+    render(
+      <div onKeyDown={parentKey}>
+        <CheckboxMenu
+          compact
+          title="Shortcuts"
+          options={options.map((option) => ({ ...option, displayLabel: <kbd>{option.id}</kbd> }))}
+          onToggle={vi.fn()}
+          onClose={onClose}
+          footer={<button>Custom</button>}
+        />
+      </div>,
+    );
     expect(screen.queryByText('Shortcuts')).toBeNull();
     const first = screen.getByRole('menuitemcheckbox', { name: '命令历史' });
-    first.focus(); fireEvent.keyDown(first, { key: 'ArrowDown' });
+    first.focus();
+    fireEvent.keyDown(first, { key: 'ArrowDown' });
     expect(screen.getByRole('menuitemcheckbox', { name: '文件' })).toHaveFocus();
     fireEvent.keyDown(document.activeElement!, { key: 'End' });
     expect(screen.getByRole('button', { name: 'Custom' })).toHaveFocus();
@@ -23,7 +34,9 @@ describe('CheckboxMenu', () => {
     expect(onClose).toHaveBeenCalledOnce();
     expect(parentKey).not.toHaveBeenCalled();
   });
-  afterEach(() => { vi.useRealTimers(); });
+  afterEach(() => {
+    vi.useRealTimers();
+  });
 
   it('toggles an item and stays open', () => {
     const onToggle = vi.fn();
@@ -50,7 +63,9 @@ describe('CheckboxMenu', () => {
     vi.useFakeTimers();
     const onClose = vi.fn();
     render(<CheckboxMenu title="搜索范围" options={options} onToggle={vi.fn()} onClose={onClose} />);
-    act(() => { vi.advanceTimersByTime(1); });
+    act(() => {
+      vi.advanceTimersByTime(1);
+    });
 
     fireEvent.pointerDown(document.body);
     expect(onClose).toHaveBeenCalledOnce();
@@ -61,10 +76,13 @@ describe('CheckboxMenu', () => {
 
   it('leaves trigger presses to the trigger toggle instead of closing and reopening', () => {
     vi.useFakeTimers();
-    const trigger = document.createElement('button'); document.body.append(trigger);
+    const trigger = document.createElement('button');
+    document.body.append(trigger);
     const onClose = vi.fn();
     render(<CheckboxMenu title="Shortcuts" options={options} onToggle={vi.fn()} onClose={onClose} triggerRef={{ current: trigger }} />);
-    act(() => { vi.advanceTimersByTime(1); });
+    act(() => {
+      vi.advanceTimersByTime(1);
+    });
     fireEvent.pointerDown(trigger);
     expect(onClose).not.toHaveBeenCalled();
     fireEvent.pointerDown(document.body);
@@ -75,11 +93,15 @@ describe('CheckboxMenu', () => {
   it('closes on an outside press even when the target stops event propagation', () => {
     vi.useFakeTimers();
     const onClose = vi.fn();
-    render(<>
-      <button onPointerDown={event => event.stopPropagation()}>Outside</button>
-      <CheckboxMenu title="Filters" options={options} onToggle={vi.fn()} onClose={onClose} />
-    </>);
-    act(() => { vi.advanceTimersByTime(1); });
+    render(
+      <>
+        <button onPointerDown={(event) => event.stopPropagation()}>Outside</button>
+        <CheckboxMenu title="Filters" options={options} onToggle={vi.fn()} onClose={onClose} />
+      </>,
+    );
+    act(() => {
+      vi.advanceTimersByTime(1);
+    });
     fireEvent.pointerDown(screen.getByRole('button', { name: 'Outside' }));
     expect(onClose).toHaveBeenCalledOnce();
   });
@@ -89,7 +111,9 @@ describe('CheckboxMenu', () => {
     const firstClose = vi.fn();
     const nextClose = vi.fn();
     const view = render(<CheckboxMenu title="Filters" options={options} onToggle={vi.fn()} onClose={firstClose} />);
-    act(() => { vi.advanceTimersByTime(1); });
+    act(() => {
+      vi.advanceTimersByTime(1);
+    });
     view.rerender(<CheckboxMenu title="Filters" options={options} onToggle={vi.fn()} onClose={nextClose} />);
     fireEvent.pointerDown(document.body);
     expect(firstClose).not.toHaveBeenCalled();

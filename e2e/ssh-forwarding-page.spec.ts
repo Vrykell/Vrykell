@@ -3,9 +3,13 @@ import { setupTauriMock } from './tauri-mock';
 
 test('forwarding has its own compact page with create, edit, start, stop and delete', async ({ page }, info) => {
   await setupTauriMock(page, {});
-  await page.addInitScript(() => { localStorage.setItem('workspace-navigation-v1', JSON.stringify({ collapsed: false })); });
+  await page.addInitScript(() => {
+    localStorage.setItem('workspace-navigation-v1', JSON.stringify({ collapsed: false }));
+  });
   await page.goto('/');
-  await page.evaluate(() => { document.documentElement.dataset.nativeMaterial = 'fallback'; });
+  await page.evaluate(() => {
+    document.documentElement.dataset.nativeMaterial = 'fallback';
+  });
   await page.getByTestId('workspace-area-ssh').click();
   await page.getByTestId('ssh-forwarding-entry').click();
   const root = page.getByTestId('port-forwarding-page');
@@ -46,5 +50,6 @@ test('host list never wraps and metric menu stays inside the viewport at narrow 
   for (const row of await rows.all()) expect((await row.boundingBox())!.height).toBeLessThanOrEqual(42);
   await root.getByTestId('ssh-dashboard-metrics').click();
   const bounds = (await page.getByRole('menu', { name: '采集并显示' }).boundingBox())!;
-  expect(bounds.x).toBeGreaterThanOrEqual(0); expect(bounds.x + bounds.width).toBeLessThanOrEqual(780);
+  expect(bounds.x).toBeGreaterThanOrEqual(0);
+  expect(bounds.x + bounds.width).toBeLessThanOrEqual(780);
 });

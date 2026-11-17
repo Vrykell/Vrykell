@@ -47,8 +47,13 @@ beforeEach(() => {
 
 it('projects the visible AI strip and routes conversation selection', () => {
   const { result } = renderHook(() => useAiWorkspaceTabs());
-  expect(result.current.handles.map(handle => handle.id)).toEqual([
-    'chat:c1', 'chat:c2', 'acp:agent-1', 'page:usage', 'page:history', 'page:start-ai',
+  expect(result.current.handles.map((handle) => handle.id)).toEqual([
+    'chat:c1',
+    'chat:c2',
+    'acp:agent-1',
+    'page:usage',
+    'page:history',
+    'page:start-ai',
   ]);
   act(() => result.current.onSelect('chat:c1'));
   expect(openHarnessTab).toHaveBeenCalledOnce();

@@ -23,9 +23,14 @@ describe('history store', () => {
     const entries = useHistoryStore.getState().entries;
     expect(entries.map((e) => e.command)).toEqual(['ls', 'pwd']);
     expect(entries[0]!.exitCode).toBe(1);
-    expect(invokeMock).toHaveBeenCalledWith('record_history', expect.objectContaining({
-      command: 'ls', cwd: '/a', exitCode: 1,
-    }));
+    expect(invokeMock).toHaveBeenCalledWith(
+      'record_history',
+      expect.objectContaining({
+        command: 'ls',
+        cwd: '/a',
+        exitCode: 1,
+      }),
+    );
   });
 
   it('search: prefix matching, case insensitive, limit truncation', () => {
@@ -33,7 +38,12 @@ describe('history store', () => {
     s.record('npm run dev', '/a', 0);
     s.record('npm test', '/b', 0);
     s.record('echo hi', '/c', 0);
-    expect(useHistoryStore.getState().search('NPM').map((e) => e.command)).toEqual(['npm test', 'npm run dev']);
+    expect(
+      useHistoryStore
+        .getState()
+        .search('NPM')
+        .map((e) => e.command),
+    ).toEqual(['npm test', 'npm run dev']);
     expect(useHistoryStore.getState().search('npm', 1)).toHaveLength(1);
     expect(useHistoryStore.getState().search('zzz')).toEqual([]);
   });

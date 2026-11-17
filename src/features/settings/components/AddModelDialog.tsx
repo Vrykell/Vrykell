@@ -19,7 +19,13 @@ import SettingsDialog from './SettingsDialog';
 
 const fieldStyle = { ...inputStyle, minWidth: 0 };
 
-export default function AddModelDialog({ open, row, toast, onClose, onAdd }: {
+export default function AddModelDialog({
+  open,
+  row,
+  toast,
+  onClose,
+  onAdd,
+}: {
   open: boolean;
   row: ProviderRow<ModelProfile>;
   toast: (msg: string, type: 'info' | 'success' | 'error') => void;
@@ -53,7 +59,7 @@ export default function AddModelDialog({ open, row, toast, onClose, onAdd }: {
       name: name.trim() || id,
       provider: row.kind,
       baseUrl: row.baseUrl,
-      providerName: row.models.find(model => model.providerName)?.providerName,
+      providerName: row.models.find((model) => model.providerName)?.providerName,
       model: id,
       group: group.trim() || undefined,
       capabilities: detectCapabilities(row.kind, id),
@@ -69,24 +75,30 @@ export default function AddModelDialog({ open, row, toast, onClose, onAdd }: {
       width={460}
       initialFocus="[data-testid=add-model-id]"
       onClose={onClose}
-      footer={<>
-        <OutlineButton onClick={onClose} data-testid="add-model-cancel">{t('Cancel')}</OutlineButton>
-        <button
-          type="button"
-          className="primary-button"
-          onClick={add}
-          data-testid="add-model-confirm"
-          style={{
-            padding: '5px 16px', fontSize: 'calc(12px * var(--ui-font-scale))', border: 'none',
-            borderRadius: 'var(--radius-inner)', background: 'var(--primary-button-bg)',
-            color: 'var(--primary-button-text)', cursor: 'pointer',
-            opacity: canAdd ? 1 : 0.6,
-          }}
-        >
-          {t('Add model')}
-        </button>
-      </>}
-    >
+      footer={
+        <>
+          <OutlineButton onClick={onClose} data-testid="add-model-cancel">
+            {t('Cancel')}
+          </OutlineButton>
+          <button
+            type="button"
+            className="primary-button"
+            onClick={add}
+            data-testid="add-model-confirm"
+            style={{
+              padding: '5px 16px',
+              fontSize: 'calc(12px * var(--ui-font-scale))',
+              border: 'none',
+              borderRadius: 'var(--radius-inner)',
+              background: 'var(--primary-button-bg)',
+              color: 'var(--primary-button-text)',
+              cursor: 'pointer',
+              opacity: canAdd ? 1 : 0.6,
+            }}>
+            {t('Add model')}
+          </button>
+        </>
+      }>
       <div style={{ display: 'grid', gridTemplateColumns: 'auto 1fr', alignItems: 'center', gap: '10px 12px' }}>
         <label htmlFor="add-model-id" style={{ color: 'var(--text-secondary)', fontSize: 'var(--fs-caption)' }}>
           {t('Model ID')} <span style={{ color: 'var(--error)' }}>*</span>
@@ -99,7 +111,9 @@ export default function AddModelDialog({ open, row, toast, onClose, onAdd }: {
           data-testid="add-model-id"
           placeholder={t('For example deepseek-chat')}
           onChange={(event) => setModelId(event.target.value)}
-          onKeyDown={(event) => { if (event.key === 'Enter') add(); }}
+          onKeyDown={(event) => {
+            if (event.key === 'Enter') add();
+          }}
           style={fieldStyle}
         />
         <label htmlFor="add-model-name" style={{ color: 'var(--text-secondary)', fontSize: 'var(--fs-caption)' }}>

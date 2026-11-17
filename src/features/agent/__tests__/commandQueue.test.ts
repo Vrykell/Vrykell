@@ -3,13 +3,17 @@ import { createCommandQueue } from '../services/commandQueue';
 
 it('serializes concurrent commands before authorization and execution', async () => {
   let finish: (value: { ok: boolean; completed: boolean; output: string }) => void = () => {};
-  const pending = new Promise<{ ok: boolean; completed: boolean; output: string }>(resolve => { finish = resolve; });
+  const pending = new Promise<{ ok: boolean; completed: boolean; output: string }>((resolve) => {
+    finish = resolve;
+  });
   const first = vi.fn(() => pending);
   const second = vi.fn(async () => ({ ok: true, completed: true, output: 'second' }));
   const queue = createCommandQueue();
-  const firstResult = queue(first); const secondResult = queue(second);
+  const firstResult = queue(first);
+  const secondResult = queue(second);
   await Promise.resolve();
-  expect(first).toHaveBeenCalledOnce(); expect(second).not.toHaveBeenCalled();
+  expect(first).toHaveBeenCalledOnce();
+  expect(second).not.toHaveBeenCalled();
   finish({ ok: true, completed: true, output: 'first' });
   expect(await firstResult).toMatchObject({ output: 'first' });
   expect(await secondResult).toMatchObject({ output: 'second' });
@@ -36,7 +40,9 @@ it('keeps an unconfirmed command blocked until the terminal reports ready, then 
 it('never runs a command queued before an unconfirmed completion, even after the terminal becomes ready', async () => {
   let ready = false;
   let finish!: (value: { ok: boolean; completed: boolean; code: string }) => void;
-  const pending = new Promise<{ ok: boolean; completed: boolean; code: string }>(resolve => { finish = resolve; });
+  const pending = new Promise<{ ok: boolean; completed: boolean; code: string }>((resolve) => {
+    finish = resolve;
+  });
   const queue = createCommandQueue({ isReady: () => ready });
   const first = queue(() => pending);
   const skipped = vi.fn(async () => ({ ok: true, completed: true, output: 'recovered' }));
@@ -74,7 +80,8 @@ it('does not poison the queue after a transient busy result', async () => {
 
 it('keeps an aborted turn hard even when the terminal is ready', async () => {
   const queue = createCommandQueue({ isReady: () => true });
-  const controller = new AbortController(); controller.abort();
+  const controller = new AbortController();
+  controller.abort();
   expect(await queue(vi.fn(), controller.signal)).toMatchObject({ ok: false, completed: false, code: 'COMMAND_ABORTED' });
 
   const execute = vi.fn(async () => ({ ok: true, completed: true, output: 'no' }));

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { iconSizes, Copy, Minus, Square, X  } from '@ui/icons';
+import { iconSizes, Copy, Minus, Square, X } from '@ui/icons';
 import { getCurrentWindow, type Window } from '@tauri-apps/api/window';
 import { usesCustomWindowControls } from '@platform/runtime';
 import { t } from '@i18n';
@@ -35,7 +35,9 @@ export default function WindowControls() {
 
     void syncMaximized();
     appWindow
-      .onResized(() => { void syncMaximized(); })
+      .onResized(() => {
+        void syncMaximized();
+      })
       .then((stop) => {
         if (disposed) stop();
         else unlisten = stop;
@@ -101,8 +103,7 @@ export default function WindowControls() {
       data-testid="window-controls"
       data-window-maximized={maximized}
       style={{ display: 'flex', alignItems: 'stretch', alignSelf: 'stretch', height: '100%', flexShrink: 0 }}
-      onMouseDown={(event) => event.stopPropagation()}
-    >
+      onMouseDown={(event) => event.stopPropagation()}>
       <button
         type="button"
         data-subtle
@@ -111,8 +112,7 @@ export default function WindowControls() {
         aria-label={t('Minimize window')}
         data-tip={t('Minimize')}
         style={buttonStyle}
-        onClick={minimize}
-      >
+        onClick={minimize}>
         <Minus size={iconSizes.control} />
       </button>
       <button
@@ -123,8 +123,7 @@ export default function WindowControls() {
         aria-label={maximized ? t('Restore window') : t('Maximize window')}
         data-tip={maximized ? t('Restore') : t('Maximize')}
         style={buttonStyle}
-        onClick={toggleMaximize}
-      >
+        onClick={toggleMaximize}>
         {maximized ? <Copy size={iconSizes.compact} /> : <Square size={iconSizes.compact} />}
       </button>
       <button
@@ -136,8 +135,7 @@ export default function WindowControls() {
         aria-label={t('Close window')}
         data-tip={t('Close')}
         style={buttonStyle}
-        onClick={close}
-      >
+        onClick={close}>
         <X size={iconSizes.row} />
       </button>
     </div>

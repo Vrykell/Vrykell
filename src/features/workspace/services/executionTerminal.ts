@@ -8,9 +8,16 @@ export function createExecutionTerminal(spec: TerminalSpec) {
   const workspace = useWorkspaceStore.getState();
   const { area, aiPlacement } = useWorkspaceNavigation.getState();
   const previous = workspace.activeId;
-  const id = workspace.addTab({ kind: spec.kind, ssh: spec.ssh, shellType: spec.shellType as ShellType | undefined, cwd: spec.cwd, useProfileDirectory: spec.useProfileDirectory });
-  const tab = useWorkspaceStore.getState().tabs.find(tab => tab.id === id);
-  if ((area === 'ai' || area === 'unified') && useWorkspaceStore.getState().tabs.some(tab => tab.id === previous)) workspace.activate(previous);
+  const id = workspace.addTab({
+    kind: spec.kind,
+    ssh: spec.ssh,
+    shellType: spec.shellType as ShellType | undefined,
+    cwd: spec.cwd,
+    useProfileDirectory: spec.useProfileDirectory,
+  });
+  const tab = useWorkspaceStore.getState().tabs.find((tab) => tab.id === id);
+  if ((area === 'ai' || area === 'unified') && useWorkspaceStore.getState().tabs.some((tab) => tab.id === previous))
+    workspace.activate(previous);
   useWorkspaceNavigation.getState().selectArea(area);
   useWorkspaceNavigation.getState().setAiPlacement(aiPlacement);
   return tab?.kind === 'session' ? firstLeaf(tab.layout).id : undefined;

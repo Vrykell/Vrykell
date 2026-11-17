@@ -12,10 +12,8 @@ test.beforeEach(async ({ page }) => {
 });
 
 /** Locate the installed row without depending on its identity markup. */
-const rowOf = (name: string) =>
-  (page: import('@playwright/test').Page) =>
-    page.locator('.skill-list-row').filter({ has: page.getByText(name, { exact: true }) });
-
+const rowOf = (name: string) => (page: import('@playwright/test').Page) =>
+  page.locator('.skill-list-row').filter({ has: page.getByText(name, { exact: true }) });
 
 test.describe('Skills settings page', () => {
   test('Skill list keeps identity, description and enable control compact', async ({ page }) => {
@@ -78,7 +76,6 @@ test.describe('Skills settings page', () => {
     const ops = await skillOps(page);
     expect(ops).toContainEqual(expect.objectContaining({ op: 'remove', name: '写单测' }));
   });
-
 
   test('URL import: install remote skills in bulk', async ({ page }) => {
     await page.getByRole('button', { name: '导入技能', exact: true }).click();

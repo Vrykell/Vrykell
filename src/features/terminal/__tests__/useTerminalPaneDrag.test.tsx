@@ -15,13 +15,15 @@ describe('useTerminalPaneDrag', () => {
     const preventDefault = vi.fn();
     const { result } = renderHook(() => useTerminalPaneDrag('pane-1'));
 
-    act(() => result.current({
-      button: 0,
-      target: surface,
-      clientX: 10,
-      clientY: 10,
-      preventDefault,
-    } as unknown as React.MouseEvent));
+    act(() =>
+      result.current({
+        button: 0,
+        target: surface,
+        clientX: 10,
+        clientY: 10,
+        preventDefault,
+      } as unknown as React.MouseEvent),
+    );
     act(() => document.dispatchEvent(new MouseEvent('mousemove', { clientX: 14, clientY: 14 })));
     expect(useDockDragStore.getState().draggingTerminalId).toBeNull();
 
@@ -40,13 +42,15 @@ describe('useTerminalPaneDrag', () => {
     const preventDefault = vi.fn();
     const { result } = renderHook(() => useTerminalPaneDrag('pane-2'));
 
-    act(() => result.current({
-      button: 0,
-      target: input,
-      clientX: 0,
-      clientY: 0,
-      preventDefault,
-    } as unknown as React.MouseEvent));
+    act(() =>
+      result.current({
+        button: 0,
+        target: input,
+        clientX: 0,
+        clientY: 0,
+        preventDefault,
+      } as unknown as React.MouseEvent),
+    );
     act(() => document.dispatchEvent(new MouseEvent('mousemove', { clientX: 20, clientY: 20 })));
 
     expect(preventDefault).not.toHaveBeenCalled();
@@ -56,9 +60,15 @@ describe('useTerminalPaneDrag', () => {
   it('does not intercept pointer gestures when no other pane can be reordered', () => {
     const preventDefault = vi.fn();
     const { result } = renderHook(() => useTerminalPaneDrag('pane-1', false));
-    act(() => result.current({
-      button: 0, target: document.createElement('div'), clientX: 0, clientY: 0, preventDefault,
-    } as unknown as React.MouseEvent));
+    act(() =>
+      result.current({
+        button: 0,
+        target: document.createElement('div'),
+        clientX: 0,
+        clientY: 0,
+        preventDefault,
+      } as unknown as React.MouseEvent),
+    );
     act(() => document.dispatchEvent(new MouseEvent('mousemove', { clientX: 30, clientY: 30 })));
     act(() => document.dispatchEvent(new MouseEvent('mouseup')));
     expect(preventDefault).not.toHaveBeenCalled();

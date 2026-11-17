@@ -55,12 +55,14 @@ test.describe('Tab management sidebar', () => {
     await page.evaluate(() => {
       const row = document.querySelector<HTMLElement>('[data-tab-row-id]');
       if (!row) throw new Error('Tab row not found');
-      row.dispatchEvent(new MouseEvent('contextmenu', {
-        bubbles: true,
-        cancelable: true,
-        clientX: window.innerWidth - 2,
-        clientY: window.innerHeight - 2,
-      }));
+      row.dispatchEvent(
+        new MouseEvent('contextmenu', {
+          bubbles: true,
+          cancelable: true,
+          clientX: window.innerWidth - 2,
+          clientY: window.innerHeight - 2,
+        }),
+      );
     });
 
     const menu = page.getByRole('menu', { name: '标签页操作' });

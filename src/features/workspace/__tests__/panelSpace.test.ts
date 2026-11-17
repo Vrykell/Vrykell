@@ -6,11 +6,21 @@ const originalWidth = window.innerWidth;
 const snapshot = useDockStore.getState();
 beforeEach(() => {
   useWorkspaceNavigation.setState({ collapsed: false, area: 'code' });
-  useDockStore.setState({ leftZone: [], rightZone: ['files', 'chat'], leftPanels: [], rightPanels: [], panelWidths: {}, collapsedPanels: [] });
+  useDockStore.setState({
+    leftZone: [],
+    rightZone: ['files', 'chat'],
+    leftPanels: [],
+    rightPanels: [],
+    panelWidths: {},
+    collapsedPanels: [],
+  });
 });
-afterEach(() => { Object.defineProperty(window, 'innerWidth', { configurable: true, value: originalWidth }); useDockStore.setState(snapshot, true); });
+afterEach(() => {
+  Object.defineProperty(window, 'innerWidth', { configurable: true, value: originalWidth });
+  useDockStore.setState(snapshot, true);
+});
 
-it.each([1240, 940, 908, 760, 600])('keeps a usable right panel at width %s', width => {
+it.each([1240, 940, 908, 760, 600])('keeps a usable right panel at width %s', (width) => {
   Object.defineProperty(window, 'innerWidth', { configurable: true, value: width });
   useWorkspaceNavigation.setState({ collapsed: width <= 900 });
   useDockStore.getState().openPanel('chat');

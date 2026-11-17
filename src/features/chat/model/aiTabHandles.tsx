@@ -33,7 +33,7 @@ export function projectAiTabs(input: AiTabInput): AiTabTarget[] {
   const targets: AiTabTarget[] = [];
 
   for (const id of nativeTabs) {
-    const conversation = conversations.find(item => item.id === id);
+    const conversation = conversations.find((item) => item.id === id);
     const handleId = `chat:${id}`;
     if (!conversation || sideSessions.includes(handleId) || handleId === sideSelected) continue;
     targets.push({
@@ -77,7 +77,14 @@ export function projectAiTabs(input: AiTabInput): AiTabTarget[] {
         id: `page:${page.id}`,
         label: page.title,
         tip: page.title,
-        icon: page.kind === 'usage' ? <DataUsage size={16} /> : page.kind === 'start-ai' ? <AppMark colored size={16} /> : <History size={16} />,
+        icon:
+          page.kind === 'usage' ? (
+            <DataUsage size={16} />
+          ) : page.kind === 'start-ai' ? (
+            <AppMark colored size={16} />
+          ) : (
+            <History size={16} />
+          ),
         closeLabel: t('Close this tab'),
         surface: 'canvas',
         dataAttributes: { 'data-tab-kind': page.kind },

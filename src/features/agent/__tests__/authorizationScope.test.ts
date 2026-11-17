@@ -8,9 +8,15 @@ afterEach(() => invoke.mockReset().mockResolvedValue({ decision: 'allow', lease:
 
 it('carries conversation identity through policy decisions, approval and revocation', async () => {
   await authorizeToolCall({ tool: 'run_command', args: { command: 'build' }, conversationId: 'conversation-a' });
-  expect(invoke).toHaveBeenLastCalledWith('authorize_tool_call', { request: {
-    tool: 'run_command', args: { command: 'build' }, conversationId: 'conversation-a', shell: null, mode: 'standard',
-  } });
+  expect(invoke).toHaveBeenLastCalledWith('authorize_tool_call', {
+    request: {
+      tool: 'run_command',
+      args: { command: 'build' },
+      conversationId: 'conversation-a',
+      shell: null,
+      mode: 'standard',
+    },
+  });
   await approveToolCall('run_command', undefined, { command: 'build' }, 'session', 'conversation-a');
   expect(invoke).toHaveBeenLastCalledWith('approve_tool_call', expect.objectContaining({ conversationId: 'conversation-a' }));
   await clearToolSessionGrants('conversation-a');

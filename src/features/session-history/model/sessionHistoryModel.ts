@@ -1,5 +1,12 @@
 import type { BackendGroupEntry, BackendSessionEntry } from '@platform/api/types';
-import { filterSessions, isSshSession, sshTargetOf, type SessionDateFilter, type SessionTypeFilter, type SessionModeFilter } from '@features/session-history/model/filter';
+import {
+  filterSessions,
+  isSshSession,
+  sshTargetOf,
+  type SessionDateFilter,
+  type SessionTypeFilter,
+  type SessionModeFilter,
+} from '@features/session-history/model/filter';
 import { t } from '@i18n';
 import { shellTypeLabel } from '@platform/shells';
 import { historyDirectory } from '@utils/historyDirectory';
@@ -32,8 +39,11 @@ export interface SessionHistoryFilter {
 /** Title sorting retains the date basis; time sorting and date-basis choices stay synchronized. */
 export function updateSessionHistoryFilter(previous: SessionHistoryFilter, patch: Partial<SessionHistoryFilter>): SessionHistoryFilter {
   let sort = patch.sort ?? previous.sort ?? 'closed-desc';
-  const dateField = patch.dateField ?? (patch.sort && !patch.sort.startsWith('title')
-    ? sessionHistoryDateField(patch.sort) : previous.dateField ?? sessionHistoryDateField(previous.sort));
+  const dateField =
+    patch.dateField ??
+    (patch.sort && !patch.sort.startsWith('title')
+      ? sessionHistoryDateField(patch.sort)
+      : (previous.dateField ?? sessionHistoryDateField(previous.sort)));
   if (patch.dateField && !sort.startsWith('title')) sort = `${dateField}-${sort.endsWith('asc') ? 'asc' : 'desc'}`;
   return { ...previous, ...patch, dateField, sort };
 }
@@ -67,7 +77,8 @@ export const SESSION_SORT_OPTIONS = [
 export function sortHistoricalSessions(sessions: BackendSessionEntry[], sort: SessionHistorySort = 'closed-desc'): BackendSessionEntry[] {
   const compare = (a: BackendSessionEntry, b: BackendSessionEntry) => {
     let order: number;
-    if (sort === 'title-asc' || sort === 'title-desc') order = a.title.localeCompare(b.title, undefined, { numeric: true }) * (sort === 'title-asc' ? 1 : -1);
+    if (sort === 'title-asc' || sort === 'title-desc')
+      order = a.title.localeCompare(b.title, undefined, { numeric: true }) * (sort === 'title-asc' ? 1 : -1);
     else {
       const aTime = sessionHistoryTimestamp(a, sort);
       const bTime = sessionHistoryTimestamp(b, sort);
@@ -90,8 +101,12 @@ export function sessionHistoryDateField(sort: SessionHistorySort = 'closed-desc'
 }
 
 /** Date filtering, time grouping and card metadata share the selected time field. */
-export function sessionHistoryTimestamp(session: BackendSessionEntry, sort: SessionHistorySort = 'closed-desc', dateField = sessionHistoryDateField(sort)): number {
-  return dateField === 'created' ? session.created_at : session.closed_at ?? session.created_at;
+export function sessionHistoryTimestamp(
+  session: BackendSessionEntry,
+  sort: SessionHistorySort = 'closed-desc',
+  dateField = sessionHistoryDateField(sort),
+): number {
+  return dateField === 'created' ? session.created_at : (session.closed_at ?? session.created_at);
 }
 
 function dateTitle(timestamp: number, groupBy: Extract<SessionHistoryGroupBy, 'day' | 'week' | 'month'>): string {
@@ -108,10 +123,17 @@ function dateTitle(timestamp: number, groupBy: Extract<SessionHistoryGroupBy, 'd
 }
 
 export function sessionHistoryDirectories(session: BackendSessionEntry): Array<{ id: string; title: string }> {
-  return [...new Map(sessionHistoryTerminals(session).map(terminal => {
-    const directory = historyDirectory(terminal, t(terminal.kind === 'ssh' ? 'Working directory not recorded' : 'No working directory'));
-    return [directory.id, directory] as const;
-  })).values()];
+  return [
+    ...new Map(
+      sessionHistoryTerminals(session).map((terminal) => {
+        const directory = historyDirectory(
+          terminal,
+          t(terminal.kind === 'ssh' ? 'Working directory not recorded' : 'No working directory'),
+        );
+        return [directory.id, directory] as const;
+      }),
+    ).values(),
+  ];
 }
 
 function sessionGroup(
@@ -125,22 +147,31 @@ function sessionGroup(
     return directories.length > 1 ? { id: 'cwd:multiple', title: t('Multiple working directories') } : directories[0];
   }
   if (groupBy === 'type') {
-    const types = new Set(sessionHistoryTerminals(session).map(terminal => terminal.kind));
+    const types = new Set(sessionHistoryTerminals(session).map((terminal) => terminal.kind));
     const type = types.size > 1 ? 'mixed' : isSshSession(session) ? 'ssh' : 'local';
     return { id: `type:${type}`, title: type === 'mixed' ? t('Mixed connections') : t(type === 'ssh' ? 'SSH' : 'Local') };
   }
   if (groupBy === 'terminal') {
-    const types = new Set(sessionHistoryTerminals(session).map(terminal => terminal.kind === 'ssh' ? 'ssh' : terminal.shellType?.trim() || 'default'));
+    const types = new Set(
+      sessionHistoryTerminals(session).map((terminal) => (terminal.kind === 'ssh' ? 'ssh' : terminal.shellType?.trim() || 'default')),
+    );
     const type = types.size > 1 ? 'mixed' : [...types][0];
-    const title = type === 'mixed' ? t('Mixed terminal types') : type === 'default' ? t('Default terminal')
-      : type === 'ssh' ? 'SSH' : shellTypeLabel(type);
+    const title =
+      type === 'mixed'
+        ? t('Mixed terminal types')
+        : type === 'default'
+          ? t('Default terminal')
+          : type === 'ssh'
+            ? 'SSH'
+            : shellTypeLabel(type);
     return { id: `terminal:${type}`, title };
   }
   if (groupBy === 'none') return { id: 'all', title: t('All sessions') };
 
   const timestamp = sessionHistoryTimestamp(session, sort, dateField);
   const date = new Date(timestamp);
-  if (groupBy === 'day') return { id: `day:${date.getFullYear()}-${date.getMonth()}-${date.getDate()}`, title: dateTitle(timestamp, groupBy) };
+  if (groupBy === 'day')
+    return { id: `day:${date.getFullYear()}-${date.getMonth()}-${date.getDate()}`, title: dateTitle(timestamp, groupBy) };
   if (groupBy === 'week') {
     const start = startOfWeek(date);
     return { id: `week:${start.getFullYear()}-${start.getMonth()}-${start.getDate()}`, title: dateTitle(timestamp, groupBy) };
@@ -159,33 +190,59 @@ export function groupHistoricalSessions(
   source?: { groups: readonly BackendGroupEntry[]; sessions: readonly BackendSessionEntry[] },
 ): SessionHistoryCardGroup[] {
   if (source) {
-    const originals = new Map(source.groups.map(group => [group.id, group]));
-    const loose = sessions.filter(session => !session.group_id || !originals.has(session.group_id));
+    const originals = new Map(source.groups.map((group) => [group.id, group]));
+    const loose = sessions.filter((session) => !session.group_id || !originals.has(session.group_id));
     const cards = groupHistoricalSessions(loose, groupBy, sort, dateField);
     for (const original of source.groups) {
-      const matching = sessions.filter(session => session.group_id === original.id);
+      const matching = sessions.filter((session) => session.group_id === original.id);
       if (!matching.length) continue;
       // Classify the original container using all historical members so filters never move or split it.
-      const savedMembers = source.sessions.filter(session => session.status === 'historical' && session.group_id === original.id);
+      const savedMembers = source.sessions.filter((session) => session.status === 'historical' && session.group_id === original.id);
       const members = savedMembers.length ? savedMembers : matching;
       const classifications = groupHistoricalSessions(members, groupBy, sort, dateField);
-      const timestamp = Math.max(...members.map(session => sessionHistoryTimestamp(session, sort, dateField)));
+      const timestamp = Math.max(...members.map((session) => sessionHistoryTimestamp(session, sort, dateField)));
       const timeGrouped = groupBy === 'day' || groupBy === 'week' || groupBy === 'month';
-      const category = timeGrouped ? sessionGroup(members.find(session => sessionHistoryTimestamp(session, sort, dateField) === timestamp)!, groupBy, sort, dateField)
-        : classifications.length === 1 ? classifications[0]
-        : { title: t(groupBy === 'cwd' ? 'Multiple working directories' : groupBy === 'terminal' ? 'Mixed terminal types' : 'Mixed connections') };
-      cards.push({ id: `source:${original.id}`, title: original.title, sessions: sortHistoricalSessions(matching, sort),
-        originalGroup: original, categoryTitle: groupBy === 'none' ? undefined : category.title, totalCount: members.length, timestamp });
+      const category = timeGrouped
+        ? sessionGroup(
+            members.find((session) => sessionHistoryTimestamp(session, sort, dateField) === timestamp)!,
+            groupBy,
+            sort,
+            dateField,
+          )
+        : classifications.length === 1
+          ? classifications[0]
+          : {
+              title: t(
+                groupBy === 'cwd' ? 'Multiple working directories' : groupBy === 'terminal' ? 'Mixed terminal types' : 'Mixed connections',
+              ),
+            };
+      cards.push({
+        id: `source:${original.id}`,
+        title: original.title,
+        sessions: sortHistoricalSessions(matching, sort),
+        originalGroup: original,
+        categoryTitle: groupBy === 'none' ? undefined : category.title,
+        totalCount: members.length,
+        timestamp,
+      });
     }
     const timeGrouped = groupBy === 'day' || groupBy === 'week' || groupBy === 'month';
     cards.sort((left, right) => {
-      if (timeGrouped) return ((left.timestamp ?? Math.max(...left.sessions.map(session => sessionHistoryTimestamp(session, sort, dateField))))
-        - (right.timestamp ?? Math.max(...right.sessions.map(session => sessionHistoryTimestamp(session, sort, dateField)))))
-        * (sort.endsWith('asc') && !sort.startsWith('title') ? 1 : -1) || left.id.localeCompare(right.id);
-      return (left.categoryTitle ?? left.title).localeCompare(right.categoryTitle ?? right.title, undefined, { numeric: true })
-        || left.title.localeCompare(right.title, undefined, { numeric: true }) || left.id.localeCompare(right.id);
+      if (timeGrouped)
+        return (
+          ((left.timestamp ?? Math.max(...left.sessions.map((session) => sessionHistoryTimestamp(session, sort, dateField)))) -
+            (right.timestamp ?? Math.max(...right.sessions.map((session) => sessionHistoryTimestamp(session, sort, dateField))))) *
+            (sort.endsWith('asc') && !sort.startsWith('title') ? 1 : -1) || left.id.localeCompare(right.id)
+        );
+      return (
+        (left.categoryTitle ?? left.title).localeCompare(right.categoryTitle ?? right.title, undefined, { numeric: true }) ||
+        left.title.localeCompare(right.title, undefined, { numeric: true }) ||
+        left.id.localeCompare(right.id)
+      );
     });
-    return pinnedIds?.size ? [...cards.filter(card => pinnedIds.has(card.id)), ...cards.filter(card => !pinnedIds.has(card.id))] : cards;
+    return pinnedIds?.size
+      ? [...cards.filter((card) => pinnedIds.has(card.id)), ...cards.filter((card) => !pinnedIds.has(card.id))]
+      : cards;
   }
   const cards = new Map<string, SessionHistoryCardGroup>();
   for (const session of sortHistoricalSessions(sessions, sort)) {
@@ -195,9 +252,12 @@ export function groupHistoricalSessions(
     cards.set(group.id, card);
   }
   const timeGrouped = groupBy === 'day' || groupBy === 'week' || groupBy === 'month';
-  const ordered = [...cards.values()].sort((left, right) => timeGrouped
-    ? (sessionHistoryTimestamp(left.sessions[0], sort, dateField) - sessionHistoryTimestamp(right.sessions[0], sort, dateField)) * (sort.endsWith('asc') && !sort.startsWith('title') ? 1 : -1)
-    : left.title.localeCompare(right.title, undefined, { numeric: true }) || left.id.localeCompare(right.id));
+  const ordered = [...cards.values()].sort((left, right) =>
+    timeGrouped
+      ? (sessionHistoryTimestamp(left.sessions[0], sort, dateField) - sessionHistoryTimestamp(right.sessions[0], sort, dateField)) *
+        (sort.endsWith('asc') && !sort.startsWith('title') ? 1 : -1)
+      : left.title.localeCompare(right.title, undefined, { numeric: true }) || left.id.localeCompare(right.id),
+  );
   if (!pinnedIds?.size) return ordered;
   return [...ordered.filter((group) => pinnedIds.has(group.id)), ...ordered.filter((group) => !pinnedIds.has(group.id))];
 }
@@ -240,7 +300,10 @@ export function deriveSessionHistorySections(
     searchAnnotations,
   );
   const grouped = new Map<string, BackendSessionEntry[]>();
-  const ungrouped = sortHistoricalSessions(historical.filter((session) => !session.group_id), filter.sort);
+  const ungrouped = sortHistoricalSessions(
+    historical.filter((session) => !session.group_id),
+    filter.sort,
+  );
 
   for (const group of historical.filter((session) => session.group_id)) {
     const groupId = group.group_id!;
@@ -256,7 +319,9 @@ export function deriveSessionHistorySections(
 }
 
 export function hasSessionHistoryFilter(filter: SessionHistoryFilter): boolean {
-  return filter.type !== 'all' || filter.date !== 'all' || (filter.mode !== undefined && filter.mode !== 'all') || filter.starredOnly === true;
+  return (
+    filter.type !== 'all' || filter.date !== 'all' || (filter.mode !== undefined && filter.mode !== 'all') || filter.starredOnly === true
+  );
 }
 
 /** Classic sessions have no command blocks; chat messages are counted separately. */
@@ -266,23 +331,28 @@ export function sessionCommandCount(session: BackendSessionEntry): number | null
     const modes: Array<string | undefined> = [];
     const walk = (layout: NonNullable<typeof payload.layout>) => {
       if (layout.type === 'leaf') modes.push(layout.terminal.openMode ?? (layout.terminal.shellType === 'cmd' ? 'classic' : undefined));
-      else if (layout.type === 'split') { walk(layout.first); walk(layout.second); }
+      else if (layout.type === 'split') {
+        walk(layout.first);
+        walk(layout.second);
+      }
     };
     if (payload.layout) walk(payload.layout);
     if (modes.includes('block')) return session.block_count;
-    if (modes.length > 0 && modes.every(mode => mode === 'classic')) return null;
-  } catch { /* A corrupt payload has no reliable presentation mode. */ }
+    if (modes.length > 0 && modes.every((mode) => mode === 'classic')) return null;
+  } catch {
+    /* A corrupt payload has no reliable presentation mode. */
+  }
   return session.block_count > 0 ? session.block_count : null;
 }
 
 /** Plain-text session summary used by the copy action; labels stay in English like other exports. */
 export function sessionSummaryText(session: BackendSessionEntry): string {
   const terminals = sessionHistoryTerminals(session);
-  const kinds = [...new Set(terminals.map(terminal => terminal.kind === 'ssh' ? 'SSH' : terminal.shellType?.trim() || 'Terminal'))];
+  const kinds = [...new Set(terminals.map((terminal) => (terminal.kind === 'ssh' ? 'SSH' : terminal.shellType?.trim() || 'Terminal')))];
   const lines = [session.title || t('Untitled session'), `Type: ${kinds.join(', ')}`];
   const target = sshTargetOf(session);
   if (target) lines.push(`Target: ${target}`);
-  const directories = sessionHistoryDirectories(session).map(directory => directory.title);
+  const directories = sessionHistoryDirectories(session).map((directory) => directory.title);
   if (directories.length) lines.push(`Directories: ${directories.join(', ')}`);
   lines.push(`Created: ${new Date(session.created_at).toLocaleString()}`);
   if (session.closed_at) lines.push(`Closed: ${new Date(session.closed_at).toLocaleString()}`);

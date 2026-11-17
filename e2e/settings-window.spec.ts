@@ -26,7 +26,7 @@ test('settings cover the content card and toggle back to the unchanged workspace
     await page.setViewportSize({ width, height: 800 });
     await expect(settings).toBeVisible();
     const sidebarWidth = width <= 900 ? 0 : 208;
-    expect(await rail.evaluate(element => element.getBoundingClientRect().width)).toBe(sidebarWidth);
+    expect(await rail.evaluate((element) => element.getBoundingClientRect().width)).toBe(sidebarWidth);
     await verifyButtonCenters();
     expect(await settings.boundingBox()).toEqual({ x: sidebarWidth, y: 40, width: width - sidebarWidth, height: 760 });
     await expect(settings.locator('.settings-close')).toHaveCount(0);
@@ -41,12 +41,14 @@ test('settings cover the content card and toggle back to the unchanged workspace
   await page.locator('[data-dock-btn="chat"]').click();
   await expect(page.locator('.workspace-side-panel[data-side="left"][data-visible="true"]')).toHaveCount(0);
   await expect(page.locator('.workspace-side-panel[data-side="right"][data-visible="true"]')).toBeVisible();
-  const sampledColors = await page.locator('html').evaluate(element => {
+  const sampledColors = await page.locator('html').evaluate((element) => {
     const style = getComputedStyle(element);
-    return ['--canvas', '--sidebar-bg', '--xterm-bg', '--surface', '--field-bg', '--primary-action'].map(name => style.getPropertyValue(name).trim().toUpperCase());
+    return ['--canvas', '--sidebar-bg', '--xterm-bg', '--surface', '--field-bg', '--primary-action'].map((name) =>
+      style.getPropertyValue(name).trim().toUpperCase(),
+    );
   });
   expect(sampledColors).toEqual(['#202020', '#28282B', '#141414', '#282828', '#3C3C3C', '#2C67C5']);
-  const chrome = await page.locator('.application-chrome').evaluate(element => {
+  const chrome = await page.locator('.application-chrome').evaluate((element) => {
     const style = getComputedStyle(element);
     return {
       color: style.backgroundColor,
@@ -70,7 +72,8 @@ test('settings cover the content card and toggle back to the unchanged workspace
 });
 
 test('language and appearance choices apply immediately and persist', async ({ page }, info) => {
-  await setupTauriMock(page); await page.goto('/');
+  await setupTauriMock(page);
+  await page.goto('/');
   await gotoSetting(page, '语言');
   await page.getByRole('combobox', { name: '界面语言', exact: true }).click();
   await page.getByRole('option', { name: 'English', exact: true }).click();
@@ -115,14 +118,14 @@ test('wallpaper mode darkens the sidebar backdrop while preserving the UI layout
   await gotoSetting(page, '主题');
   await page.waitForFunction(async () => {
     const path = '/src/features/settings/model/terminalTheme.ts';
-    const { useTerminalThemeStore } = await import(path) as typeof import('../src/features/settings/model/terminalTheme');
+    const { useTerminalThemeStore } = (await import(path)) as typeof import('../src/features/settings/model/terminalTheme');
     return useTerminalThemeStore.getState().loaded;
   });
   await page.evaluate(async () => {
     const path = '/src/features/settings/model/terminalTheme.ts';
-    const { useTerminalThemeStore } = await import(path) as typeof import('../src/features/settings/model/terminalTheme');
+    const { useTerminalThemeStore } = (await import(path)) as typeof import('../src/features/settings/model/terminalTheme');
     const wallpaper = '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16"><rect width="16" height="16" fill="#ffd8ee"/></svg>';
-    useTerminalThemeStore.setState(state => ({
+    useTerminalThemeStore.setState((state) => ({
       wallpaperDataUrl: `data:image/svg+xml;base64,${btoa(wallpaper)}`,
       config: { ...state.config, opacity: 0.7 },
     }));

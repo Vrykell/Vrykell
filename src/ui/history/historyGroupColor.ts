@@ -1,6 +1,6 @@
 export const GROUP_COLORS = ['blue', 'green', 'violet', 'amber', 'cyan', 'rose', 'orange', 'coral'] as const;
 
-export type HistoryGroupColor = typeof GROUP_COLORS[number] | 'neutral';
+export type HistoryGroupColor = (typeof GROUP_COLORS)[number] | 'neutral';
 
 /** Validates stored overrides before they reach the card markup. */
 export function isHistoryGroupColor(value: unknown): value is HistoryGroupColor {

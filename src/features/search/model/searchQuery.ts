@@ -15,7 +15,8 @@ export function parseSearchQuery(input: string): { term: string; source?: Result
   for (const scope of SEARCH_PREFIXES) {
     if (trimmed.startsWith(scope.prefix)) return { term: trimmed.slice(1).trimStart(), source: scope.source, prefix: scope.prefix };
     const alias = `${scope.alias}:`;
-    if (trimmed.toLowerCase().startsWith(alias)) return { term: trimmed.slice(alias.length).trimStart(), source: scope.source, prefix: scope.prefix };
+    if (trimmed.toLowerCase().startsWith(alias))
+      return { term: trimmed.slice(alias.length).trimStart(), source: scope.source, prefix: scope.prefix };
   }
   return { term: input };
 }

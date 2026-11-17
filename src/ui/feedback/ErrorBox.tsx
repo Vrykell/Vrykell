@@ -56,13 +56,30 @@ export default function ErrorBox({
   const [hovered, setHovered] = useState(false);
   const [focused, setFocused] = useState(false);
   const [detailsOpen, setDetailsOpen] = useState(false);
-  const notification = placement === 'notification' || placement === undefined && tone === 'error';
+  const notification = placement === 'notification' || (placement === undefined && tone === 'error');
   const identity = JSON.stringify([tone, typeof title === 'string' ? title : '', typeof children === 'string' ? children : '', details]);
-  useNotificationTimeout(identity,
+  useNotificationTimeout(
+    identity,
     notification && dismissed !== identity && dismissible !== false ? autoDismissMs : 0,
-    hovered || focused || detailsOpen, () => { setDismissed(identity); onDismiss?.(); });
-  const close = (dismissible ?? tone === 'error') ? <IconButton compact aria-label={t('Dismiss error')} data-tip={t('Dismiss error')}
-    onClick={() => { setDismissed(identity); onDismiss?.(); }}><X size={14} /></IconButton> : null;
+    hovered || focused || detailsOpen,
+    () => {
+      setDismissed(identity);
+      onDismiss?.();
+    },
+  );
+  const close =
+    (dismissible ?? tone === 'error') ? (
+      <IconButton
+        compact
+        aria-label={t('Dismiss error')}
+        data-tip={t('Dismiss error')}
+        onClick={() => {
+          setDismissed(identity);
+          onDismiss?.();
+        }}>
+        <X size={14} />
+      </IconButton>
+    ) : null;
   if (dismissed === identity) return null;
   const palette = TONE[tone];
   const base: CSSProperties = {
@@ -74,52 +91,85 @@ export default function ErrorBox({
     ...style,
   };
 
-  if (notification) return <NotificationPortal><NotificationCard role={palette.role} data-testid={testId} tone={tone} message={title ?? children} data-error-notification={tone === 'error' ? 'true' : undefined}
-    onMouseEnter={() => setHovered(true)} onMouseLeave={() => setHovered(false)}
-    onFocusCapture={() => setFocused(true)} onBlurCapture={event => {
-      if (!(event.relatedTarget instanceof Node) || !event.currentTarget.contains(event.relatedTarget)) setFocused(false);
-    }}
-    dismissLabel={t('Dismiss error')} onDismiss={(dismissible ?? true) ? () => { setDismissed(identity); onDismiss?.(); } : undefined}
-    onKeyDown={event => {
-      if (event.key !== 'Escape' || !(dismissible ?? true)) return;
-      event.preventDefault(); event.stopPropagation();
-      const sourceId = event.currentTarget.parentElement?.dataset.notificationSourceId;
-      const source = Array.from(document.querySelectorAll<HTMLElement>('[data-notification-source]')).find(element => element.dataset.notificationSource === sourceId);
-      source?.closest('[role="dialog"]')?.querySelector<HTMLElement>('button:not(:disabled), input:not(:disabled)')?.focus();
-      setDismissed(identity); onDismiss?.();
-    }}>
-    {(title && children || details || actions) ? <>
-    {title && children && <div className="error-notification-message">{children}</div>}
-    {details && <ErrorDetails title={detailsTitle} text={details} preStyle={{ maxHeight: 160 }} onOpenChange={setDetailsOpen} />}
-    {actions && <div className="error-box-actions error-notification-actions">{actions}</div>}
-    </> : null}
-  </NotificationCard></NotificationPortal>;
+  if (notification)
+    return (
+      <NotificationPortal>
+        <NotificationCard
+          role={palette.role}
+          data-testid={testId}
+          tone={tone}
+          message={title ?? children}
+          data-error-notification={tone === 'error' ? 'true' : undefined}
+          onMouseEnter={() => setHovered(true)}
+          onMouseLeave={() => setHovered(false)}
+          onFocusCapture={() => setFocused(true)}
+          onBlurCapture={(event) => {
+            if (!(event.relatedTarget instanceof Node) || !event.currentTarget.contains(event.relatedTarget)) setFocused(false);
+          }}
+          dismissLabel={t('Dismiss error')}
+          onDismiss={
+            (dismissible ?? true)
+              ? () => {
+                  setDismissed(identity);
+                  onDismiss?.();
+                }
+              : undefined
+          }
+          onKeyDown={(event) => {
+            if (event.key !== 'Escape' || !(dismissible ?? true)) return;
+            event.preventDefault();
+            event.stopPropagation();
+            const sourceId = event.currentTarget.parentElement?.dataset.notificationSourceId;
+            const source = Array.from(document.querySelectorAll<HTMLElement>('[data-notification-source]')).find(
+              (element) => element.dataset.notificationSource === sourceId,
+            );
+            source?.closest('[role="dialog"]')?.querySelector<HTMLElement>('button:not(:disabled), input:not(:disabled)')?.focus();
+            setDismissed(identity);
+            onDismiss?.();
+          }}>
+          {(title && children) || details || actions ? (
+            <>
+              {title && children && <div className="error-notification-message">{children}</div>}
+              {details && <ErrorDetails title={detailsTitle} text={details} preStyle={{ maxHeight: 160 }} onOpenChange={setDetailsOpen} />}
+              {actions && <div className="error-box-actions error-notification-actions">{actions}</div>}
+            </>
+          ) : null}
+        </NotificationCard>
+      </NotificationPortal>
+    );
 
   if (compact && !details && !title) {
     return (
       <div
         role={palette.role}
         data-testid={testId}
-        style={{ ...base, display: 'flex', alignItems: 'flex-start', gap: 8, padding: '6px 8px' }}
-      >
+        style={{ ...base, display: 'flex', alignItems: 'flex-start', gap: 8, padding: '6px 8px' }}>
         <span style={{ flex: 1, minWidth: 0, overflowWrap: 'anywhere' }}>{children}</span>
-        {(actions || close) && <div className="error-box-actions" style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>{actions}{close}</div>}
+        {(actions || close) && (
+          <div className="error-box-actions" style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
+            {actions}
+            {close}
+          </div>
+        )}
       </div>
     );
   }
 
   return (
-    <div
-      role={palette.role}
-      data-testid={testId}
-      style={{ ...base, display: 'flex', flexDirection: 'column', gap: 8, padding: 12 }}
-    >
-      {(title || close) && <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-        <div style={{ flex: 1, minWidth: 0, fontWeight: 'var(--fw-semibold)', color: 'var(--text-primary)' }}>{title}</div>{close}
-      </div>}
+    <div role={palette.role} data-testid={testId} style={{ ...base, display: 'flex', flexDirection: 'column', gap: 8, padding: 12 }}>
+      {(title || close) && (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <div style={{ flex: 1, minWidth: 0, fontWeight: 'var(--fw-semibold)', color: 'var(--text-primary)' }}>{title}</div>
+          {close}
+        </div>
+      )}
       {children && <div style={{ lineHeight: 1.6, minWidth: 0, overflowWrap: 'anywhere' }}>{children}</div>}
       {details && <ErrorDetails title={detailsTitle} text={details} preStyle={{ maxHeight: 160 }} />}
-      {actions && <div className="error-box-actions" style={{ display: 'flex', justifyContent: 'flex-end', flexWrap: 'wrap', gap: 8 }}>{actions}</div>}
+      {actions && (
+        <div className="error-box-actions" style={{ display: 'flex', justifyContent: 'flex-end', flexWrap: 'wrap', gap: 8 }}>
+          {actions}
+        </div>
+      )}
     </div>
   );
 }

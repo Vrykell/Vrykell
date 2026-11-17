@@ -24,18 +24,26 @@ interface HarnessConfigPrefs {
   remember: (harness: string, update: { config?: Record<string, string | boolean>; mode?: string; model?: string }) => void;
 }
 
-export const useHarnessConfigPrefs = create<HarnessConfigPrefs>()(persist(
-  (set) => ({
-    prefs: {},
-    remember: (harness, update) => set((state) => {
-      const current = state.prefs[harness];
-      return { prefs: { ...state.prefs, [harness]: {
-        config: { ...(current?.config ?? {}), ...(update.config ?? {}) },
-        mode: update.mode ?? current?.mode,
-        model: update.model ?? current?.model,
-        at: Date.now(),
-      } } };
+export const useHarnessConfigPrefs = create<HarnessConfigPrefs>()(
+  persist(
+    (set) => ({
+      prefs: {},
+      remember: (harness, update) =>
+        set((state) => {
+          const current = state.prefs[harness];
+          return {
+            prefs: {
+              ...state.prefs,
+              [harness]: {
+                config: { ...(current?.config ?? {}), ...(update.config ?? {}) },
+                mode: update.mode ?? current?.mode,
+                model: update.model ?? current?.model,
+                at: Date.now(),
+              },
+            },
+          };
+        }),
     }),
-  }),
-  { name: 'vrykell-harness-config', version: 1 },
-));
+    { name: 'vrykell-harness-config', version: 1 },
+  ),
+);

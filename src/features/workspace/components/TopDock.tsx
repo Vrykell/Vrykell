@@ -15,11 +15,11 @@ import { goBackWorkspaceArea, goForwardWorkspaceArea } from '../services/areaHis
 
 /** Keep window controls and global actions separate from workspace navigation. */
 export default function TopDock({ sidebarOverlayRequired = false }: { sidebarOverlayRequired?: boolean }) {
-  const settingsOpen = useUiStore(state => state.settingsOpen);
-  const area = useWorkspaceNavigation(state => state.area);
-  const collapsed = useWorkspaceNavigation(state => state.collapsed);
-  const canGoBack = useWorkspaceNavigation(state => state.areaHistoryIndex > 0);
-  const canGoForward = useWorkspaceNavigation(state => state.areaHistoryIndex < state.areaHistory.length - 1);
+  const settingsOpen = useUiStore((state) => state.settingsOpen);
+  const area = useWorkspaceNavigation((state) => state.area);
+  const collapsed = useWorkspaceNavigation((state) => state.collapsed);
+  const canGoBack = useWorkspaceNavigation((state) => state.areaHistoryIndex > 0);
+  const canGoForward = useWorkspaceNavigation((state) => state.areaHistoryIndex < state.areaHistory.length - 1);
   const workspaceTitle = t(WORKSPACE_AREA_LABELS[area]);
   const [fullscreen, setFullscreen] = useState(false);
   const headerRef = useRef<HTMLElement>(null);
@@ -37,29 +37,74 @@ export default function TopDock({ sidebarOverlayRequired = false }: { sidebarOve
         if (!disposed) setFullscreen(value);
       };
       void sync().catch(() => {});
-      void win.onResized(() => { void sync().catch(() => {}); })
-        .then(fn => { if (disposed) fn(); else unlisten = fn; }).catch(() => {});
-    } catch { /* Browser previews have no native window. */ }
-    return () => { disposed = true; unlisten?.(); };
+      void win
+        .onResized(() => {
+          void sync().catch(() => {});
+        })
+        .then((fn) => {
+          if (disposed) fn();
+          else unlisten = fn;
+        })
+        .catch(() => {});
+    } catch {
+      /* Browser previews have no native window. */
+    }
+    return () => {
+      disposed = true;
+      unlisten?.();
+    };
   }, []);
 
   return (
     // Every non-interactive part of the titlebar is a window drag handle; buttons
     // below keep their own behaviour because a clickable element without the
     // attribute blocks dragging for the whole path.
-    <header ref={headerRef} className="workspace-titlebar" data-platform={isMacOS ? 'macos' : 'other'} data-fullscreen={fullscreen} data-sidebar-collapsed={collapsed} data-tauri-drag-region>
+    <header
+      ref={headerRef}
+      className="workspace-titlebar"
+      data-platform={isMacOS ? 'macos' : 'other'}
+      data-fullscreen={fullscreen}
+      data-sidebar-collapsed={collapsed}
+      data-tauri-drag-region>
       <div data-tauri-drag-region className="workspace-title">
-        {collapsed && <IconButton compact className="workspace-sidebar-toggle" data-testid="workspace-sidebar-expand" aria-label={t('Expand sidebar')} data-tip={t('Expand sidebar')}
-          onClick={() => useWorkspaceNavigation.getState().openSidebar(sidebarOverlayRequired)}><PanelLeft size={iconSizes.control} /></IconButton>}
+        {collapsed && (
+          <IconButton
+            compact
+            className="workspace-sidebar-toggle"
+            data-testid="workspace-sidebar-expand"
+            aria-label={t('Expand sidebar')}
+            data-tip={t('Expand sidebar')}
+            onClick={() => useWorkspaceNavigation.getState().openSidebar(sidebarOverlayRequired)}>
+            <PanelLeft size={iconSizes.control} />
+          </IconButton>
+        )}
         <span data-tauri-drag-region>{settingsOpen ? t('Settings') : workspaceTitle}</span>
         <div className="workspace-title-history" data-tauri-drag-region>
-          <IconButton compact data-testid="workspace-history-back" aria-label={t('Back')} data-tip={t('Back')}
-            disabled={!canGoBack} onClick={goBackWorkspaceArea}><ArrowLeft size={iconSizes.control} /></IconButton>
-          <IconButton compact data-testid="workspace-history-forward" aria-label={t('Forward')} data-tip={t('Forward')}
-            disabled={!canGoForward} onClick={goForwardWorkspaceArea}><ArrowRight size={iconSizes.control} /></IconButton>
+          <IconButton
+            compact
+            data-testid="workspace-history-back"
+            aria-label={t('Back')}
+            data-tip={t('Back')}
+            disabled={!canGoBack}
+            onClick={goBackWorkspaceArea}>
+            <ArrowLeft size={iconSizes.control} />
+          </IconButton>
+          <IconButton
+            compact
+            data-testid="workspace-history-forward"
+            aria-label={t('Forward')}
+            data-tip={t('Forward')}
+            disabled={!canGoForward}
+            onClick={goForwardWorkspaceArea}>
+            <ArrowRight size={iconSizes.control} />
+          </IconButton>
         </div>
       </div>
-      <button data-subtle data-testid="global-search-trigger" className="workspace-search" aria-label={t('Search files, commands, settings…')}
+      <button
+        data-subtle
+        data-testid="global-search-trigger"
+        className="workspace-search"
+        aria-label={t('Search files, commands, settings…')}
         onClick={() => useUiStore.getState().setGlobalSearchOpen(true)}>
         <Search size={iconSizes.control} />
         <span>{t('Search files, commands, settings…')}</span>

@@ -14,10 +14,4 @@ export {
   getFocusedCwd,
 } from '@features/workspace/stores/workspace';
 
-export type {
-  Tab,
-  TabGroup,
-  AddTabOptions,
-  SshTabTarget,
-  TitleSource,
-} from '@features/workspace/stores/workspace';
+export type { Tab, TabGroup, AddTabOptions, SshTabTarget, TitleSource } from '@features/workspace/stores/workspace';

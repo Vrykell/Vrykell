@@ -3,17 +3,30 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { TextInput, TextArea, configureLiteralInput } from '@ui/fields/TextInput';
 
-afterEach(() => { cleanup(); vi.restoreAllMocks(); });
+afterEach(() => {
+  cleanup();
+  vi.restoreAllMocks();
+});
 
 describe('literal text input', () => {
-  it.each([TextInput, TextArea])('applies the shared field presentation on request', Component => {
+  it.each([TextInput, TextArea])('applies the shared field presentation on request', (Component) => {
     render(<Component variant="field" aria-label="Field" />);
     expect(screen.getByRole('textbox')).toHaveClass('text-input-field');
   });
-  it.each([TextInput, TextArea])('disables native substitutions while retaining composition and changes', Component => {
+  it.each([TextInput, TextArea])('disables native substitutions while retaining composition and changes', (Component) => {
     const change = vi.fn();
     const compose = vi.fn();
-    render(<Component aria-label="Command" defaultValue="npm" autoCorrect="on" autoCapitalize="sentences" spellCheck onChange={change} onCompositionEnd={compose} />);
+    render(
+      <Component
+        aria-label="Command"
+        defaultValue="npm"
+        autoCorrect="on"
+        autoCapitalize="sentences"
+        spellCheck
+        onChange={change}
+        onCompositionEnd={compose}
+      />,
+    );
     const input = screen.getByRole('textbox');
     expect(input).toHaveAttribute('autocorrect', 'off');
     expect(input).toHaveAttribute('autocapitalize', 'off');
@@ -51,7 +64,16 @@ describe('literal text input', () => {
     expect(input).toHaveStyle({ height: '120px', overflowY: 'auto' });
     expect(input).toHaveValue(long);
     expect(input).toHaveFocus();
-    rerender(<TextArea ref={ref} aria-label="Notes" value={`${long}\nmore`} readOnly autoSizeMaxHeight={120} style={{ ...style, maxHeight: 80 }} />);
+    rerender(
+      <TextArea
+        ref={ref}
+        aria-label="Notes"
+        value={`${long}\nmore`}
+        readOnly
+        autoSizeMaxHeight={120}
+        style={{ ...style, maxHeight: 80 }}
+      />,
+    );
     expect(input).toHaveStyle({ height: '80px', overflowY: 'auto' });
     rerender(<TextArea ref={ref} aria-label="Notes" value="short" readOnly autoSizeMaxHeight={120} style={style} />);
     expect(input).toHaveStyle({ height: '42px', overflowY: 'hidden' });

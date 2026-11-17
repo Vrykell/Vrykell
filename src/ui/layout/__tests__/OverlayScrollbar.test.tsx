@@ -4,13 +4,21 @@ import OverlayScrollbar from '@ui/layout/OverlayScrollbar';
 
 let resized: () => void;
 beforeEach(() => {
-  vi.stubGlobal('ResizeObserver', class {
-    constructor(callback: () => void) { resized = callback; }
-    observe() {}
-    disconnect() {}
-  });
+  vi.stubGlobal(
+    'ResizeObserver',
+    class {
+      constructor(callback: () => void) {
+        resized = callback;
+      }
+      observe() {}
+      disconnect() {}
+    },
+  );
 });
-afterEach(() => { cleanup(); vi.unstubAllGlobals(); });
+afterEach(() => {
+  cleanup();
+  vi.unstubAllGlobals();
+});
 
 function surface(height: number, extent: number, top = 0) {
   const scroll = document.createElement('div');
@@ -91,7 +99,9 @@ it('places floating tracks above the scroll surface itself', () => {
   const scroll = document.createElement('div');
   scroll.style.zIndex = '400';
   Object.defineProperties(scroll, {
-    clientWidth: { value: 300 }, scrollWidth: { value: 900 }, clientHeight: { value: 70 },
+    clientWidth: { value: 300 },
+    scrollWidth: { value: 900 },
+    clientHeight: { value: 70 },
     getClientRects: { value: () => [new DOMRect(300, 120, 300, 70)] },
     getBoundingClientRect: { value: () => new DOMRect(300, 120, 300, 70) },
   });
@@ -106,15 +116,19 @@ function clippedSurface(options: { width: number; height: number; clipWidth: num
   viewport.style.overflowX = 'hidden';
   viewport.style.overflowY = 'hidden';
   Object.defineProperties(viewport, {
-    clientWidth: { value: options.clipWidth }, clientHeight: { value: options.clipHeight },
-    clientTop: { value: 0 }, clientLeft: { value: 0 },
+    clientWidth: { value: options.clipWidth },
+    clientHeight: { value: options.clipHeight },
+    clientTop: { value: 0 },
+    clientLeft: { value: 0 },
     getBoundingClientRect: { value: () => new DOMRect(0, 0, options.clipWidth, options.clipHeight) },
   });
   const scroll = document.createElement('div');
   viewport.append(scroll);
   Object.defineProperties(scroll, {
-    clientWidth: { value: options.width }, clientHeight: { value: options.height },
-    scrollWidth: { value: options.width * 3 }, scrollHeight: { value: options.height * 3 },
+    clientWidth: { value: options.width },
+    clientHeight: { value: options.height },
+    scrollWidth: { value: options.width * 3 },
+    scrollHeight: { value: options.height * 3 },
     getClientRects: { value: () => [new DOMRect(0, 0, options.width, options.height)] },
     getBoundingClientRect: { value: () => new DOMRect(0, 0, options.width, options.height) },
   });
@@ -141,16 +155,23 @@ it('clips a floating vertical track against the same viewport edge', () => {
 
 it('maps a hosted track into the owning layer so transformed popups stay aligned', () => {
   const host = document.createElement('div');
-  host.style.position = 'fixed'; host.style.zIndex = '10000';
+  host.style.position = 'fixed';
+  host.style.zIndex = '10000';
   Object.defineProperties(host, {
-    clientTop: { value: 2 }, clientLeft: { value: 2 },
-    offsetWidth: { value: 600 }, offsetHeight: { value: 500 },
-    scrollLeft: { value: 20 }, scrollTop: { value: 40 },
+    clientTop: { value: 2 },
+    clientLeft: { value: 2 },
+    offsetWidth: { value: 600 },
+    offsetHeight: { value: 500 },
+    scrollLeft: { value: 20 },
+    scrollTop: { value: 40 },
     getBoundingClientRect: { value: () => new DOMRect(100, 50, 600, 500) },
   });
-  const scroll = document.createElement('div'); host.append(scroll);
+  const scroll = document.createElement('div');
+  host.append(scroll);
   Object.defineProperties(scroll, {
-    clientWidth: { value: 300 }, clientHeight: { value: 200 }, scrollHeight: { value: 1000 },
+    clientWidth: { value: 300 },
+    clientHeight: { value: 200 },
+    scrollHeight: { value: 1000 },
     getClientRects: { value: () => [new DOMRect(120, 80, 300, 200)] },
     getBoundingClientRect: { value: () => new DOMRect(120, 80, 300, 200) },
   });

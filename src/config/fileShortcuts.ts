@@ -7,8 +7,15 @@ export const FILE_DIRECTORY_SHORTCUTS = {
 };
 
 export function fileDirectoryShortcut(event: KeyboardEvent): 'terminal' | 'panel' | null {
-  if (event.isComposing || event.keyCode === 229 || event.repeat || !event.altKey || !(event.ctrlKey || event.metaKey)
-    || event.getModifierState('AltGraph')
-    || event.code !== 'KeyL' && event.key.toLowerCase() !== 'l') return null;
+  if (
+    event.isComposing ||
+    event.keyCode === 229 ||
+    event.repeat ||
+    !event.altKey ||
+    !(event.ctrlKey || event.metaKey) ||
+    event.getModifierState('AltGraph') ||
+    (event.code !== 'KeyL' && event.key.toLowerCase() !== 'l')
+  )
+    return null;
   return event.shiftKey ? 'panel' : 'terminal';
 }

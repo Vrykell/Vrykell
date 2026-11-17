@@ -85,8 +85,12 @@ export function sanitizeOutputHtml(html: string, compactTextRuns = false): strin
           separator = child;
           continue;
         }
-        if (child instanceof Element && child.tagName === 'SPAN' && child.childElementCount === 0
-          && !/(?:^|;)(?:display|width):/.test(child.getAttribute('style') ?? '')) {
+        if (
+          child instanceof Element &&
+          child.tagName === 'SPAN' &&
+          child.childElementCount === 0 &&
+          !/(?:^|;)(?:display|width):/.test(child.getAttribute('style') ?? '')
+        ) {
           if (run && separator && run.getAttribute('style') === child.getAttribute('style')) {
             run.append('\n', ...Array.from(child.childNodes));
             separator.remove();

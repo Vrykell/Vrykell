@@ -3,13 +3,26 @@ import { t } from '@i18n';
 import { capabilityLabel, type ModelCapability } from '../model/capabilities';
 
 export const MODEL_CAPABILITY_ICONS: Record<ModelCapability, AppIcon> = {
-  vision: Eye, reasoning: BrainCircuit, tools: Wrench, search: Globe,
+  vision: Eye,
+  reasoning: BrainCircuit,
+  tools: Wrench,
+  search: Globe,
 };
 
 export function ModelCapabilityBadge({ capability, supported }: { capability: ModelCapability; supported: boolean }) {
   if (!supported) return null;
   const Icon = MODEL_CAPABILITY_ICONS[capability];
   const label = t('{{capability}} supported', { capability: capabilityLabel(capability) });
-  return <span className="model-cap-chip" data-testid={`model-cap-${capability}`} data-capability={capability} data-supported={supported}
-    role="img" aria-label={label} data-tip={label}><Icon size={14} aria-hidden="true" /></span>;
+  return (
+    <span
+      className="model-cap-chip"
+      data-testid={`model-cap-${capability}`}
+      data-capability={capability}
+      data-supported={supported}
+      role="img"
+      aria-label={label}
+      data-tip={label}>
+      <Icon size={14} aria-hidden="true" />
+    </span>
+  );
 }

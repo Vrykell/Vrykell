@@ -3,7 +3,7 @@ import { setupTauriMock } from './tauri-mock';
 
 async function prepareAuthentication(page: Page, theme: 'dark' | 'light' = 'dark') {
   await setupTauriMock(page, { integration: false });
-  await page.addInitScript(theme => localStorage.setItem('vrykell-theme-mode', theme), theme);
+  await page.addInitScript((theme) => localStorage.setItem('vrykell-theme-mode', theme), theme);
   await page.goto('/');
   await page.evaluate(() => {
     const globals = window as unknown as Record<string, unknown>;
@@ -17,31 +17,65 @@ async function prepareAuthentication(page: Page, theme: 'dark' | 'light' = 'dark
     let finish: (() => void) | undefined;
     let fail: ((reason: Error) => void) | undefined;
     const target = { connectionId: 'ssh-1', host: 'gateway.test', port: 2222, user: 'jump-user' };
-    const challenge = () => send?.(round === 1
-      ? { kind: 'hostKey', round, target, fingerprint: 'SHA256:fixture-gateway', keyType: 'ed25519' }
-      : { kind: 'prompts', round, target: round === 2 ? target : { ...target, host: '10.0.0.1', user: 'root', port: 22 },
-        instructions: round === 2 ? 'Enter both account fields' : 'Enter the current verification code',
-        prompts: round === 2 ? [{ text: 'Account:', echo: true }, { text: 'Password:', echo: false }] : [{ text: 'One-time code:', echo: false }] });
+    const challenge = () =>
+      send?.(
+        round === 1
+          ? { kind: 'hostKey', round, target, fingerprint: 'SHA256:fixture-gateway', keyType: 'ed25519' }
+          : {
+              kind: 'prompts',
+              round,
+              target: round === 2 ? target : { ...target, host: '10.0.0.1', user: 'root', port: 22 },
+              instructions: round === 2 ? 'Enter both account fields' : 'Enter the current verification code',
+              prompts:
+                round === 2
+                  ? [
+                      { text: 'Account:', echo: true },
+                      { text: 'Password:', echo: false },
+                    ]
+                  : [{ text: 'One-time code:', echo: false }],
+            },
+      );
     globals.__AUTH_STATE__ = () => ({ authenticated, cancelled, attempts });
     internals.invoke = async (command, args) => {
-      if (command === 'ssh_system_status' && !authenticated) throw new Error(`SSH_CONNECTION_FAILED:${JSON.stringify({
-        connectionId: 'gateway', host: 'gateway.test', port: 2222, stage: 'authentication', cause: 'SSH_AUTH_FAILED: Interactive authentication required',
-      })}`);
+      if (command === 'ssh_system_status' && !authenticated)
+        throw new Error(
+          `SSH_CONNECTION_FAILED:${JSON.stringify({
+            connectionId: 'gateway',
+            host: 'gateway.test',
+            port: 2222,
+            stage: 'authentication',
+            cause: 'SSH_AUTH_FAILED: Interactive authentication required',
+          })}`,
+        );
       if (command === 'ssh_authenticate_session') {
-        attempts += 1; round = 1;
+        attempts += 1;
+        round = 1;
         send = (args.onChallenge as { onmessage: (value: unknown) => void }).onmessage;
-        return new Promise<void>((resolve, reject) => { finish = resolve; fail = reject; queueMicrotask(challenge); });
+        return new Promise<void>((resolve, reject) => {
+          finish = resolve;
+          fail = reject;
+          queueMicrotask(challenge);
+        });
       }
       if (command === 'ssh_authentication_respond') {
         if (args.round !== round) throw new Error('Stale challenge');
         const responses = args.responses as string[];
         const expected = round === 1 ? ['SHA256:fixture-gateway'] : round === 2 ? ['operator', 'fixture-password'] : ['123456'];
         if (JSON.stringify(responses) !== JSON.stringify(expected)) throw new Error('Rejected answer');
-        if (round < 3) { round += 1; queueMicrotask(challenge); }
-        else { authenticated = true; finish?.(); }
+        if (round < 3) {
+          round += 1;
+          queueMicrotask(challenge);
+        } else {
+          authenticated = true;
+          finish?.();
+        }
         return;
       }
-      if (command === 'ssh_authentication_cancel') { cancelled += 1; fail?.(new Error('SSH_AUTH_CANCELLED: Authentication cancelled')); return; }
+      if (command === 'ssh_authentication_cancel') {
+        cancelled += 1;
+        fail?.(new Error('SSH_AUTH_CANCELLED: Authentication cancelled'));
+        return;
+      }
       return original(command, args);
     };
   });
@@ -58,7 +92,10 @@ async function prepareAuthentication(page: Page, theme: 'dark' | 'light' = 'dark
   return dialog;
 }
 
-for (const [theme, width] of [['dark', 1240], ['light', 520]] as const) {
+for (const [theme, width] of [
+  ['dark', 1240],
+  ['light', 520],
+] as const) {
   test(`interactive authentication shares service success in ${theme} at ${width}px`, async ({ page }, info) => {
     const dialog = await prepareAuthentication(page, theme);
     await page.setViewportSize({ width, height: 800 });
@@ -73,18 +110,18 @@ for (const [theme, width] of [['dark', 1240], ['light', 520]] as const) {
     await expect(dialog.getByLabel('One-time code:')).toHaveValue('');
     await expect(dialog.getByText('root@10.0.0.1:22', { exact: true })).toBeVisible();
     await page.screenshot({ path: info.outputPath(`authentication-${theme}-${width}.png`), animations: 'disabled' });
-    expect(await dialog.evaluate(element => element.scrollWidth <= element.clientWidth)).toBe(true);
+    expect(await dialog.evaluate((element) => element.scrollWidth <= element.clientWidth)).toBe(true);
     await dialog.getByLabel('One-time code:').fill('123456');
     await dialog.getByLabel('One-time code:').press('Enter');
     await expect(dialog).toBeHidden();
     await expect(page.getByText('Linux 6.8', { exact: true })).toBeVisible();
     await page.locator('[data-dock-btn="files"]').click();
     await expect(page.getByText('app.log', { exact: true }).first()).toBeVisible();
-    const state = await page.evaluate(() => ((window as unknown as Record<string, () => unknown>).__AUTH_STATE__)());
+    const state = await page.evaluate(() => (window as unknown as Record<string, () => unknown>).__AUTH_STATE__());
     expect(state).toEqual({ authenticated: true, cancelled: 0, attempts: 1 });
     const diagnostics = await page.evaluate(async () => {
       const path = '/src/platform/diagnostics.ts';
-      return (await import(path) as typeof import('../src/platform/diagnostics')).diagnosticSnapshot();
+      return ((await import(path)) as typeof import('../src/platform/diagnostics')).diagnosticSnapshot();
     });
     expect(JSON.stringify(diagnostics)).not.toMatch(/fixture-password|123456/);
   });
@@ -96,5 +133,7 @@ test('Escape cancels an interactive challenge without completing service authent
   await dialog.getByLabel('Password:').fill('unused-password');
   await dialog.getByLabel('Password:').press('Escape');
   await expect(dialog).toBeHidden();
-  await expect.poll(() => page.evaluate(() => ((window as unknown as Record<string, () => unknown>).__AUTH_STATE__)())).toEqual({ authenticated: false, cancelled: 1, attempts: 1 });
+  await expect
+    .poll(() => page.evaluate(() => (window as unknown as Record<string, () => unknown>).__AUTH_STATE__()))
+    .toEqual({ authenticated: false, cancelled: 1, attempts: 1 });
 });

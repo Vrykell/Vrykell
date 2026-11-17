@@ -19,16 +19,36 @@ export interface HarnessPreset {
 export const HARNESS_PRESETS: HarnessPreset[] = [
   // Verified end to end: handshake, session and a whole turn (2026-10).
   { name: 'Claude Code', command: 'npx', args: ['-y', '@zed-industries/claude-code-acp'], hint: 'Run with npx; answers a whole turn.' },
-  { name: 'Codex', command: 'npx', args: ['-y', '@agentclientprotocol/codex-acp'], hint: 'Run with npx; answers a whole turn, the first one may take a while.' },
-  { name: 'Gemini CLI', command: 'npx', args: ['-y', '@google/gemini-cli', '--experimental-acp'], hint: 'Run with npx; needs a Google account or an API key.' },
-  { name: 'OpenCode', command: 'opencode', args: ['acp'], hint: 'Requires opencode (npm i -g opencode-ai) and a one-time opencode auth login.' },
+  {
+    name: 'Codex',
+    command: 'npx',
+    args: ['-y', '@agentclientprotocol/codex-acp'],
+    hint: 'Run with npx; answers a whole turn, the first one may take a while.',
+  },
+  {
+    name: 'Gemini CLI',
+    command: 'npx',
+    args: ['-y', '@google/gemini-cli', '--experimental-acp'],
+    hint: 'Run with npx; needs a Google account or an API key.',
+  },
+  {
+    name: 'OpenCode',
+    command: 'opencode',
+    args: ['acp'],
+    hint: 'Requires opencode (npm i -g opencode-ai) and a one-time opencode auth login.',
+  },
   { name: 'Qwen Code', command: 'qwen', args: ['--acp'], hint: 'Requires qwen (npm i -g @qwen-code/qwen-code); answers a whole turn.' },
   { name: 'Cursor', command: 'cursor-agent', args: ['acp'], hint: 'Requires cursor-agent.' },
   { name: 'OpenClaw', command: 'openclaw', args: ['acp'], hint: 'Requires openclaw.' },
   { name: 'Kiro CLI', command: 'kiro-cli', args: ['acp'], hint: 'Requires kiro-cli.' },
   { name: 'Kimi CLI', command: 'kimi', args: ['acp'], hint: 'Requires kimi.' },
   { name: 'Goose', command: 'goose', args: ['acp'], hint: 'Requires goose.' },
-  { name: 'Pi', command: 'npx', args: ['-y', 'pi-acp'], hint: 'Requires pi (npm i -g @earendil-works/pi-coding-agent) and a one-time provider setup; run with npx.' },
+  {
+    name: 'Pi',
+    command: 'npx',
+    args: ['-y', 'pi-acp'],
+    hint: 'Requires pi (npm i -g @earendil-works/pi-coding-agent) and a one-time provider setup; run with npx.',
+  },
 ];
 
 export interface HarnessEntry {

@@ -5,7 +5,11 @@ import { useShellProfiles } from '@config/shellProfiles';
 import { useTerminalDefaults } from '@config/terminalDefaults';
 
 const defaults = useTerminalDefaults.getState();
-afterEach(() => { cleanup(); useShellProfiles.setState({ profiles: {} }); useTerminalDefaults.setState(defaults, true); });
+afterEach(() => {
+  cleanup();
+  useShellProfiles.setState({ profiles: {} });
+  useTerminalDefaults.setState(defaults, true);
+});
 
 it('groups identity, startup and menu settings without duplicating shell headings', () => {
   render(<ShellProfilePage shell="zsh" />);

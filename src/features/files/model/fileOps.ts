@@ -38,8 +38,12 @@ export interface FileOps {
   /** Slow channels check one visible directory per idle pass. */
   backgroundRefresh?: 'one-directory';
   /** Optional optimized traversal on the target's file channel. */
-  search?(root: string, query: string, signal: AbortSignal,
-    onProgress?: (result: { entries: FsEntry[]; truncated: boolean; skipped: number }) => void): Promise<{ entries: FsEntry[]; truncated: boolean; skipped: number }>;
+  search?(
+    root: string,
+    query: string,
+    signal: AbortSignal,
+    onProgress?: (result: { entries: FsEntry[]; truncated: boolean; skipped: number }) => void,
+  ): Promise<{ entries: FsEntry[]; truncated: boolean; skipped: number }>;
   /** Single-path metadata: the path bar detects files with it and the properties dialog reads it. */
   stat(path: string): Promise<FileStat>;
   /** Lists a directory; dir null means the target's default start directory (remote returns the resolved base). */

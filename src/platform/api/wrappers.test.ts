@@ -5,7 +5,15 @@ import { describe, it, expect, vi } from 'vitest';
 const { invokeMock } = vi.hoisted(() => ({ invokeMock: vi.fn() }));
 vi.mock('@tauri-apps/api/core', () => ({ invoke: invokeMock }));
 
-import { createSession, archiveSession, restoreSession, updateSessionTitle, updateSessionCwd, listSessions, deleteSession } from '@platform/api/session';
+import {
+  createSession,
+  archiveSession,
+  restoreSession,
+  updateSessionTitle,
+  updateSessionCwd,
+  listSessions,
+  deleteSession,
+} from '@platform/api/session';
 import { groupsList, groupCreate, groupRename, groupSetCollapsed, groupDelete } from '@platform/api/group';
 import { addWorkspace, removeWorkspace, listWorkspaces } from '@platform/api/workspace';
 import { searchFiles } from '@platform/api/search';
@@ -13,7 +21,14 @@ import { searchFiles } from '@platform/api/search';
 describe('api wrappers', () => {
   it('forwards session commands', async () => {
     await createSession('s1', 't', 1, '/cwd', 'local', '{}');
-    expect(invokeMock).toHaveBeenLastCalledWith('create_session', { id: 's1', title: 't', timestamp: 1, cwd: '/cwd', kind: 'local', payload: '{}' });
+    expect(invokeMock).toHaveBeenLastCalledWith('create_session', {
+      id: 's1',
+      title: 't',
+      timestamp: 1,
+      cwd: '/cwd',
+      kind: 'local',
+      payload: '{}',
+    });
     await archiveSession('s1', 2);
     expect(invokeMock).toHaveBeenLastCalledWith('archive_session', { id: 's1', timestamp: 2 });
     await restoreSession('s1');

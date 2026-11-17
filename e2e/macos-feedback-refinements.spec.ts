@@ -33,7 +33,10 @@ test('wallpaper picker filters images and rejects both documents and renamed inv
     target.__WALLPAPER_DIALOGS__ = [];
     target.__WALLPAPER_READS__ = [];
     target.__TAURI_INTERNALS__.invoke = async (cmd, args) => {
-      if (cmd === 'plugin:dialog|open') { target.__WALLPAPER_DIALOGS__.push(args); return paths.shift(); }
+      if (cmd === 'plugin:dialog|open') {
+        target.__WALLPAPER_DIALOGS__.push(args);
+        return paths.shift();
+      }
       // The candidate is read by the backend, so the test answers that call instead of
       // serving the asset-protocol URL the picker must not depend on.
       if (cmd === 'read_image_data_url') {
@@ -61,7 +64,9 @@ test('wallpaper picker filters images and rejects both documents and renamed inv
   expect((await themeConfig(page)).backgroundImage).toBeNull();
   expect(await page.evaluate(() => (window as unknown as { __WALLPAPER_READS__: string[] }).__WALLPAPER_READS__)).toHaveLength(0);
   await select.click();
-  await expect.poll(async () => (await page.evaluate(() => (window as unknown as { __WALLPAPER_READS__: string[] }).__WALLPAPER_READS__))[0]).toBe('/invalid-wallpaper.png');
+  await expect
+    .poll(async () => (await page.evaluate(() => (window as unknown as { __WALLPAPER_READS__: string[] }).__WALLPAPER_READS__))[0])
+    .toBe('/invalid-wallpaper.png');
   await dismissToast();
   await expect(page.getByText('/invalid-wallpaper.png', { exact: true })).toHaveCount(0);
   expect((await themeConfig(page)).backgroundImage).toBeNull();
@@ -69,7 +74,9 @@ test('wallpaper picker filters images and rejects both documents and renamed inv
   await expect.poll(async () => (await themeConfig(page)).backgroundImage).toBe('/valid-wallpaper.png');
   await select.click();
   expect((await themeConfig(page)).backgroundImage).toBe('/valid-wallpaper.png');
-  const dialogs = await page.evaluate(() => (window as unknown as { __WALLPAPER_DIALOGS__: { options: { filters: { extensions: string[] }[] } }[] }).__WALLPAPER_DIALOGS__);
+  const dialogs = await page.evaluate(
+    () => (window as unknown as { __WALLPAPER_DIALOGS__: { options: { filters: { extensions: string[] }[] } }[] }).__WALLPAPER_DIALOGS__,
+  );
   expect(dialogs[0].options.filters).toHaveLength(1);
   expect(dialogs[0].options.filters[0].extensions).toContain('png');
   expect(dialogs[0].options.filters[0].extensions).not.toContain('txt');
@@ -91,11 +98,11 @@ test('the full panel preview accepts release and shares its surface with split p
   const bounds = (await preview.boundingBox())!;
   await page.mouse.move(bounds.x + 2, y);
   await expect(preview).toBeVisible();
-  const colors = await preview.evaluate(element => {
+  const colors = await preview.evaluate((element) => {
     const css = getComputedStyle(element);
     return { background: css.backgroundColor, border: css.borderColor, radius: css.borderRadius, blur: css.backdropFilter };
   });
-  expect(colors.blur).toBe(await page.getByTestId('workspace-sidebar').evaluate(element => getComputedStyle(element).backdropFilter));
+  expect(colors.blur).toBe(await page.getByTestId('workspace-sidebar').evaluate((element) => getComputedStyle(element).backdropFilter));
   expect(colors.blur).toContain('blur(20px)');
   await page.mouse.up();
   await expect(page.locator('.workspace-side-panel[data-side="right"]').getByText('notes.txt')).toBeVisible();

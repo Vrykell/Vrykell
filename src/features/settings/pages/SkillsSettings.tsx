@@ -12,10 +12,7 @@ import { TextInput } from '@ui/fields/TextInput';
 import { useState } from 'react';
 import { ChevronRight, Download, FileText, Folder, ShieldAlert, X, Plus, Search } from '@ui/icons';
 import { fileOpenWith } from '@platform/api/fs';
-import {
-  setSkillState, removeSkill,
-  type SkillDetail,
-} from '@features/agent/services/skills';
+import { setSkillState, removeSkill, type SkillDetail } from '@features/agent/services/skills';
 import { useToastStore } from '@ui/feedback/Toast';
 import ErrorBox from '@ui/feedback/ErrorBox';
 import { useSkillsSettings } from '@features/settings/hooks/useSkillsSettings';
@@ -29,8 +26,7 @@ import ConfirmDialog from '@ui/feedback/ConfirmDialog';
 import './resources.css';
 import PageBreadcrumb from '@ui/layout/PageBreadcrumb';
 
-const toast = (msg: string, type: 'info' | 'success' | 'error') =>
-  useToastStore.getState().addToast(msg, type);
+const toast = (msg: string, type: 'info' | 'success' | 'error') => useToastStore.getState().addToast(msg, type);
 
 const btn: React.CSSProperties = {
   padding: '4px 10px',
@@ -38,16 +34,27 @@ const btn: React.CSSProperties = {
 
 function Badge({ text, tone }: { text: string; tone: 'warn' | 'muted' | 'ok' | 'danger' }) {
   const color =
-    tone === 'warn' ? 'var(--accent-warm)'
-    : tone === 'ok' ? 'var(--success)'
-    : tone === 'danger' ? 'var(--error-light)'
-    : 'var(--text-muted)';
+    tone === 'warn'
+      ? 'var(--accent-warm)'
+      : tone === 'ok'
+        ? 'var(--success)'
+        : tone === 'danger'
+          ? 'var(--error-light)'
+          : 'var(--text-muted)';
   const bg =
-    tone === 'warn' ? 'var(--accent-warm-dim)'
-    : tone === 'ok' ? 'var(--success-bg)'
-    : tone === 'danger' ? 'var(--error-bg)'
-    : 'var(--hover)';
-  return <span style={{ fontSize: 'calc(10px * var(--ui-font-scale))', padding: '1px 6px', borderRadius: 4, color, background: bg, flexShrink: 0 }}>{text}</span>;
+    tone === 'warn'
+      ? 'var(--accent-warm-dim)'
+      : tone === 'ok'
+        ? 'var(--success-bg)'
+        : tone === 'danger'
+          ? 'var(--error-bg)'
+          : 'var(--hover)';
+  return (
+    <span
+      style={{ fontSize: 'calc(10px * var(--ui-font-scale))', padding: '1px 6px', borderRadius: 4, color, background: bg, flexShrink: 0 }}>
+      {text}
+    </span>
+  );
 }
 
 function SkillFileBrowser({ skillName, files }: { skillName: string; files: string[] }) {
@@ -56,16 +63,24 @@ function SkillFileBrowser({ skillName, files }: { skillName: string; files: stri
   const render = (nodes: FileNode[], depth: number): React.ReactNode =>
     nodes.map((n) => (
       <div key={n.path}>
-        <button type="button" data-subtle
+        <button
+          type="button"
+          data-subtle
           aria-expanded={n.isDir ? open.has(n.path) : undefined}
           onClick={() => void pick(n)}
           style={{
-            display: 'flex', alignItems: 'center', gap: 4,
-            padding: `2px 8px 2px ${8 + depth * 14}px`, fontSize: 'calc(12px * var(--ui-font-scale))',
-            cursor: 'pointer', color: n.isDir ? 'var(--text-primary)' : 'var(--text-secondary)', border: 0, width: '100%', textAlign: 'left',
+            display: 'flex',
+            alignItems: 'center',
+            gap: 4,
+            padding: `2px 8px 2px ${8 + depth * 14}px`,
+            fontSize: 'calc(12px * var(--ui-font-scale))',
+            cursor: 'pointer',
+            color: n.isDir ? 'var(--text-primary)' : 'var(--text-secondary)',
+            border: 0,
+            width: '100%',
+            textAlign: 'left',
             background: selected === n.path ? 'var(--hover)' : 'transparent',
-          }}
-        >
+          }}>
           {n.isDir ? (
             <>
               <ChevronRight size={11} style={{ transform: open.has(n.path) ? 'rotate(90deg)' : 'none', transition: 'transform 0.1s' }} />
@@ -81,34 +96,57 @@ function SkillFileBrowser({ skillName, files }: { skillName: string; files: stri
     ));
 
   if (files.length === 0) {
-    return <div style={{ fontSize: 'calc(11px * var(--ui-font-scale))', color: 'var(--text-muted)', padding: 8 }}>{t('Only SKILL.md, no other files')}</div>;
+    return (
+      <div style={{ fontSize: 'calc(11px * var(--ui-font-scale))', color: 'var(--text-muted)', padding: 8 }}>
+        {t('Only SKILL.md, no other files')}
+      </div>
+    );
   }
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
       <div style={{ borderRadius: 'var(--radius-inner)', overflow: 'auto', maxHeight: 180, background: 'var(--surface)' }}>
         {render(tree, 0)}
       </div>
-      {selected && (error ? (
-        <ErrorBox actions={<button onClick={reload} style={{ minHeight: 32 }}>{t('Retry')}</button>}>
-          {error}
-        </ErrorBox>
-      ) : (
-        <pre style={{
-          margin: 0, padding: '8px 10px', maxHeight: 180, overflow: 'auto',
-          background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--radius-inner)',
-          fontSize: 'calc(11px * var(--ui-font-scale))', fontFamily: 'var(--font-ui)', whiteSpace: 'pre-wrap', wordBreak: 'break-word',
-          color: 'var(--text-secondary)',
-        }}>
-          {content}
-        </pre>
-      ))}
+      {selected &&
+        (error ? (
+          <ErrorBox
+            actions={
+              <button onClick={reload} style={{ minHeight: 32 }}>
+                {t('Retry')}
+              </button>
+            }>
+            {error}
+          </ErrorBox>
+        ) : (
+          <pre
+            style={{
+              margin: 0,
+              padding: '8px 10px',
+              maxHeight: 180,
+              overflow: 'auto',
+              background: 'var(--surface)',
+              border: '1px solid var(--border)',
+              borderRadius: 'var(--radius-inner)',
+              fontSize: 'calc(11px * var(--ui-font-scale))',
+              fontFamily: 'var(--font-ui)',
+              whiteSpace: 'pre-wrap',
+              wordBreak: 'break-word',
+              color: 'var(--text-secondary)',
+            }}>
+            {content}
+          </pre>
+        ))}
     </div>
   );
 }
 
 // ── Detail panel ──
 
-function SkillDetailPanel({ skill, onClose, onChanged }: {
+function SkillDetailPanel({
+  skill,
+  onClose,
+  onChanged,
+}: {
   skill: SkillDetail;
   onClose: () => void;
   onChanged: (deleted?: boolean) => void;
@@ -119,9 +157,15 @@ function SkillDetailPanel({ skill, onClose, onChanged }: {
   const [showFiles, setShowFiles] = useState(false);
   const run = async (action: () => Promise<void>) => {
     if (busy) return;
-    setBusy(true); setError(null);
-    try { await action(); } catch (failure) { setError(String(failure)); }
-    finally { setBusy(false); }
+    setBusy(true);
+    setError(null);
+    try {
+      await action();
+    } catch (failure) {
+      setError(String(failure));
+    } finally {
+      setBusy(false);
+    }
   };
   const toggleTrust = async () => {
     await setSkillState(skill.name, !skill.trusted, undefined);
@@ -141,11 +185,20 @@ function SkillDetailPanel({ skill, onClose, onChanged }: {
     <div className="skill-detail" data-testid="skill-detail" aria-busy={busy}>
       <PageBreadcrumb className="resource-breadcrumb" ancestors={[{ label: t('Skills'), onClick: onClose }]} current={skill.name} />
       <div className="resource-detail-header">
-        <span className="resource-mark resource-mark-large"><FileText size={28} aria-hidden="true" /></span>
-        <div className="resource-identity"><h2>{skill.name}</h2><p>{skill.description || t('No description')}</p></div>
+        <span className="resource-mark resource-mark-large">
+          <FileText size={28} aria-hidden="true" />
+        </span>
+        <div className="resource-identity">
+          <h2>{skill.name}</h2>
+          <p>{skill.description || t('No description')}</p>
+        </div>
         <div className="resource-actions">
-          <OutlineButton aria-expanded={showFiles} onClick={() => setShowFiles(value => !value)}>{t('View instructions')}</OutlineButton>
-          <OutlineButton disabled={busy} onClick={() => setConfirmDelete(true)} style={{ color: 'var(--control-danger-color)' }}>{t('Delete')}</OutlineButton>
+          <OutlineButton aria-expanded={showFiles} onClick={() => setShowFiles((value) => !value)}>
+            {t('View instructions')}
+          </OutlineButton>
+          <OutlineButton disabled={busy} onClick={() => setConfirmDelete(true)} style={{ color: 'var(--control-danger-color)' }}>
+            {t('Delete')}
+          </OutlineButton>
         </div>
       </div>
       <div className="resource-badges">
@@ -153,38 +206,97 @@ function SkillDetailPanel({ skill, onClose, onChanged }: {
         {skill.modified && <Badge text={t('Modified')} tone="warn" />}
       </div>
       <SettingsGroup title={t('Skill settings')}>
-        <div className="resource-setting-row"><div><strong>{t('Enabled')}</strong><p>{t('Make this skill available to the assistant when trusted.')}</p></div>
-          <Toggle label={t('Enable {{name}}', { name: skill.name })} on={skill.enabled} disabled={busy} onChange={() => void run(toggleEnabled)} /></div>
-        <div className="resource-setting-row"><div><strong>{t(skill.trusted ? 'Trusted' : 'Untrusted')}</strong><p>{t('Review the instructions and files before trusting this skill. Script execution still requires tool permissions.')}</p></div>
-          <OutlineButton disabled={busy} onClick={() => void run(toggleTrust)}>{t(skill.trusted ? 'Untrust' : 'Trust')}</OutlineButton></div>
+        <div className="resource-setting-row">
+          <div>
+            <strong>{t('Enabled')}</strong>
+            <p>{t('Make this skill available to the assistant when trusted.')}</p>
+          </div>
+          <Toggle
+            label={t('Enable {{name}}', { name: skill.name })}
+            on={skill.enabled}
+            disabled={busy}
+            onChange={() => void run(toggleEnabled)}
+          />
+        </div>
+        <div className="resource-setting-row">
+          <div>
+            <strong>{t(skill.trusted ? 'Trusted' : 'Untrusted')}</strong>
+            <p>{t('Review the instructions and files before trusting this skill. Script execution still requires tool permissions.')}</p>
+          </div>
+          <OutlineButton disabled={busy} onClick={() => void run(toggleTrust)}>
+            {t(skill.trusted ? 'Untrust' : 'Trust')}
+          </OutlineButton>
+        </div>
       </SettingsGroup>
       <SettingsGroup title={t('About')}>
         <dl className="resource-metadata">
-          <div><dt>{t('Source')}</dt><dd>{skill.source || t('Local')}</dd></div>
-          <div><dt>{t('Additional files')}</dt><dd>{t('{{count}} files', { count: skill.files.length })}</dd></div>
-          {skill.allowedTools && <div><dt>{t('Allowed tools:')}</dt><dd>{skill.allowedTools}</dd></div>}
-          <div><dt>{t('Folder')}</dt><dd className="skill-location"><span>{skill.dir}</span><OutlineButton disabled={busy} onClick={() => void run(() => fileOpenWith(skill.dir))}>{t('Open folder')}</OutlineButton></dd></div>
+          <div>
+            <dt>{t('Source')}</dt>
+            <dd>{skill.source || t('Local')}</dd>
+          </div>
+          <div>
+            <dt>{t('Additional files')}</dt>
+            <dd>{t('{{count}} files', { count: skill.files.length })}</dd>
+          </div>
+          {skill.allowedTools && (
+            <div>
+              <dt>{t('Allowed tools:')}</dt>
+              <dd>{skill.allowedTools}</dd>
+            </div>
+          )}
+          <div>
+            <dt>{t('Folder')}</dt>
+            <dd className="skill-location">
+              <span>{skill.dir}</span>
+              <OutlineButton disabled={busy} onClick={() => void run(() => fileOpenWith(skill.dir))}>
+                {t('Open folder')}
+              </OutlineButton>
+            </dd>
+          </div>
         </dl>
       </SettingsGroup>
-      {showFiles && <><div style={{ marginTop: 12 }}>
-        <div style={{ fontSize: 'calc(12px * var(--ui-font-scale))', fontWeight: 'var(--fw-semibold)', marginBottom: 6 }}>{t('Files')}</div>
-        <SkillFileBrowser skillName={skill.name} files={skill.files} />
-      </div>
+      {showFiles && (
+        <>
+          <div style={{ marginTop: 12 }}>
+            <div style={{ fontSize: 'calc(12px * var(--ui-font-scale))', fontWeight: 'var(--fw-semibold)', marginBottom: 6 }}>
+              {t('Files')}
+            </div>
+            <SkillFileBrowser skillName={skill.name} files={skill.files} />
+          </div>
 
-      <div style={{ marginTop: 12 }}>
-        <div style={{ fontSize: 'calc(12px * var(--ui-font-scale))', fontWeight: 'var(--fw-semibold)', marginBottom: 6 }}>SKILL.md</div>
-        <pre style={{
-          margin: 0, padding: '8px 10px', maxHeight: 240, overflow: 'auto',
-          background: 'var(--hover)', borderRadius: 'var(--radius-inner)',
-          fontSize: 'calc(11px * var(--ui-font-scale))', fontFamily: 'var(--font-ui)', whiteSpace: 'pre-wrap', wordBreak: 'break-word',
-          color: 'var(--text-secondary)',
-        }}>
-          {skill.prompt || t('Empty prompt')}
-        </pre>
-      </div></>}
+          <div style={{ marginTop: 12 }}>
+            <div style={{ fontSize: 'calc(12px * var(--ui-font-scale))', fontWeight: 'var(--fw-semibold)', marginBottom: 6 }}>SKILL.md</div>
+            <pre
+              style={{
+                margin: 0,
+                padding: '8px 10px',
+                maxHeight: 240,
+                overflow: 'auto',
+                background: 'var(--hover)',
+                borderRadius: 'var(--radius-inner)',
+                fontSize: 'calc(11px * var(--ui-font-scale))',
+                fontFamily: 'var(--font-ui)',
+                whiteSpace: 'pre-wrap',
+                wordBreak: 'break-word',
+                color: 'var(--text-secondary)',
+              }}>
+              {skill.prompt || t('Empty prompt')}
+            </pre>
+          </div>
+        </>
+      )}
       {error && <ErrorBox title={t('Could not update skill')} details={error} onDismiss={() => setError(null)} />}
-      <ConfirmDialog open={confirmDelete} title={t('Delete skill')} message={t('Delete {{name}} and its local files?', { name: skill.name })} danger
-        onCancel={() => setConfirmDelete(false)} onConfirm={() => { setConfirmDelete(false); void run(del); }} />
+      <ConfirmDialog
+        open={confirmDelete}
+        title={t('Delete skill')}
+        message={t('Delete {{name}} and its local files?', { name: skill.name })}
+        danger
+        onCancel={() => setConfirmDelete(false)}
+        onConfirm={() => {
+          setConfirmDelete(false);
+          void run(del);
+        }}
+      />
     </div>
   );
 }
@@ -194,7 +306,10 @@ function SkillDetailPanel({ skill, onClose, onChanged }: {
 export default function SkillsSettings() {
   const {
     metas,
-    loading, error, setError, changing,
+    loading,
+    error,
+    setError,
+    changing,
     detail,
     importUrl,
     importing,
@@ -210,29 +325,68 @@ export default function SkillsSettings() {
   } = useSkillsSettings();
   const [query, setQuery] = useState('');
   const [importOpen, setImportOpen] = useState(false);
-  const visible = metas.filter(skill => `${skill.name} ${skill.description}`.toLowerCase().includes(query.trim().toLowerCase()));
-  const importFromUrl = async () => { await doImportUrl(); setImportOpen(false); };
-  const importFromPath = async (directory: boolean) => { await doImportPath(directory); setImportOpen(false); };
+  const visible = metas.filter((skill) => `${skill.name} ${skill.description}`.toLowerCase().includes(query.trim().toLowerCase()));
+  const importFromUrl = async () => {
+    await doImportUrl();
+    setImportOpen(false);
+  };
+  const importFromPath = async (directory: boolean) => {
+    await doImportPath(directory);
+    setImportOpen(false);
+  };
 
-  if (detail) return <SkillDetailPanel key={detail.name} skill={detail} onClose={() => setDetail(null)} onChanged={deleted => { refresh(); if (!deleted) void openDetail(detail.name); }} />;
+  if (detail)
+    return (
+      <SkillDetailPanel
+        key={detail.name}
+        skill={detail}
+        onClose={() => setDetail(null)}
+        onChanged={(deleted) => {
+          refresh();
+          if (!deleted) void openDetail(detail.name);
+        }}
+      />
+    );
 
   return (
     <div style={{ position: 'relative' }}>
       <header className="resource-page-header">
-        <div><h1>{t('Skills')}</h1><p>{t('Manage the skills available to your assistant.')}</p></div>
+        <div>
+          <h1>{t('Skills')}</h1>
+          <p>{t('Manage the skills available to your assistant.')}</p>
+        </div>
       </header>
-      <SettingsDialog open={importOpen} title={t('Import skills')} icon={<Download size={16} />} width={520} testId="skills-import-dialog"
-        initialFocus='[data-testid="skill-import-url"]' onClose={() => setImportOpen(false)}>
+      <SettingsDialog
+        open={importOpen}
+        title={t('Import skills')}
+        icon={<Download size={16} />}
+        width={520}
+        testId="skills-import-dialog"
+        initialFocus='[data-testid="skill-import-url"]'
+        onClose={() => setImportOpen(false)}>
         <section style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
           {!warnDismissed && (
-            <div style={{
-              display: 'flex', alignItems: 'center', gap: 8,
-              padding: '8px 10px', borderRadius: 'var(--radius-inner)',
-              background: 'var(--accent-warm-dim)', fontSize: 'calc(11px * var(--ui-font-scale))', lineHeight: 1.5, color: 'var(--accent-warm)',
-            }}>
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 8,
+                padding: '8px 10px',
+                borderRadius: 'var(--radius-inner)',
+                background: 'var(--accent-warm-dim)',
+                fontSize: 'calc(11px * var(--ui-font-scale))',
+                lineHeight: 1.5,
+                color: 'var(--accent-warm)',
+              }}>
               <ShieldAlert size={14} style={{ flexShrink: 0 }} />
-              <span style={{ flex: 1 }}>{t('Skills may contain scripts. Imported skills remain untrusted until you review and trust them. Script execution still follows tool permissions.')}</span>
-              <IconButton compact onClick={() => setWarnDismissed(true)} data-tip={t('Close')} aria-label={t('Close')}><X size={16} /></IconButton>
+              <span style={{ flex: 1 }}>
+                {t(
+                  'Skills may contain scripts. Imported skills remain untrusted until you review and trust them. Script execution still follows tool permissions.',
+                )}
+              </span>
+              <IconButton compact onClick={() => setWarnDismissed(true)} data-tip={t('Close')} aria-label={t('Close')}>
+                <X size={16} />
+              </IconButton>
             </div>
           )}
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
@@ -243,7 +397,9 @@ export default function SkillsSettings() {
               value={importUrl}
               placeholder={t('Import a skill manifest from a URL')}
               onChange={(e) => setImportUrl(e.target.value)}
-              onKeyDown={(e) => { if (e.key === 'Enter') void importFromUrl(); }}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') void importFromUrl();
+              }}
               style={{ ...inputStyle, flex: 1, width: 'auto' }}
             />
             <OutlineButton onClick={() => void importFromUrl()} disabled={importing} style={{ ...btn, flexShrink: 0 }}>
@@ -251,10 +407,16 @@ export default function SkillsSettings() {
             </OutlineButton>
           </div>
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
-            <OutlineButton onClick={() => void importFromPath(true)} disabled={importing} style={{ ...btn, display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+            <OutlineButton
+              onClick={() => void importFromPath(true)}
+              disabled={importing}
+              style={{ ...btn, display: 'inline-flex', alignItems: 'center', gap: 4 }}>
               <Download size={13} /> {t('Import folder')}
             </OutlineButton>
-            <OutlineButton onClick={() => void importFromPath(false)} disabled={importing} style={{ ...btn, display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+            <OutlineButton
+              onClick={() => void importFromPath(false)}
+              disabled={importing}
+              style={{ ...btn, display: 'inline-flex', alignItems: 'center', gap: 4 }}>
               <Download size={13} /> {t('Import archive')}
             </OutlineButton>
           </div>
@@ -263,31 +425,72 @@ export default function SkillsSettings() {
 
       <div className="resource-library-toolbar">
         <div className="resource-actions">
-          <OutlineButton aria-expanded={importOpen} onClick={() => setImportOpen(true)}><Plus size={16} />{t('Import skills')}</OutlineButton>
+          <OutlineButton aria-expanded={importOpen} onClick={() => setImportOpen(true)}>
+            <Plus size={16} />
+            {t('Import skills')}
+          </OutlineButton>
         </div>
-        <div className="resource-search"><Search size={16} aria-hidden="true" /><TextInput variant="field" aria-label={t('Search skills…')} placeholder={t('Search skills…')} value={query} onChange={event => setQuery(event.target.value)} /></div>
+        <div className="resource-search">
+          <Search size={16} aria-hidden="true" />
+          <TextInput
+            variant="field"
+            aria-label={t('Search skills…')}
+            placeholder={t('Search skills…')}
+            value={query}
+            onChange={(event) => setQuery(event.target.value)}
+          />
+        </div>
       </div>
       <div className="skill-list">
-      {loading && metas.length === 0 && <p role="status" className="resource-caption">{t('Loading…')}</p>}
-      {!loading && !error && metas.length === 0 && (
-        <div style={{ fontSize: 'calc(12px * var(--ui-font-scale))', color: 'var(--text-muted)', padding: '6px 0' }}>
-          {t('No skills yet. Import from a URL, folder or archive.')}
-        </div>
-      )}
+        {loading && metas.length === 0 && (
+          <p role="status" className="resource-caption">
+            {t('Loading…')}
+          </p>
+        )}
+        {!loading && !error && metas.length === 0 && (
+          <div style={{ fontSize: 'calc(12px * var(--ui-font-scale))', color: 'var(--text-muted)', padding: '6px 0' }}>
+            {t('No skills yet. Import from a URL, folder or archive.')}
+          </div>
+        )}
 
-      {metas.length > 0 && visible.length === 0 && <p className="resource-caption">{t('No matching skills.')}</p>}
-      {visible.map(skill => <div className="skill-list-row" key={skill.name}>
-        <button type="button" data-subtle className="skill-open" aria-label={t('Open {{name}}', { name: skill.name })} onClick={() => void openDetail(skill.name)}>
-          <span className="resource-mark"><FileText size={20} aria-hidden="true" /></span>
-          <span className="resource-identity"><strong>{skill.name}</strong><span>{skill.description || t('No description')}</span>
-            {!skill.trusted && <span className="resource-trust">{t('Untrusted')}</span>}</span>
-        </button>
-        <Toggle label={t('Enable {{name}}', { name: skill.name })} disabled={changing.includes(skill.name)} on={skill.enabled} onChange={() => void toggleEnabled(skill)} />
-        <IconButton aria-label={t('Open {{name}}', { name: skill.name })} onClick={() => void openDetail(skill.name)}><ChevronRight size={16} /></IconButton>
-      </div>)}
-
+        {metas.length > 0 && visible.length === 0 && <p className="resource-caption">{t('No matching skills.')}</p>}
+        {visible.map((skill) => (
+          <div className="skill-list-row" key={skill.name}>
+            <button
+              type="button"
+              data-subtle
+              className="skill-open"
+              aria-label={t('Open {{name}}', { name: skill.name })}
+              onClick={() => void openDetail(skill.name)}>
+              <span className="resource-mark">
+                <FileText size={20} aria-hidden="true" />
+              </span>
+              <span className="resource-identity">
+                <strong>{skill.name}</strong>
+                <span>{skill.description || t('No description')}</span>
+                {!skill.trusted && <span className="resource-trust">{t('Untrusted')}</span>}
+              </span>
+            </button>
+            <Toggle
+              label={t('Enable {{name}}', { name: skill.name })}
+              disabled={changing.includes(skill.name)}
+              on={skill.enabled}
+              onChange={() => void toggleEnabled(skill)}
+            />
+            <IconButton aria-label={t('Open {{name}}', { name: skill.name })} onClick={() => void openDetail(skill.name)}>
+              <ChevronRight size={16} />
+            </IconButton>
+          </div>
+        ))}
       </div>
-      {error && <ErrorBox title={t('Could not load skills')} details={error} onDismiss={() => setError(null)} actions={<OutlineButton onClick={refresh}>{t('Retry')}</OutlineButton>} />}
+      {error && (
+        <ErrorBox
+          title={t('Could not load skills')}
+          details={error}
+          onDismiss={() => setError(null)}
+          actions={<OutlineButton onClick={refresh}>{t('Retry')}</OutlineButton>}
+        />
+      )}
     </div>
   );
 }

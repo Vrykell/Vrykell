@@ -45,9 +45,9 @@ describe('CommandBlock', () => {
   it('stages a multiline script in its selected terminal without writing to either PTY', () => {
     useTerminalStore.setState({ sessions: { selected: 'selected-pty', focused: 'focused-pty' }, focusedPaneId: 'focused' });
     useInputStore.getState().setText('focused', 'unrelated draft');
-    render(<Markdown content={'```bash\ncat <<\'END\' > sample.txt\nscript line\nEND\necho done\n```'} paneId="selected" />);
+    render(<Markdown content={"```bash\ncat <<'END' > sample.txt\nscript line\nEND\necho done\n```"} paneId="selected" />);
     fireEvent.click(screen.getByText('在终端运行'));
-    expect(invokeMock.mock.calls.filter(call => call[0] === 'pty_write')).toEqual([]);
+    expect(invokeMock.mock.calls.filter((call) => call[0] === 'pty_write')).toEqual([]);
     expect(useInputStore.getState().byPane.selected?.text).toBe("cat <<'END' > sample.txt\nscript line\nEND\necho done");
     expect(useInputStore.getState().byPane.focused?.text).toBe('unrelated draft');
     expect(useTerminalStore.getState().focusedPaneId).toBe('selected');

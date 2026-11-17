@@ -3,14 +3,20 @@ import { fireEvent, render, screen } from '@testing-library/react';
 import FilePanel from '../components/FilePanel';
 
 vi.mock('@platform/api/fs', async () => ({
-  ...await vi.importActual<typeof import('@platform/api/fs')>('@platform/api/fs'),
+  ...(await vi.importActual<typeof import('@platform/api/fs')>('@platform/api/fs')),
   fsHome: vi.fn().mockResolvedValue('/work'),
   fsDisks: vi.fn().mockResolvedValue([]),
   fsList: vi.fn().mockResolvedValue([{ name: 'notes.txt', path: '/work/notes.txt', is_dir: false }]),
 }));
 
 beforeEach(() => {
-  vi.stubGlobal('ResizeObserver', class { observe() {} disconnect() {} });
+  vi.stubGlobal(
+    'ResizeObserver',
+    class {
+      observe() {}
+      disconnect() {}
+    },
+  );
 });
 afterEach(() => vi.unstubAllGlobals());
 

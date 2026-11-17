@@ -17,7 +17,7 @@ describe('historyGroupColor', () => {
     expect(historyGroupColor('month:2026-9')).not.toBe(historyGroupColor('month:2026-8'));
   });
 
-  it.each(['all', 'terminal:default', 'cwd:unknown', 'cwd:multiple'])('keeps %s neutral', id => {
+  it.each(['all', 'terminal:default', 'cwd:unknown', 'cwd:multiple'])('keeps %s neutral', (id) => {
     expect(historyGroupColor(id)).toBe('neutral');
   });
 

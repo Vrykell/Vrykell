@@ -5,9 +5,21 @@ import { Cpu } from '@ui/icons';
 
 describe('vendorMark', () => {
   it('prefers the model family so a gateway still shows the vendor mark', () => {
-    expect(vendorMark('openai-compatible', 'gpt-4o-mini')).toMatchObject({ color: 'var(--brand-openai)', label: 'OpenAI', icon: OpenAIMark });
-    expect(vendorMark('openai-compatible', 'deepseek-chat')).toMatchObject({ color: 'var(--brand-deepseek)', label: 'DeepSeek', icon: DeepSeekMark });
-    expect(vendorMark('anthropic', 'claude-sonnet-4')).toMatchObject({ color: 'var(--brand-anthropic)', label: 'Anthropic', icon: AnthropicMark });
+    expect(vendorMark('openai-compatible', 'gpt-4o-mini')).toMatchObject({
+      color: 'var(--brand-openai)',
+      label: 'OpenAI',
+      icon: OpenAIMark,
+    });
+    expect(vendorMark('openai-compatible', 'deepseek-chat')).toMatchObject({
+      color: 'var(--brand-deepseek)',
+      label: 'DeepSeek',
+      icon: DeepSeekMark,
+    });
+    expect(vendorMark('anthropic', 'claude-sonnet-4')).toMatchObject({
+      color: 'var(--brand-anthropic)',
+      label: 'Anthropic',
+      icon: AnthropicMark,
+    });
     expect(vendorMark('gemini', 'gemini-2.5-pro')).toMatchObject({ color: 'var(--brand-gemini)', label: 'Gemini', icon: GeminiMark });
   });
 
@@ -19,6 +31,10 @@ describe('vendorMark', () => {
 
   it('falls back to the provider and then to a neutral ink', () => {
     expect(vendorMark('anthropic', 'internal-preview')).toMatchObject({ color: 'var(--brand-anthropic)', label: 'Anthropic' });
-    expect(vendorMark('custom-gateway', 'unknown-family')).toMatchObject({ color: 'var(--text-muted)', label: 'custom-gateway', icon: Cpu });
+    expect(vendorMark('custom-gateway', 'unknown-family')).toMatchObject({
+      color: 'var(--text-muted)',
+      label: 'custom-gateway',
+      icon: Cpu,
+    });
   });
 });

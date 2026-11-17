@@ -32,13 +32,16 @@ describe('fileMenu', () => {
   it('pastes into the row target directory, so a file pastes into its sibling folder', () => {
     const onPasteInto = vi.fn();
     const file = entry('a.txt', '/work/sub/a.txt');
-    const items = buildFileMenuItems(['paste'], ctx({
-      entry: file,
-      targets: [file],
-      targetDir: '/work/sub',
-      clipboard: { mode: 'copy', paths: ['/other/x'] },
-      handlers: handlers({ onPasteInto }),
-    }));
+    const items = buildFileMenuItems(
+      ['paste'],
+      ctx({
+        entry: file,
+        targets: [file],
+        targetDir: '/work/sub',
+        clipboard: { mode: 'copy', paths: ['/other/x'] },
+        handlers: handlers({ onPasteInto }),
+      }),
+    );
 
     items[0]!.onClick?.();
 
@@ -47,12 +50,15 @@ describe('fileMenu', () => {
 
   it('uses the plain paste label for every target kind', () => {
     const folder = entry('sub', '/work/sub', true);
-    const intoFolder = buildFileMenuItems(['paste'], ctx({
-      entry: folder,
-      targets: [folder],
-      targetDir: '/work/sub',
-      clipboard: { mode: 'cut', paths: ['/x'] },
-    }));
+    const intoFolder = buildFileMenuItems(
+      ['paste'],
+      ctx({
+        entry: folder,
+        targets: [folder],
+        targetDir: '/work/sub',
+        clipboard: { mode: 'cut', paths: ['/x'] },
+      }),
+    );
     const intoCurrent = buildFileMenuItems(['paste'], ctx({ clipboard: { mode: 'cut', paths: ['/x'] } }));
 
     expect(intoFolder[0]!.label).toBe('粘贴');
@@ -81,25 +87,28 @@ describe('fileMenu', () => {
 
   it('builds the terminal binding submenu from the panel host data', () => {
     const onSelect = vi.fn();
-    const items = buildFileMenuItems(['bind-terminal'], ctx({
-      terminalMenu: {
-        value: 'pane-b',
-        options: [
-          { id: 'pane-a', label: 'Build', live: true },
-          { id: 'pane-b', label: 'Server', live: true },
-        ],
-        onSelect,
-      },
-    }));
+    const items = buildFileMenuItems(
+      ['bind-terminal'],
+      ctx({
+        terminalMenu: {
+          value: 'pane-b',
+          options: [
+            { id: 'pane-a', label: 'Build', live: true },
+            { id: 'pane-b', label: 'Server', live: true },
+          ],
+          onSelect,
+        },
+      }),
+    );
 
     expect(items).toHaveLength(1);
     expect(items[0]).toMatchObject({ label: '绑定终端', group: 'view' });
     const submenu = items[0]!.submenu?.items ?? [];
-    const server = submenu.find(item => item.label === 'Server');
+    const server = submenu.find((item) => item.label === 'Server');
     expect(server).toMatchObject({ checked: true });
     server?.onClick?.();
     expect(onSelect).toHaveBeenCalledWith('pane-b');
-    submenu.find(item => item.label === '跟随聚焦终端')?.onClick?.();
+    submenu.find((item) => item.label === '跟随聚焦终端')?.onClick?.();
     expect(onSelect).toHaveBeenCalledWith(null);
   });
 
@@ -129,11 +138,16 @@ describe('fileMenu', () => {
 
     // No handler (panel does not support it) or a group hit renders nothing
     expect(buildFileMenuItems(['properties'], ctx({ entry: file, targets: [file] }))).toHaveLength(0);
-    expect(buildFileMenuItems(['properties'], ctx({
-      entry: file,
-      targets: [file, entry('b.txt', '/work/b.txt')],
-      handlers: handlers({ onProperties }),
-    }))).toHaveLength(0);
+    expect(
+      buildFileMenuItems(
+        ['properties'],
+        ctx({
+          entry: file,
+          targets: [file, entry('b.txt', '/work/b.txt')],
+          handlers: handlers({ onProperties }),
+        }),
+      ),
+    ).toHaveLength(0);
     expect(buildFileMenuItems(['properties'], ctx({ handlers: handlers({ onProperties }) }))).toHaveLength(0);
   });
 

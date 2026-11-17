@@ -50,8 +50,7 @@ export const approveToolCall = (
 
 export const loadToolPolicy = () => invoke<Record<string, ToolLevel>>('tool_policy_get');
 
-export const setToolPolicyLevel = (tool: string, level: ToolLevel) =>
-  invoke<void>('tool_policy_set_level', { tool, level });
+export const setToolPolicyLevel = (tool: string, level: ToolLevel) => invoke<void>('tool_policy_set_level', { tool, level });
 
 export const clearToolSessionGrants = (conversationId?: string) =>
   invoke<void>('tool_policy_clear_session_grants', { conversationId: conversationId ?? null });

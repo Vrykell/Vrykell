@@ -11,7 +11,11 @@ describe('AutoSaveInput', () => {
     const commit = vi.fn();
     render(<NumberInput value={100} min={1} max={100} onChange={commit} />);
     const input = screen.getByRole('spinbutton');
-    for (const [draft, saved] of [['101', 100], ['0', 1], ['3.6', 4]] as const) {
+    for (const [draft, saved] of [
+      ['101', 100],
+      ['0', 1],
+      ['3.6', 4],
+    ] as const) {
       fireEvent.change(input, { target: { value: draft } });
       expect(input).toHaveValue(Number(draft));
       await act(() => vi.advanceTimersByTimeAsync(600));

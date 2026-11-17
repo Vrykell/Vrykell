@@ -30,9 +30,7 @@ async function openForwardedDirectories(): Promise<void> {
  * window could listen. The queue is drained by whoever gets there first, so the two paths never
  * open one directory twice.
  */
-export async function initForwardedLaunch(
-  onError: (message: string, error: unknown) => void,
-): Promise<void> {
+export async function initForwardedLaunch(onError: (message: string, error: unknown) => void): Promise<void> {
   const report = (error: unknown) => onError(t('Could not open the requested directory'), error);
   if (!listening) {
     listening = true;

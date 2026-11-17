@@ -10,7 +10,15 @@ import { writeClipboardText } from '@platform/clipboard';
  * (restarted on every click). `label` is the accessible name and the tooltip shown
  * before copying, for example "Copy output"; the confirmed state reads "Copied".
  */
-export default function CopyButton({ text, label, testId, className, style, quiet = false, iconSize = iconSizes.copy }: {
+export default function CopyButton({
+  text,
+  label,
+  testId,
+  className,
+  style,
+  quiet = false,
+  iconSize = iconSizes.copy,
+}: {
   /** Raw text written to the clipboard. */
   text: string;
   /** Accessible name and tooltip for the idle state. */
@@ -26,9 +34,12 @@ export default function CopyButton({ text, label, testId, className, style, quie
   const [copied, setCopied] = useState(false);
   const copyTimer = useRef<number | null>(null);
 
-  useEffect(() => () => {
-    if (copyTimer.current !== null) window.clearTimeout(copyTimer.current);
-  }, []);
+  useEffect(
+    () => () => {
+      if (copyTimer.current !== null) window.clearTimeout(copyTimer.current);
+    },
+    [],
+  );
 
   const name = copied ? t('Copied') : label;
 
@@ -48,24 +59,40 @@ export default function CopyButton({ text, label, testId, className, style, quie
       });
   };
 
-  return <button
-    data-subtle
-    type="button"
-    data-testid={testId}
-    data-tip={name}
-    aria-label={name}
-    data-copied={copied}
-    className={className}
-    onClick={handleCopy}
-    onMouseEnter={event => { event.currentTarget.style.background = quiet ? 'transparent' : 'var(--hover)'; event.currentTarget.style.color = 'var(--text-secondary)'; }}
-    onMouseLeave={event => { event.currentTarget.style.background = 'transparent'; event.currentTarget.style.color = 'var(--text-muted)'; }}
-    style={{
-      display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-      width: 22, height: 22, padding: 0, border: 'none', borderRadius: 'var(--radius-inner)', flexShrink: 0,
-      background: 'transparent', color: 'var(--text-muted)', cursor: 'pointer',
-      ...style,
-    }}
-  >
-    {copied ? <Check size={iconSize} style={{ color: 'var(--success)' }} /> : <Copy size={iconSize} />}
-  </button>;
+  return (
+    <button
+      data-subtle
+      type="button"
+      data-testid={testId}
+      data-tip={name}
+      aria-label={name}
+      data-copied={copied}
+      className={className}
+      onClick={handleCopy}
+      onMouseEnter={(event) => {
+        event.currentTarget.style.background = quiet ? 'transparent' : 'var(--hover)';
+        event.currentTarget.style.color = 'var(--text-secondary)';
+      }}
+      onMouseLeave={(event) => {
+        event.currentTarget.style.background = 'transparent';
+        event.currentTarget.style.color = 'var(--text-muted)';
+      }}
+      style={{
+        display: 'inline-flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        width: 22,
+        height: 22,
+        padding: 0,
+        border: 'none',
+        borderRadius: 'var(--radius-inner)',
+        flexShrink: 0,
+        background: 'transparent',
+        color: 'var(--text-muted)',
+        cursor: 'pointer',
+        ...style,
+      }}>
+      {copied ? <Check size={iconSize} style={{ color: 'var(--success)' }} /> : <Copy size={iconSize} />}
+    </button>
+  );
 }

@@ -5,14 +5,24 @@ import { gotoSetting } from './settings';
 test('interface, terminal and editor fonts load locally and keep mixed text aligned', async ({ page }) => {
   await setupTauriMock(page);
   const fonts: string[] = [];
-  page.on('response', response => {
-    if (response.url().includes('/fonts/') && response.url().endsWith('.woff2') && response.ok()) fonts.push(new URL(response.url()).pathname);
+  page.on('response', (response) => {
+    if (response.url().includes('/fonts/') && response.url().endsWith('.woff2') && response.ok())
+      fonts.push(new URL(response.url()).pathname);
   });
   await page.goto('/');
   await gotoSetting(page, '字体与显示');
-  expect(fonts.sort()).toEqual(['/fonts/terminal-alternate.woff2', '/fonts/terminal-bold.woff2', '/fonts/terminal-code.woff2', '/fonts/terminal-regular.woff2', '/fonts/ui-alternate.woff2', '/fonts/ui-sans.woff2']);
-  const loaded = await page.evaluate(() => Array.from(document.fonts).map(face => ({ family: face.family.replaceAll('"', ''), status: face.status })));
-  expect(loaded.filter(face => ['Noto Sans SC', 'Maple Mono NF CN'].includes(face.family))).toEqual([
+  expect(fonts.sort()).toEqual([
+    '/fonts/terminal-alternate.woff2',
+    '/fonts/terminal-bold.woff2',
+    '/fonts/terminal-code.woff2',
+    '/fonts/terminal-regular.woff2',
+    '/fonts/ui-alternate.woff2',
+    '/fonts/ui-sans.woff2',
+  ]);
+  const loaded = await page.evaluate(() =>
+    Array.from(document.fonts).map((face) => ({ family: face.family.replaceAll('"', ''), status: face.status })),
+  );
+  expect(loaded.filter((face) => ['Noto Sans SC', 'Maple Mono NF CN'].includes(face.family))).toEqual([
     { family: 'Noto Sans SC', status: 'loaded' },
     { family: 'Maple Mono NF CN', status: 'loaded' },
     { family: 'Maple Mono NF CN', status: 'loaded' },
@@ -22,20 +32,23 @@ test('interface, terminal and editor fonts load locally and keep mixed text alig
   await expect(family).toHaveText('Maple Mono NF CN');
   await expect(family).toHaveCSS('font-family', /"Noto Sans SC"/);
   await expect(page.getByLabel('终端字体预览')).toHaveCSS('font-family', /"Maple Mono NF CN"/);
-  const terminalBackground = await page.getByLabel('终端字体预览').evaluate(element => getComputedStyle(element).backgroundColor);
+  const terminalBackground = await page.getByLabel('终端字体预览').evaluate((element) => getComputedStyle(element).backgroundColor);
   await expect(page.getByLabel('AI Chat 字号预览')).toHaveCSS('background-color', terminalBackground);
   for (const label of ['编辑器字体预览', '终端字体预览', 'AI Chat 字号预览']) {
     const preview = page.getByLabel(label);
     await expect(preview).toHaveCSS('background-color', terminalBackground);
     await expect(preview).toHaveCSS('border-top-width', '1px');
     await expect(preview).toHaveCSS('border-top-style', 'solid');
-    await expect(preview).toHaveCSS('border-top-color', await page.getByLabel('终端字体预览').evaluate(element => getComputedStyle(element).borderTopColor));
+    await expect(preview).toHaveCSS(
+      'border-top-color',
+      await page.getByLabel('终端字体预览').evaluate((element) => getComputedStyle(element).borderTopColor),
+    );
   }
   const widths = await page.evaluate(() => {
     const canvas = document.createElement('canvas');
     const context = canvas.getContext('2d')!;
     context.font = '14px "Maple Mono NF CN"';
-    return ['A', 'W', '中', '\uf115', '\ue0a0'].map(text => context.measureText(text).width);
+    return ['A', 'W', '中', '\uf115', '\ue0a0'].map((text) => context.measureText(text).width);
   });
   expect(widths[0]).toBeCloseTo(widths[1], 2);
   // Native hinting can round a double-cell glyph differently from two single cells.
@@ -69,7 +82,7 @@ test('interface, terminal and editor fonts load locally and keep mixed text alig
 
 test('missing font assets retain a usable application with fallback fonts', async ({ page }) => {
   await setupTauriMock(page);
-  await page.route('**/fonts/*.woff2', route => route.abort());
+  await page.route('**/fonts/*.woff2', (route) => route.abort());
   await page.goto('/');
   await gotoSetting(page, '字体与显示');
   await expect(page.getByRole('combobox', { name: '终端字体', exact: true })).toBeVisible();

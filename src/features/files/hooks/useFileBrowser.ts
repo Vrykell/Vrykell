@@ -1,9 +1,7 @@
 import { useFileUndoSettings } from '@config/fileUndo';
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import type { DiskEntry, FsEntry } from '@platform/api/types';
-import {
-  DEFAULT_DIR_NAME, DEFAULT_FILE_NAME, fileOpsFor, resolveTargetDir,
-} from '@features/files/model/fileOps';
+import { DEFAULT_DIR_NAME, DEFAULT_FILE_NAME, fileOpsFor, resolveTargetDir } from '@features/files/model/fileOps';
 import type { FileListResult, FileOpPair, FileOps, FileOpsTarget } from '@features/files/model/fileOps';
 import { useToastStore } from '@ui/feedback/Toast';
 import { terminalDebug } from '@features/terminal/services/terminalDebug';
@@ -11,9 +9,7 @@ import { t, type I18nKey } from '@i18n';
 import { flattenVisible } from '../utils/fileTree';
 
 /** State for context menus, rename and the delete confirmation. */
-export type FileConfirmState =
-  | { kind: 'rename'; entry: FsEntry; newName: string }
-  | { kind: 'delete'; entries: FsEntry[] };
+export type FileConfirmState = { kind: 'rename'; entry: FsEntry; newName: string } | { kind: 'delete'; entries: FsEntry[] };
 
 /** Clipboard: copy or cut (cut then paste moves and remains undoable). */
 export interface FileClipboard {
@@ -79,11 +75,15 @@ function freshView(expanded: ReadonlySet<string>): ViewSnapshot {
 const LOADING_HINT_DELAY_MS = 150;
 
 function sameEntries(left: FsEntry[], right: FsEntry[]): boolean {
-  return left.length === right.length && left.every((entry, index) => {
-    const other = right[index]!;
-    return entry.path === other.path && entry.name === other.name
-      && entry.is_dir === other.is_dir && entry.is_symlink === other.is_symlink;
-  });
+  return (
+    left.length === right.length &&
+    left.every((entry, index) => {
+      const other = right[index]!;
+      return (
+        entry.path === other.path && entry.name === other.name && entry.is_dir === other.is_dir && entry.is_symlink === other.is_symlink
+      );
+    })
+  );
 }
 
 export interface UseFileBrowserOptions {
@@ -177,7 +177,7 @@ export function useFileBrowser({
   const scrollRef = useRef<HTMLDivElement | null>(null);
   const pendingScrollTop = useRef<number | null>(null);
   const [clipboard, setClipboard] = useState<FileClipboard | null>(null);
-  const undoEnabled = useFileUndoSettings(state => target.kind === 'ssh' ? state.remote : state.local);
+  const undoEnabled = useFileUndoSettings((state) => (target.kind === 'ssh' ? state.remote : state.local));
   const [undoStack, setUndoStack] = useState<FileUndo[]>([]);
   const undoStackRef = useRef<FileUndo[]>([]);
   const undoBusy = useRef(false);
@@ -238,89 +238,103 @@ export function useFileBrowser({
     onPathChangeRef.current?.(next);
   }, []);
 
-  const invalidateTrees = useCallback((roots: string[]) => {
-    if (roots.length === 0) return;
-    const affected = (item: string) => roots.some(root => item === root || item.startsWith(`${root}/`));
-    for (const key of directorySnapshots.current.keys()) {
-      if (key !== null && affected(key)) directorySnapshots.current.delete(key);
-    }
-    for (const key of childRequests.current.keys()) {
-      if (affected(key)) { childRequests.current.delete(key); clearChildTimer(key); }
-    }
-    setChildCache(current => Object.fromEntries(Object.entries(current).filter(([key]) => !affected(key))));
-    setChildErrors(current => Object.fromEntries(Object.entries(current).filter(([key]) => !affected(key))));
-    setExpandedSet(current => new Set([...current].filter(key => !affected(key))));
-    setChildPending(current => new Set([...current].filter(key => !affected(key))));
-    setChildLoadingHint(current => new Set([...current].filter(key => !affected(key))));
-  }, [clearChildTimer]);
+  const invalidateTrees = useCallback(
+    (roots: string[]) => {
+      if (roots.length === 0) return;
+      const affected = (item: string) => roots.some((root) => item === root || item.startsWith(`${root}/`));
+      for (const key of directorySnapshots.current.keys()) {
+        if (key !== null && affected(key)) directorySnapshots.current.delete(key);
+      }
+      for (const key of childRequests.current.keys()) {
+        if (affected(key)) {
+          childRequests.current.delete(key);
+          clearChildTimer(key);
+        }
+      }
+      setChildCache((current) => Object.fromEntries(Object.entries(current).filter(([key]) => !affected(key))));
+      setChildErrors((current) => Object.fromEntries(Object.entries(current).filter(([key]) => !affected(key))));
+      setExpandedSet((current) => new Set([...current].filter((key) => !affected(key))));
+      setChildPending((current) => new Set([...current].filter((key) => !affected(key))));
+      setChildLoadingHint((current) => new Set([...current].filter((key) => !affected(key))));
+    },
+    [clearChildTimer],
+  );
 
-  const load = useCallback((currentPath: string | null, background = false) => {
-    const version = ++requestVersion.current;
-    const initialLoad = loadedPathRef.current !== currentPath;
-    rootBusy.current = true;
-    setLoading(initialLoad);
-    setLoadingHint(false);
-    clearLoadingTimer();
-    if (initialLoad) loadingHintTimer.current = setTimeout(() => {
-      loadingHintTimer.current = null;
-      if (alive.current && version === requestVersion.current) setLoadingHint(true);
-    }, LOADING_HINT_DELAY_MS);
-    if (!background) setError(null);
-    // Keep the previous list so a fast switch replaces it in place instead of flashing empty.
-    const kind = currentPath === null ? 'root' : 'directory';
-    terminalDebug('files-load-start', { requestId: version, kind });
-    const cached = preloaded.current;
-    preloaded.current = null;
-    const request = (cached?.path === currentPath ? Promise.resolve(cached.result) : ops.list(currentPath)).then((result) => {
-      if (version !== requestVersion.current) return;
-      setError(null);
-      loadedPathRef.current = currentPath;
-      setLoadedPath(currentPath);
-      if (currentPath === null && result.base) {
-        // The target resolved its own start directory (remote home): correct silently, no trail entry.
-        initialized.current = true;
-        preloaded.current = { path: result.base, result };
-        correctPath(result.base);
-      }
-      // A null path on the local panel is the disk view (no entries); otherwise use the list.
-      const showDisks = currentPath === null && ops.disks !== undefined;
-      const next = showDisks ? [] : result.entries;
-      const snapshotPath = result.base ?? currentPath;
-      const previous = directorySnapshots.current.get(snapshotPath)
-        ?? (snapshotPath === null ? [] : childCacheRef.current[snapshotPath] ?? []);
-      const directories = new Set(next.filter(item => item.is_dir).map(item => item.path));
-      invalidateTrees(previous.filter(entry => entry.is_dir && !directories.has(entry.path))
-        .map(entry => entry.path));
-      directorySnapshots.current.delete(snapshotPath);
-      directorySnapshots.current.set(snapshotPath, next);
-      if (directorySnapshots.current.size > MAX_TRAIL_ENTRIES) {
-        directorySnapshots.current.delete(directorySnapshots.current.keys().next().value!);
-      }
-      setEntries(current => sameEntries(current, next) ? current : next);
-      if (currentPath !== null && childCacheRef.current[currentPath] !== undefined) {
-        setChildCache(current => ({ ...current, [currentPath]: next }));
-      }
-      terminalDebug('files-load-end', { requestId: version, kind, entryCount: result.entries.length });
-      return next;
-    });
-    if (currentPath === null && ops.disks) {
-      void ops.disks().then((list) => {
-        if (version === requestVersion.current) setDisks(list);
-      }).catch(() => {});
-    }
-    return request.catch((cause: unknown) => {
-      if (version !== requestVersion.current) return;
-      // Preserve the original error; the remote panel classifies service-unavailable and auth cases.
-      setError(String((cause as Error)?.message ?? cause));
-      terminalDebug('files-load-error', { requestId: version, kind, errorType: cause instanceof Error ? cause.name : typeof cause });
-    }).finally(() => {
-      if (version !== requestVersion.current) return;
-      rootBusy.current = false;
-      clearLoadingTimer();
-      setLoading(false);
+  const load = useCallback(
+    (currentPath: string | null, background = false) => {
+      const version = ++requestVersion.current;
+      const initialLoad = loadedPathRef.current !== currentPath;
+      rootBusy.current = true;
+      setLoading(initialLoad);
       setLoadingHint(false);
-    });
-  }, [clearLoadingTimer, correctPath, invalidateTrees, ops]);
+      clearLoadingTimer();
+      if (initialLoad)
+        loadingHintTimer.current = setTimeout(() => {
+          loadingHintTimer.current = null;
+          if (alive.current && version === requestVersion.current) setLoadingHint(true);
+        }, LOADING_HINT_DELAY_MS);
+      if (!background) setError(null);
+      // Keep the previous list so a fast switch replaces it in place instead of flashing empty.
+      const kind = currentPath === null ? 'root' : 'directory';
+      terminalDebug('files-load-start', { requestId: version, kind });
+      const cached = preloaded.current;
+      preloaded.current = null;
+      const request = (cached?.path === currentPath ? Promise.resolve(cached.result) : ops.list(currentPath)).then((result) => {
+        if (version !== requestVersion.current) return;
+        setError(null);
+        loadedPathRef.current = currentPath;
+        setLoadedPath(currentPath);
+        if (currentPath === null && result.base) {
+          // The target resolved its own start directory (remote home): correct silently, no trail entry.
+          initialized.current = true;
+          preloaded.current = { path: result.base, result };
+          correctPath(result.base);
+        }
+        // A null path on the local panel is the disk view (no entries); otherwise use the list.
+        const showDisks = currentPath === null && ops.disks !== undefined;
+        const next = showDisks ? [] : result.entries;
+        const snapshotPath = result.base ?? currentPath;
+        const previous =
+          directorySnapshots.current.get(snapshotPath) ?? (snapshotPath === null ? [] : (childCacheRef.current[snapshotPath] ?? []));
+        const directories = new Set(next.filter((item) => item.is_dir).map((item) => item.path));
+        invalidateTrees(previous.filter((entry) => entry.is_dir && !directories.has(entry.path)).map((entry) => entry.path));
+        directorySnapshots.current.delete(snapshotPath);
+        directorySnapshots.current.set(snapshotPath, next);
+        if (directorySnapshots.current.size > MAX_TRAIL_ENTRIES) {
+          directorySnapshots.current.delete(directorySnapshots.current.keys().next().value!);
+        }
+        setEntries((current) => (sameEntries(current, next) ? current : next));
+        if (currentPath !== null && childCacheRef.current[currentPath] !== undefined) {
+          setChildCache((current) => ({ ...current, [currentPath]: next }));
+        }
+        terminalDebug('files-load-end', { requestId: version, kind, entryCount: result.entries.length });
+        return next;
+      });
+      if (currentPath === null && ops.disks) {
+        void ops
+          .disks()
+          .then((list) => {
+            if (version === requestVersion.current) setDisks(list);
+          })
+          .catch(() => {});
+      }
+      return request
+        .catch((cause: unknown) => {
+          if (version !== requestVersion.current) return;
+          // Preserve the original error; the remote panel classifies service-unavailable and auth cases.
+          setError(String((cause as Error)?.message ?? cause));
+          terminalDebug('files-load-error', { requestId: version, kind, errorType: cause instanceof Error ? cause.name : typeof cause });
+        })
+        .finally(() => {
+          if (version !== requestVersion.current) return;
+          rootBusy.current = false;
+          clearLoadingTimer();
+          setLoading(false);
+          setLoadingHint(false);
+        });
+    },
+    [clearLoadingTimer, correctPath, invalidateTrees, ops],
+  );
 
   // Start directory: use the one given from outside; a local panel without a cwd falls back to home.
   useEffect(() => {
@@ -330,11 +344,14 @@ export function useFileBrowser({
       return;
     }
     if (!ops.home) return;
-    void ops.home().then((home) => {
-      if (!alive.current || initialized.current) return;
-      initialized.current = true;
-      correctPath(home);
-    }).catch(() => {});
+    void ops
+      .home()
+      .then((home) => {
+        if (!alive.current || initialized.current) return;
+        initialized.current = true;
+        correctPath(home);
+      })
+      .catch(() => {});
   }, [correctPath, enabled, initialPath, ops]);
 
   // Restore the snapshot scroll position after the target directory loads; earlier commits still
@@ -355,8 +372,9 @@ export function useFileBrowser({
     const step = () => {
       const container = scrollRef.current;
       if (container) {
-        const element = Array.from(container.querySelectorAll<HTMLElement>('[data-file-row]'))
-          .find((candidate) => candidate.dataset.path === target);
+        const element = Array.from(container.querySelectorAll<HTMLElement>('[data-file-row]')).find(
+          (candidate) => candidate.dataset.path === target,
+        );
         if (element) {
           if (typeof element.scrollIntoView === 'function') element.scrollIntoView({ block: 'nearest' });
           return;
@@ -397,12 +415,15 @@ export function useFileBrowser({
   // ── Navigation and the visit trail ──
 
   /** Save the live view of the entry being left; it is restored on return. */
-  const captureView = useCallback((): ViewSnapshot => ({
-    expanded: expandedSet,
-    selection,
-    anchorPath,
-    scrollTop: scrollRef.current?.scrollTop ?? 0,
-  }), [anchorPath, expandedSet, selection]);
+  const captureView = useCallback(
+    (): ViewSnapshot => ({
+      expanded: expandedSet,
+      selection,
+      anchorPath,
+      scrollTop: scrollRef.current?.scrollTop ?? 0,
+    }),
+    [anchorPath, expandedSet, selection],
+  );
 
   /** Restore saved expansion, selection and scroll after a directory change. */
   const restoreView = useCallback((view: ViewSnapshot) => {
@@ -413,41 +434,46 @@ export function useFileBrowser({
   }, []);
 
   /** History navigation displays its last listing immediately, then revalidates in place. */
-  const restoreListing = useCallback((nextPath: string | null) => {
-    const snapshot = directorySnapshots.current.get(nextPath)
-      ?? (nextPath === null ? undefined : childCacheRef.current[nextPath]);
-    if (!snapshot) return;
-    requestVersion.current += 1;
-    treeVersion.current += 1;
-    childRequests.current.clear();
-    rootBusy.current = false;
-    treeBusy.current = false;
-    loadedPathRef.current = nextPath;
-    restoredPath.current = nextPath;
-    preloaded.current = null;
-    setLoadedPath(nextPath);
-    setEntries(snapshot);
-    setError(null);
-    clearLoadingTimer();
-    setLoading(false);
-    setLoadingHint(false);
-  }, [clearLoadingTimer]);
+  const restoreListing = useCallback(
+    (nextPath: string | null) => {
+      const snapshot = directorySnapshots.current.get(nextPath) ?? (nextPath === null ? undefined : childCacheRef.current[nextPath]);
+      if (!snapshot) return;
+      requestVersion.current += 1;
+      treeVersion.current += 1;
+      childRequests.current.clear();
+      rootBusy.current = false;
+      treeBusy.current = false;
+      loadedPathRef.current = nextPath;
+      restoredPath.current = nextPath;
+      preloaded.current = null;
+      setLoadedPath(nextPath);
+      setEntries(snapshot);
+      setError(null);
+      clearLoadingTimer();
+      setLoading(false);
+      setLoadingHint(false);
+    },
+    [clearLoadingTimer],
+  );
 
   /** Move the cursor to another trail entry: save the live view, then restore the target's. */
-  const moveCursor = useCallback((nextCursor: number) => {
-    const target = trail.entries[nextCursor];
-    if (!target) return;
-    navigationVersion.current += 1;
-    setNavigationPending(false);
-    const snapshot = captureView();
-    restoreListing(target.path);
-    setTrail((prev) => ({
-      entries: prev.entries.map((entry, index) => (index === prev.cursor ? { ...entry, view: snapshot } : entry)),
-      cursor: nextCursor,
-    }));
-    restoreView(target.view);
-    onPathChangeRef.current?.(target.path);
-  }, [captureView, restoreListing, restoreView, trail.entries]);
+  const moveCursor = useCallback(
+    (nextCursor: number) => {
+      const target = trail.entries[nextCursor];
+      if (!target) return;
+      navigationVersion.current += 1;
+      setNavigationPending(false);
+      const snapshot = captureView();
+      restoreListing(target.path);
+      setTrail((prev) => ({
+        entries: prev.entries.map((entry, index) => (index === prev.cursor ? { ...entry, view: snapshot } : entry)),
+        cursor: nextCursor,
+      }));
+      restoreView(target.view);
+      onPathChangeRef.current?.(target.path);
+    },
+    [captureView, restoreListing, restoreView, trail.entries],
+  );
 
   const goBack = useCallback(() => moveCursor(trail.cursor - 1), [moveCursor, trail.cursor]);
   const goForward = useCallback(() => moveCursor(trail.cursor + 1), [moveCursor, trail.cursor]);
@@ -460,169 +486,198 @@ export function useFileBrowser({
    * drops the forward side, becomes the trail head and starts from a blank
    * view.
    */
-  const navigate = useCallback(async (nextPath: string | null) => {
-    initialized.current = true;
-    const version = ++navigationVersion.current;
-    if (path === nextPath && !error && settled) { setNavigationPending(false); return true; }
-    setNavigationPending(true);
-    let result: FileListResult;
-    try {
-      const cached = directorySnapshots.current.get(nextPath)
-        ?? (nextPath === null ? undefined : childCacheRef.current[nextPath]);
-      result = cached ? { base: nextPath, entries: cached } : await ops.list(nextPath);
-    } catch (cause) {
-      if (alive.current && version === navigationVersion.current) {
-        toast(`${t('files.error.readDir')}: ${String((cause as Error)?.message ?? cause)}`, 'error');
-        terminalDebug('files-navigation-error', { errorType: cause instanceof Error ? cause.name : typeof cause });
+  const navigate = useCallback(
+    async (nextPath: string | null) => {
+      initialized.current = true;
+      const version = ++navigationVersion.current;
+      if (path === nextPath && !error && settled) {
+        setNavigationPending(false);
+        return true;
       }
-      return false;
-    } finally {
-      if (alive.current && version === navigationVersion.current) setNavigationPending(false);
-    }
-    if (!alive.current || version !== navigationVersion.current) return false;
-    const destination = result.base ?? nextPath;
-    preloaded.current = { path: destination, result };
-    const target = trail.entries.findIndex((entry) => entry.path === destination);
-    const snapshot = captureView();
+      setNavigationPending(true);
+      let result: FileListResult;
+      try {
+        const cached = directorySnapshots.current.get(nextPath) ?? (nextPath === null ? undefined : childCacheRef.current[nextPath]);
+        result = cached ? { base: nextPath, entries: cached } : await ops.list(nextPath);
+      } catch (cause) {
+        if (alive.current && version === navigationVersion.current) {
+          toast(`${t('files.error.readDir')}: ${String((cause as Error)?.message ?? cause)}`, 'error');
+          terminalDebug('files-navigation-error', { errorType: cause instanceof Error ? cause.name : typeof cause });
+        }
+        return false;
+      } finally {
+        if (alive.current && version === navigationVersion.current) setNavigationPending(false);
+      }
+      if (!alive.current || version !== navigationVersion.current) return false;
+      const destination = result.base ?? nextPath;
+      preloaded.current = { path: destination, result };
+      const target = trail.entries.findIndex((entry) => entry.path === destination);
+      const snapshot = captureView();
 
-    if (target !== -1 && target !== trail.cursor) {
+      if (target !== -1 && target !== trail.cursor) {
+        restoreListing(destination);
+        setTrail((prev) => ({
+          entries: prev.entries.map((entry, index) => (index === prev.cursor ? { ...entry, view: snapshot } : entry)),
+          cursor: target,
+        }));
+        restoreView(trail.entries[target]!.view);
+        onPathChangeRef.current?.(destination);
+        return true;
+      }
+      if (target === trail.cursor) {
+        // The path resolved to the directory already on screen: reload it.
+        load(destination);
+        return true;
+      }
       restoreListing(destination);
-      setTrail((prev) => ({
-        entries: prev.entries.map((entry, index) => (index === prev.cursor ? { ...entry, view: snapshot } : entry)),
-        cursor: target,
-      }));
-      restoreView(trail.entries[target]!.view);
+      const view = freshView(expandedSet);
+      setTrail((prev) => {
+        const saved = prev.entries.map((entry, index) => (index === prev.cursor ? { ...entry, view: snapshot } : entry));
+        const next = [...saved.slice(0, prev.cursor + 1), { path: destination, view }];
+        const entries = next.length > MAX_TRAIL_ENTRIES ? next.slice(next.length - MAX_TRAIL_ENTRIES) : next;
+        return { entries, cursor: entries.length - 1 };
+      });
+      pendingScrollTop.current = 0;
+      setSelectionState(new Set());
+      setAnchorPath(null);
       onPathChangeRef.current?.(destination);
       return true;
-    }
-    if (target === trail.cursor) {
-      // The path resolved to the directory already on screen: reload it.
-      load(destination);
-      return true;
-    }
-    restoreListing(destination);
-    const view = freshView(expandedSet);
-    setTrail((prev) => {
-      const saved = prev.entries.map((entry, index) => (index === prev.cursor ? { ...entry, view: snapshot } : entry));
-      const next = [...saved.slice(0, prev.cursor + 1), { path: destination, view }];
-      const entries = next.length > MAX_TRAIL_ENTRIES ? next.slice(next.length - MAX_TRAIL_ENTRIES) : next;
-      return { entries, cursor: entries.length - 1 };
-    });
-    pendingScrollTop.current = 0;
-    setSelectionState(new Set());
-    setAnchorPath(null);
-    onPathChangeRef.current?.(destination);
-    return true;
-  }, [captureView, error, expandedSet, load, ops, path, restoreListing, restoreView, settled, toast, trail.entries, trail.cursor]);
+    },
+    [captureView, error, expandedSet, load, ops, path, restoreListing, restoreView, settled, toast, trail.entries, trail.cursor],
+  );
 
   // Tree expansion.
 
-  const loadChildren = useCallback((entry: Pick<FsEntry, 'path'>, background = false) => {
-    const version = ++nextChildRequest.current;
-    childRequests.current.set(entry.path, version);
-    const isCurrent = () => alive.current && childRequests.current.get(entry.path) === version;
-    terminalDebug('files-tree-load-start', {});
-    if (!background) setChildErrors((current) => {
-      const next = { ...current };
-      delete next[entry.path];
-      return next;
-    });
-    setChildPending((current) => new Set([...current, entry.path]));
-    clearChildTimer(entry.path);
-    if (!background && childCacheRef.current[entry.path] === undefined) childHintTimers.current.set(entry.path, setTimeout(() => {
-      childHintTimers.current.delete(entry.path);
-      if (isCurrent()) setChildLoadingHint((current) => new Set([...current, entry.path]));
-    }, LOADING_HINT_DELAY_MS));
-    return ops.list(entry.path)
-      .then((result) => {
-        if (!isCurrent()) return;
-        const directories = new Set(result.entries.filter(item => item.is_dir).map(item => item.path));
-        invalidateTrees((childCacheRef.current[entry.path] ?? []).filter(child => child.is_dir
-          && !directories.has(child.path)).map(child => child.path));
-        if (directorySnapshots.current.has(entry.path)) directorySnapshots.current.set(entry.path, result.entries);
-        setChildCache((current) => sameEntries(current[entry.path] ?? [], result.entries) && current[entry.path] !== undefined
-          ? current : { ...current, [entry.path]: result.entries });
-        setChildErrors(current => {
-          if (current[entry.path] === undefined) return current;
+  const loadChildren = useCallback(
+    (entry: Pick<FsEntry, 'path'>, background = false) => {
+      const version = ++nextChildRequest.current;
+      childRequests.current.set(entry.path, version);
+      const isCurrent = () => alive.current && childRequests.current.get(entry.path) === version;
+      terminalDebug('files-tree-load-start', {});
+      if (!background)
+        setChildErrors((current) => {
           const next = { ...current };
           delete next[entry.path];
           return next;
         });
-        terminalDebug('files-tree-load-end', { entryCount: result.entries.length });
-        return result.entries;
-      })
-      .catch((cause: unknown) => {
-        if (!isCurrent()) return;
-        directorySnapshots.current.delete(entry.path);
-        setChildErrors((current) => ({ ...current, [entry.path]: t('files.error.readDir') }));
-        setChildCache(current => {
-          const next = { ...current };
-          delete next[entry.path];
-          return next;
+      setChildPending((current) => new Set([...current, entry.path]));
+      clearChildTimer(entry.path);
+      if (!background && childCacheRef.current[entry.path] === undefined)
+        childHintTimers.current.set(
+          entry.path,
+          setTimeout(() => {
+            childHintTimers.current.delete(entry.path);
+            if (isCurrent()) setChildLoadingHint((current) => new Set([...current, entry.path]));
+          }, LOADING_HINT_DELAY_MS),
+        );
+      return ops
+        .list(entry.path)
+        .then((result) => {
+          if (!isCurrent()) return;
+          const directories = new Set(result.entries.filter((item) => item.is_dir).map((item) => item.path));
+          invalidateTrees(
+            (childCacheRef.current[entry.path] ?? [])
+              .filter((child) => child.is_dir && !directories.has(child.path))
+              .map((child) => child.path),
+          );
+          if (directorySnapshots.current.has(entry.path)) directorySnapshots.current.set(entry.path, result.entries);
+          setChildCache((current) =>
+            sameEntries(current[entry.path] ?? [], result.entries) && current[entry.path] !== undefined
+              ? current
+              : { ...current, [entry.path]: result.entries },
+          );
+          setChildErrors((current) => {
+            if (current[entry.path] === undefined) return current;
+            const next = { ...current };
+            delete next[entry.path];
+            return next;
+          });
+          terminalDebug('files-tree-load-end', { entryCount: result.entries.length });
+          return result.entries;
+        })
+        .catch((cause: unknown) => {
+          if (!isCurrent()) return;
+          directorySnapshots.current.delete(entry.path);
+          setChildErrors((current) => ({ ...current, [entry.path]: t('files.error.readDir') }));
+          setChildCache((current) => {
+            const next = { ...current };
+            delete next[entry.path];
+            return next;
+          });
+          terminalDebug('files-tree-load-error', { errorType: cause instanceof Error ? cause.name : typeof cause });
+          return undefined;
+        })
+        .finally(() => {
+          if (!isCurrent()) return;
+          childRequests.current.delete(entry.path);
+          clearChildTimer(entry.path);
+          setChildPending((current) => {
+            if (!current.has(entry.path)) return current;
+            const next = new Set(current);
+            next.delete(entry.path);
+            return next;
+          });
+          setChildLoadingHint((current) => {
+            if (!current.has(entry.path)) return current;
+            const next = new Set(current);
+            next.delete(entry.path);
+            return next;
+          });
         });
-        terminalDebug('files-tree-load-error', { errorType: cause instanceof Error ? cause.name : typeof cause });
-        return undefined;
-      })
-      .finally(() => {
-        if (!isCurrent()) return;
-        childRequests.current.delete(entry.path);
-        clearChildTimer(entry.path);
-        setChildPending((current) => {
-          if (!current.has(entry.path)) return current;
-          const next = new Set(current);
-          next.delete(entry.path);
-          return next;
-        });
-        setChildLoadingHint((current) => {
-          if (!current.has(entry.path)) return current;
-          const next = new Set(current);
-          next.delete(entry.path);
-          return next;
-        });
-      });
-  }, [clearChildTimer, invalidateTrees, ops]);
+    },
+    [clearChildTimer, invalidateTrees, ops],
+  );
 
   /** Reconcile the visible tree from parents to children, without reading collapsed branches. */
-  const refreshTree = useCallback(async (background = false, full = false) => {
-    if (!alive.current || !enabledRef.current) return;
-    if (background && (treeBusy.current || rootBusy.current || document.hidden)) return;
-    const version = ++treeVersion.current;
-    const currentPath = pathRef.current;
-    treeBusy.current = true;
-    childRequests.current.clear();
-    for (const timer of childHintTimers.current.values()) clearTimeout(timer);
-    childHintTimers.current.clear();
-    setChildPending(new Set());
-    setChildLoadingHint(new Set());
-    const isCurrent = () => alive.current && version === treeVersion.current && pathRef.current === currentPath;
-    try {
-      if (background && !full && ops.backgroundRefresh === 'one-directory') {
-        const dirs = [currentPath, ...flattenVisible(entriesRef.current, expandedRef.current, childCacheRef.current)
-          .filter(row => row.expanded).map(row => row.entry.path)];
-        const next = dirs[backgroundCursor.current++ % dirs.length]!;
-        if (next === currentPath) await load(currentPath, true);
-        else if (next !== null) await loadChildren({ path: next }, true);
-        return;
+  const refreshTree = useCallback(
+    async (background = false, full = false) => {
+      if (!alive.current || !enabledRef.current) return;
+      if (background && (treeBusy.current || rootBusy.current || document.hidden)) return;
+      const version = ++treeVersion.current;
+      const currentPath = pathRef.current;
+      treeBusy.current = true;
+      childRequests.current.clear();
+      for (const timer of childHintTimers.current.values()) clearTimeout(timer);
+      childHintTimers.current.clear();
+      setChildPending(new Set());
+      setChildLoadingHint(new Set());
+      const isCurrent = () => alive.current && version === treeVersion.current && pathRef.current === currentPath;
+      try {
+        if (background && !full && ops.backgroundRefresh === 'one-directory') {
+          const dirs = [
+            currentPath,
+            ...flattenVisible(entriesRef.current, expandedRef.current, childCacheRef.current)
+              .filter((row) => row.expanded)
+              .map((row) => row.entry.path),
+          ];
+          const next = dirs[backgroundCursor.current++ % dirs.length]!;
+          if (next === currentPath) await load(currentPath, true);
+          else if (next !== null) await loadChildren({ path: next }, true);
+          return;
+        }
+        const roots = await load(currentPath, background);
+        if (!roots || !isCurrent()) return;
+        const queue = [...roots];
+        const visited = new Set<string>(currentPath === null ? [] : [currentPath]);
+        for (let index = 0; index < queue.length; index += 1) {
+          if (!isCurrent() || (background && document.hidden)) return;
+          const entry = queue[index]!;
+          if (!entry.is_dir || !expandedRef.current.has(entry.path) || visited.has(entry.path)) continue;
+          visited.add(entry.path);
+          const children = await loadChildren(entry, background);
+          if (children) queue.push(...children);
+        }
+        if (isCurrent()) terminalDebug('files-tree-sync', { background, directoryCount: visited.size });
+      } finally {
+        if (version === treeVersion.current) treeBusy.current = false;
       }
-      const roots = await load(currentPath, background);
-      if (!roots || !isCurrent()) return;
-      const queue = [...roots];
-      const visited = new Set<string>(currentPath === null ? [] : [currentPath]);
-      for (let index = 0; index < queue.length; index += 1) {
-        if (!isCurrent() || (background && document.hidden)) return;
-        const entry = queue[index]!;
-        if (!entry.is_dir || !expandedRef.current.has(entry.path) || visited.has(entry.path)) continue;
-        visited.add(entry.path);
-        const children = await loadChildren(entry, background);
-        if (children) queue.push(...children);
-      }
-      if (isCurrent()) terminalDebug('files-tree-sync', { background, directoryCount: visited.size });
-    } finally {
-      if (version === treeVersion.current) treeBusy.current = false;
-    }
-  }, [load, loadChildren, ops.backgroundRefresh]);
+    },
+    [load, loadChildren, ops.backgroundRefresh],
+  );
 
-  const refresh = useCallback(() => { void refreshTree(); }, [refreshTree]);
+  const refresh = useCallback(() => {
+    void refreshTree();
+  }, [refreshTree]);
 
   useEffect(() => {
     if (!enabled) return;
@@ -647,14 +702,22 @@ export function useFileBrowser({
       if (disposed || checking) return;
       checking = true;
       clearTimeout(timer);
-      try { await refreshTree(true, full); }
-      finally {
+      try {
+        await refreshTree(true, full);
+      } finally {
         checking = false;
-        if (!disposed) timer = setTimeout(() => { void check(); }, ops.refreshIntervalMs ?? 5000);
+        if (!disposed)
+          timer = setTimeout(() => {
+            void check();
+          }, ops.refreshIntervalMs ?? 5000);
       }
     };
-    const resume = () => { if (!document.hidden) void check(true); };
-    timer = setTimeout(() => { void check(); }, ops.refreshIntervalMs ?? 5000);
+    const resume = () => {
+      if (!document.hidden) void check(true);
+    };
+    timer = setTimeout(() => {
+      void check();
+    }, ops.refreshIntervalMs ?? 5000);
     window.addEventListener('focus', resume);
     document.addEventListener('visibilitychange', resume);
     return () => {
@@ -666,82 +729,96 @@ export function useFileBrowser({
   }, [enabled, ops.refreshIntervalMs, refreshTree]);
 
   /** Re-read a directory's children (after a failure or a content change). */
-  const refreshDir = useCallback((target1: Pick<FsEntry, 'path'>) => {
-    return loadChildren(target1);
-  }, [loadChildren]);
+  const refreshDir = useCallback(
+    (target1: Pick<FsEntry, 'path'>) => {
+      return loadChildren(target1);
+    },
+    [loadChildren],
+  );
 
   /** Collapse every folder; cached rows remain available while a later expansion revalidates. */
   const collapseAll = useCallback(() => {
     setExpandedSet(new Set());
   }, []);
 
-  const toggleExpand = useCallback((entry: FsEntry) => {
-    setExpandedSet((current) => {
-      const next = new Set(current);
-      if (next.has(entry.path)) next.delete(entry.path);
-      else next.add(entry.path);
-      return next;
-    });
-    if (expandedSet.has(entry.path)) return;
-    void loadChildren(entry);
-  }, [expandedSet, loadChildren]);
+  const toggleExpand = useCallback(
+    (entry: FsEntry) => {
+      setExpandedSet((current) => {
+        const next = new Set(current);
+        if (next.has(entry.path)) next.delete(entry.path);
+        else next.add(entry.path);
+        return next;
+      });
+      if (expandedSet.has(entry.path)) return;
+      void loadChildren(entry);
+    },
+    [expandedSet, loadChildren],
+  );
 
   /**
    * Refresh every directory affected by a file change: the current list, the changed item's
    * parent and the destination. Refreshing only the root leaves ghosts: stale child caches keep
    * deleted or moved entries on the tree and renamed entries under their old names.
    */
-  const refreshAffected = useCallback((touched: Array<string | null | undefined>, destDir?: string | null) => {
-    const dirs = new Set<string>();
-    for (const item of touched) {
-      if (!item) continue;
-      const parent = ops.parentOf(item);
-      if (parent) dirs.add(parent);
-    }
-    if (destDir) dirs.add(destDir);
-    const currentPath = pathRef.current;
-    if (currentPath !== null && dirs.has(currentPath)) void load(currentPath, true);
-    let refreshed = 0;
-    for (const dir of dirs) {
-      // A directory that was never expanded has no cache; read it when the user expands it.
-      if (dir === currentPath || (childCacheRef.current[dir] === undefined && !expandedRef.current.has(dir) && dir !== destDir)) continue;
-      void loadChildren({ path: dir }, true);
-      refreshed += 1;
-    }
-    terminalDebug('files-dir-refresh', { candidateDirs: dirs.size, refreshedDirs: refreshed });
-  }, [load, loadChildren, ops]);
+  const refreshAffected = useCallback(
+    (touched: Array<string | null | undefined>, destDir?: string | null) => {
+      const dirs = new Set<string>();
+      for (const item of touched) {
+        if (!item) continue;
+        const parent = ops.parentOf(item);
+        if (parent) dirs.add(parent);
+      }
+      if (destDir) dirs.add(destDir);
+      const currentPath = pathRef.current;
+      if (currentPath !== null && dirs.has(currentPath)) void load(currentPath, true);
+      let refreshed = 0;
+      for (const dir of dirs) {
+        // A directory that was never expanded has no cache; read it when the user expands it.
+        if (dir === currentPath || (childCacheRef.current[dir] === undefined && !expandedRef.current.has(dir) && dir !== destDir)) continue;
+        void loadChildren({ path: dir }, true);
+        refreshed += 1;
+      }
+      terminalDebug('files-dir-refresh', { candidateDirs: dirs.size, refreshedDirs: refreshed });
+    },
+    [load, loadChildren, ops],
+  );
 
   /** Apply only server-confirmed changes before any follow-up listing completes. */
-  const applyChanges = useCallback((removed: string[], added: FsEntry[]) => {
-    invalidateTrees(removed);
-    const gone = new Set(removed);
-    const addedPaths = new Set(added.map(entry => entry.path));
-    const dirs = new Set([...removed, ...added.map(entry => entry.path)].map(item => ops.parentOf(item)));
-    const patch = (list: FsEntry[], dir: string | null) => [
-      ...list.filter(entry => !gone.has(entry.path) && !addedPaths.has(entry.path)),
-      ...added.filter(entry => ops.parentOf(entry.path) === dir),
-    ];
-    treeVersion.current += 1;
-    treeBusy.current = false;
-    for (const dir of dirs) {
-      if (dir === null) continue;
-      childRequests.current.delete(dir);
-      clearChildTimer(dir);
-      const snapshot = directorySnapshots.current.get(dir);
-      if (snapshot) directorySnapshots.current.set(dir, patch(snapshot, dir));
-    }
-    if (dirs.has(loadedPathRef.current ?? null)) {
-      requestVersion.current += 1;
-      rootBusy.current = false;
-      clearLoadingTimer();
-      setLoading(false);
-      setLoadingHint(false);
-      setEntries(current => patch(current, loadedPathRef.current ?? null));
-    }
-    setChildCache(current => Object.fromEntries(Object.entries(current).map(([dir, list]) => [dir, dirs.has(dir) ? patch(list, dir) : list])));
-    setChildPending(current => new Set([...current].filter(dir => !dirs.has(dir))));
-    setChildLoadingHint(current => new Set([...current].filter(dir => !dirs.has(dir))));
-  }, [clearChildTimer, clearLoadingTimer, invalidateTrees, ops]);
+  const applyChanges = useCallback(
+    (removed: string[], added: FsEntry[]) => {
+      invalidateTrees(removed);
+      const gone = new Set(removed);
+      const addedPaths = new Set(added.map((entry) => entry.path));
+      const dirs = new Set([...removed, ...added.map((entry) => entry.path)].map((item) => ops.parentOf(item)));
+      const patch = (list: FsEntry[], dir: string | null) => [
+        ...list.filter((entry) => !gone.has(entry.path) && !addedPaths.has(entry.path)),
+        ...added.filter((entry) => ops.parentOf(entry.path) === dir),
+      ];
+      treeVersion.current += 1;
+      treeBusy.current = false;
+      for (const dir of dirs) {
+        if (dir === null) continue;
+        childRequests.current.delete(dir);
+        clearChildTimer(dir);
+        const snapshot = directorySnapshots.current.get(dir);
+        if (snapshot) directorySnapshots.current.set(dir, patch(snapshot, dir));
+      }
+      if (dirs.has(loadedPathRef.current ?? null)) {
+        requestVersion.current += 1;
+        rootBusy.current = false;
+        clearLoadingTimer();
+        setLoading(false);
+        setLoadingHint(false);
+        setEntries((current) => patch(current, loadedPathRef.current ?? null));
+      }
+      setChildCache((current) =>
+        Object.fromEntries(Object.entries(current).map(([dir, list]) => [dir, dirs.has(dir) ? patch(list, dir) : list])),
+      );
+      setChildPending((current) => new Set([...current].filter((dir) => !dirs.has(dir))));
+      setChildLoadingHint((current) => new Set([...current].filter((dir) => !dirs.has(dir))));
+    },
+    [clearChildTimer, clearLoadingTimer, invalidateTrees, ops],
+  );
 
   // Undo history.
 
@@ -751,18 +828,23 @@ export function useFileBrowser({
   }, []);
 
   /** Record an undoable step; staged deletions pushed out of the window are purged permanently. */
-  const pushUndo = useCallback((entry: FileUndo) => {
-    if (!(target.kind === 'ssh' ? useFileUndoSettings.getState().remote : useFileUndoSettings.getState().local)) return;
-    const next = [entry, ...undoStackRef.current];
-    for (const dropped of next.splice(MAX_UNDO_STEPS)) {
-      if (dropped.kind === 'delete') {
-        void ops.purgeStaged(dropped.pairs.map((pair) => pair.to)).catch(() => {});
+  const pushUndo = useCallback(
+    (entry: FileUndo) => {
+      if (!(target.kind === 'ssh' ? useFileUndoSettings.getState().remote : useFileUndoSettings.getState().local)) return;
+      const next = [entry, ...undoStackRef.current];
+      for (const dropped of next.splice(MAX_UNDO_STEPS)) {
+        if (dropped.kind === 'delete') {
+          void ops.purgeStaged(dropped.pairs.map((pair) => pair.to)).catch(() => {});
+        }
       }
-    }
-    setUndo(next);
-  }, [ops, setUndo, target.kind]);
+      setUndo(next);
+    },
+    [ops, setUndo, target.kind],
+  );
 
-  useEffect(() => { if (!undoEnabled) setUndo([]); }, [undoEnabled, setUndo]);
+  useEffect(() => {
+    if (!undoEnabled) setUndo([]);
+  }, [undoEnabled, setUndo]);
 
   /**
    * Undo one file operation (rename, move or delete); repeatable.
@@ -788,7 +870,7 @@ export function useFileBrowser({
         failed = outcome.errors.length;
         firstError = outcome.errors[0] ?? '';
         restoredPaths.push(...outcome.completed.map((pair) => pair.from));
-        restored.push(...outcome.completed.map(pair => ({ from: pair.from, to: pair.from })));
+        restored.push(...outcome.completed.map((pair) => ({ from: pair.from, to: pair.from })));
       } else if (current.kind === 'remove') {
         // Undoing a new item or paste moves the added entries into the staging area.
         const outcome = await ops.stageDelete(current.pairs.map((pair) => pair.to));
@@ -815,12 +897,15 @@ export function useFileBrowser({
           byParent.set(parent, [...(byParent.get(parent) ?? []), pair]);
         }
         for (const [parent, pairs] of byParent) {
-          const outcome = await ops.move(pairs.map((pair) => pair.to), parent);
+          const outcome = await ops.move(
+            pairs.map((pair) => pair.to),
+            parent,
+          );
           done += outcome.completed.length;
           failed += outcome.errors.length;
           firstError ||= outcome.errors[0] ?? '';
           for (const pair of outcome.completed) {
-            const original = pairs.find(item => item.to === pair.from);
+            const original = pairs.find((item) => item.to === pair.from);
             if (original) restored.push({ from: original.from, to: pair.to });
             restoredPaths.push(pair.to);
           }
@@ -837,15 +922,23 @@ export function useFileBrowser({
     const index = stack.indexOf(current);
     if (index >= 0) {
       const within = (path: string, base: string) => path === base || path.startsWith(`${base}/`);
-      const failedPaths = current.kind === 'rename' || current.kind === 'move' || current.kind === 'delete'
-        ? current.pairs.filter(pair => !restored.some(item => item.from === pair.from)).map(pair => pair.from) : [];
+      const failedPaths =
+        current.kind === 'rename' || current.kind === 'move' || current.kind === 'delete'
+          ? current.pairs.filter((pair) => !restored.some((item) => item.from === pair.from)).map((pair) => pair.from)
+          : [];
       const rebase = (path: string) => {
-        const pair = restored.find(item => within(path, item.from));
+        const pair = restored.find((item) => within(path, item.from));
         return pair ? pair.to + path.slice(pair.from.length) : path;
       };
-      const older = stack.slice(index + 1).filter(entry => !entry.pairs.some(pair =>
-        failedPaths.some(path => within(pair.from, path) || within(pair.to, path) || within(path, pair.to)),
-      )).map(entry => ({ ...entry, pairs: entry.pairs.map(pair => ({ from: rebase(pair.from), to: rebase(pair.to) })) }));
+      const older = stack
+        .slice(index + 1)
+        .filter(
+          (entry) =>
+            !entry.pairs.some((pair) =>
+              failedPaths.some((path) => within(pair.from, path) || within(pair.to, path) || within(path, pair.to)),
+            ),
+        )
+        .map((entry) => ({ ...entry, pairs: entry.pairs.map((pair) => ({ from: rebase(pair.from), to: rebase(pair.to) })) }));
       setUndo([...stack.slice(0, index), ...older]);
     }
     undoBusy.current = false;
@@ -872,133 +965,160 @@ export function useFileBrowser({
    * destination cache refresh. The backend adds a numbered suffix for duplicate names, so undo
    * records the real destination paths.
    */
-  const transferInto = useCallback(async (paths: string[], destDir: string, mode: 'copy' | 'move') => {
-    try {
-      // Moving into the same directory is a no-op; skip it here so both panels match the backend.
-      const sources = mode === 'move' ? paths.filter((source) => ops.parentOf(source) !== destDir) : paths;
-      if (sources.length === 0) return;
-      const outcome = mode === 'copy' ? await ops.copy(sources, destDir) : await ops.move(sources, destDir);
-      const known = new Map([...directorySnapshots.current.values()].flat().concat(entriesRef.current, Object.values(childCacheRef.current).flat())
-        .map(entry => [entry.path, entry]));
-      const added = outcome.completed.flatMap(pair => {
-        const source = known.get(pair.from);
-        return source ? [{ ...source, path: pair.to, name: pathName(pair.to) }] : [];
-      });
-      applyChanges(mode === 'move' ? outcome.completed.map(pair => pair.from) : [], added);
-      terminalDebug('files-op', { op: mode, itemCount: sources.length, doneCount: outcome.completed.length, errorCount: outcome.errors.length });
-      if (outcome.completed.length > 0) {
-        if (mode === 'move') pushUndo({ kind: 'move', labelKey: 'files.undo.cut', pairs: outcome.completed });
-        else pushUndo({ kind: 'remove', labelKey: 'files.undo.paste', pairs: outcome.completed.map((pair) => ({ from: pair.to, to: pair.to })) });
-        // Explain an automatically numbered suffix for a duplicate name.
-        const renamed = outcome.completed.some((pair) => pathName(pair.to) !== pathName(pair.from));
-        const suffixHint = renamed ? t(' (a numbered suffix was added)') : '';
-        toast(
-          mode === 'copy'
-            ? `${t('Copied {{count}} items', { count: outcome.completed.length })}${suffixHint}`
-            : `${t('Moved {{count}} items', { count: outcome.completed.length })}${suffixHint}`,
-          'success',
+  const transferInto = useCallback(
+    async (paths: string[], destDir: string, mode: 'copy' | 'move') => {
+      try {
+        // Moving into the same directory is a no-op; skip it here so both panels match the backend.
+        const sources = mode === 'move' ? paths.filter((source) => ops.parentOf(source) !== destDir) : paths;
+        if (sources.length === 0) return;
+        const outcome = mode === 'copy' ? await ops.copy(sources, destDir) : await ops.move(sources, destDir);
+        const known = new Map(
+          [...directorySnapshots.current.values()]
+            .flat()
+            .concat(entriesRef.current, Object.values(childCacheRef.current).flat())
+            .map((entry) => [entry.path, entry]),
         );
-        replaceSelection(outcome.completed.map((pair) => pair.to));
-        // Expand a destination subdirectory so the pasted entries are visible, then scroll to them.
-        if (destDir !== path) setExpandedSet((current) => new Set([...current, destDir]));
-        revealPath(outcome.completed[0]!.to);
+        const added = outcome.completed.flatMap((pair) => {
+          const source = known.get(pair.from);
+          return source ? [{ ...source, path: pair.to, name: pathName(pair.to) }] : [];
+        });
+        applyChanges(mode === 'move' ? outcome.completed.map((pair) => pair.from) : [], added);
+        terminalDebug('files-op', {
+          op: mode,
+          itemCount: sources.length,
+          doneCount: outcome.completed.length,
+          errorCount: outcome.errors.length,
+        });
+        if (outcome.completed.length > 0) {
+          if (mode === 'move') pushUndo({ kind: 'move', labelKey: 'files.undo.cut', pairs: outcome.completed });
+          else
+            pushUndo({
+              kind: 'remove',
+              labelKey: 'files.undo.paste',
+              pairs: outcome.completed.map((pair) => ({ from: pair.to, to: pair.to })),
+            });
+          // Explain an automatically numbered suffix for a duplicate name.
+          const renamed = outcome.completed.some((pair) => pathName(pair.to) !== pathName(pair.from));
+          const suffixHint = renamed ? t(' (a numbered suffix was added)') : '';
+          toast(
+            mode === 'copy'
+              ? `${t('Copied {{count}} items', { count: outcome.completed.length })}${suffixHint}`
+              : `${t('Moved {{count}} items', { count: outcome.completed.length })}${suffixHint}`,
+            'success',
+          );
+          replaceSelection(outcome.completed.map((pair) => pair.to));
+          // Expand a destination subdirectory so the pasted entries are visible, then scroll to them.
+          if (destDir !== path) setExpandedSet((current) => new Set([...current, destDir]));
+          revealPath(outcome.completed[0]!.to);
+        }
+        if (outcome.errors.length > 0) toast(outcome.errors[0]!, 'error');
+        if (outcome.completed.length === 0 && outcome.errors.length === 0) return;
+        refreshAffected(sources, destDir);
+      } catch (error) {
+        toast(String((error as Error)?.message ?? error), 'error');
       }
-      if (outcome.errors.length > 0) toast(outcome.errors[0]!, 'error');
-      if (outcome.completed.length === 0 && outcome.errors.length === 0) return;
-      refreshAffected(sources, destDir);
-    } catch (error) {
-      toast(String((error as Error)?.message ?? error), 'error');
-    }
-  }, [applyChanges, ops, pushUndo, refreshAffected, replaceSelection, revealPath, toast]);
+    },
+    [applyChanges, ops, pushUndo, refreshAffected, replaceSelection, revealPath, toast],
+  );
 
   // Clipboard.
 
-  const copyEntries = useCallback((list: FsEntry[]) => {
-    const paths = list.map((entry) => entry.path);
-    setClipboard({ mode: 'copy', paths });
-    void ops.writeClipboard?.(paths, 'copy').catch(() => {});
-    toast(list.length > 1 ? t('Copied {{count}} items', { count: list.length }) : t('Copied'));
-  }, [ops, toast]);
+  const copyEntries = useCallback(
+    (list: FsEntry[]) => {
+      const paths = list.map((entry) => entry.path);
+      setClipboard({ mode: 'copy', paths });
+      void ops.writeClipboard?.(paths, 'copy').catch(() => {});
+      toast(list.length > 1 ? t('Copied {{count}} items', { count: list.length }) : t('Copied'));
+    },
+    [ops, toast],
+  );
 
-  const cutEntries = useCallback((list: FsEntry[]) => {
-    const paths = list.map((entry) => entry.path);
-    setClipboard({ mode: 'cut', paths });
-    void ops.writeClipboard?.(paths, 'cut').catch(() => {});
-    toast(list.length > 1 ? t('Cut {{count}} items', { count: list.length }) : t('Cut to clipboard'));
-  }, [ops, toast]);
+  const cutEntries = useCallback(
+    (list: FsEntry[]) => {
+      const paths = list.map((entry) => entry.path);
+      setClipboard({ mode: 'cut', paths });
+      void ops.writeClipboard?.(paths, 'cut').catch(() => {});
+      toast(list.length > 1 ? t('Cut {{count}} items', { count: list.length }) : t('Cut to clipboard'));
+    },
+    [ops, toast],
+  );
 
   /** Paste into a directory; cut pastes as a move (undoable) and copy adds no undo step. */
-  const pasteInto = useCallback(async (destDir: string | null) => {
-    if (!clipboard || destDir === null) return;
-    const mode = clipboard.mode === 'cut' ? 'move' : 'copy';
-    if (mode === 'move') setClipboard(null);
-    await transferInto(clipboard.paths, destDir, mode);
-  }, [clipboard, transferInto]);
+  const pasteInto = useCallback(
+    async (destDir: string | null) => {
+      if (!clipboard || destDir === null) return;
+      const mode = clipboard.mode === 'cut' ? 'move' : 'copy';
+      if (mode === 'move') setClipboard(null);
+      await transferInto(clipboard.paths, destDir, mode);
+    },
+    [clipboard, transferInto],
+  );
 
   /** Ctrl+V or the blank-area menu pastes into the current directory. */
   const pasteClipboard = useCallback(() => pasteInto(path), [pasteInto, path]);
 
-  const cutPaths = useMemo(
-    () => (clipboard?.mode === 'cut' ? new Set(clipboard.paths) : new Set<string>()),
-    [clipboard],
-  );
+  const cutPaths = useMemo(() => (clipboard?.mode === 'cut' ? new Set(clipboard.paths) : new Set<string>()), [clipboard]);
 
   // Create, rename and delete.
 
-  const doRename = useCallback(async (entry: FsEntry, newName: string) => {
-    try {
-      const finalPath = await ops.rename(entry.path, newName);
-      applyChanges([entry.path], [{ ...entry, path: finalPath, name: pathName(finalPath) }]);
-      terminalDebug('files-op', { op: 'rename', doneCount: 1, errorCount: 0 });
-      pushUndo({ kind: 'rename', labelKey: 'files.undo.rename', pairs: [{ from: entry.path, to: finalPath }] });
-      toast(t('Renamed'), 'success');
-      replaceSelection([finalPath]);
-      // A renamed entry may live in an expanded subdirectory; refresh its parent cache too.
-      refreshAffected([entry.path, finalPath]);
-    } catch (error) {
-      toast(String((error as Error)?.message ?? error), 'error');
-    }
-  }, [applyChanges, ops, pushUndo, refreshAffected, replaceSelection, toast]);
+  const doRename = useCallback(
+    async (entry: FsEntry, newName: string) => {
+      try {
+        const finalPath = await ops.rename(entry.path, newName);
+        applyChanges([entry.path], [{ ...entry, path: finalPath, name: pathName(finalPath) }]);
+        terminalDebug('files-op', { op: 'rename', doneCount: 1, errorCount: 0 });
+        pushUndo({ kind: 'rename', labelKey: 'files.undo.rename', pairs: [{ from: entry.path, to: finalPath }] });
+        toast(t('Renamed'), 'success');
+        replaceSelection([finalPath]);
+        // A renamed entry may live in an expanded subdirectory; refresh its parent cache too.
+        refreshAffected([entry.path, finalPath]);
+      } catch (error) {
+        toast(String((error as Error)?.message ?? error), 'error');
+      }
+    },
+    [applyChanges, ops, pushUndo, refreshAffected, replaceSelection, toast],
+  );
 
   /**
    * Create a file or folder: the hit row decides the location (inside a folder, beside a file, or
    * the current directory for blank space), then rename starts immediately.
    */
-  const createEntry = useCallback(async (kind: 'file' | 'dir', targetEntry: FsEntry | null) => {
-    if (path === null) return;
-    const dir = resolveTargetDir(targetEntry, path, ops.parentOf);
-    try {
-      const created = kind === 'file'
-        ? await ops.createFile(dir, DEFAULT_FILE_NAME)
-        : await ops.createDir(dir, DEFAULT_DIR_NAME);
-      terminalDebug('files-op', { op: kind === 'file' ? 'create-file' : 'create-dir', doneCount: 1 });
-      const entry: FsEntry = { name: pathName(created), path: created, is_dir: kind === 'dir' };
-      applyChanges([], [entry]);
-      // Creation is undoable: the overflow menu's undo moves the new entry into staging.
-      pushUndo({ kind: 'remove', labelKey: 'files.undo.create', pairs: [{ from: created, to: created }] });
-      if (targetEntry?.is_dir) {
-        // Created inside a folder: expand it and refresh its children so the entry is visible.
-        setExpandedSet((current) => new Set([...current, targetEntry.path]));
-        if (childCacheRef.current[dir] === undefined) void loadChildren(targetEntry);
-      } else {
-        refreshAffected([], dir);
-        if (dir !== path) {
-          // The hit row is a file inside an expanded directory, so the new entry lands in that
-          // subdirectory. Refreshing only the root would leave the old child cache in place.
-          setExpandedSet((current) => new Set([...current, dir]));
-          void loadChildren({ path: dir });
+  const createEntry = useCallback(
+    async (kind: 'file' | 'dir', targetEntry: FsEntry | null) => {
+      if (path === null) return;
+      const dir = resolveTargetDir(targetEntry, path, ops.parentOf);
+      try {
+        const created = kind === 'file' ? await ops.createFile(dir, DEFAULT_FILE_NAME) : await ops.createDir(dir, DEFAULT_DIR_NAME);
+        terminalDebug('files-op', { op: kind === 'file' ? 'create-file' : 'create-dir', doneCount: 1 });
+        const entry: FsEntry = { name: pathName(created), path: created, is_dir: kind === 'dir' };
+        applyChanges([], [entry]);
+        // Creation is undoable: the overflow menu's undo moves the new entry into staging.
+        pushUndo({ kind: 'remove', labelKey: 'files.undo.create', pairs: [{ from: created, to: created }] });
+        if (targetEntry?.is_dir) {
+          // Created inside a folder: expand it and refresh its children so the entry is visible.
+          setExpandedSet((current) => new Set([...current, targetEntry.path]));
+          if (childCacheRef.current[dir] === undefined) void loadChildren(targetEntry);
+        } else {
+          refreshAffected([], dir);
+          if (dir !== path) {
+            // The hit row is a file inside an expanded directory, so the new entry lands in that
+            // subdirectory. Refreshing only the root would leave the old child cache in place.
+            setExpandedSet((current) => new Set([...current, dir]));
+            void loadChildren({ path: dir });
+          }
         }
+        replaceSelection([created]);
+        setRenameTarget(entry);
+        revealPath(created);
+        const defaultName = kind === 'file' ? DEFAULT_FILE_NAME : DEFAULT_DIR_NAME;
+        const createdLabel = t(kind === 'dir' ? 'Created folder' : 'Created file');
+        toast(`${createdLabel}${entry.name !== defaultName ? t(' (a numbered suffix was added)') : ''}`, 'success');
+      } catch (error) {
+        toast(String((error as Error)?.message ?? error), 'error');
       }
-      replaceSelection([created]);
-      setRenameTarget(entry);
-      revealPath(created);
-      const defaultName = kind === 'file' ? DEFAULT_FILE_NAME : DEFAULT_DIR_NAME;
-      const createdLabel = t(kind === 'dir' ? 'Created folder' : 'Created file');
-      toast(`${createdLabel}${entry.name !== defaultName ? t(' (a numbered suffix was added)') : ''}`, 'success');
-    } catch (error) {
-      toast(String((error as Error)?.message ?? error), 'error');
-    }
-  }, [applyChanges, loadChildren, ops, path, pushUndo, refreshAffected, replaceSelection, revealPath, toast]);
+    },
+    [applyChanges, loadChildren, ops, path, pushUndo, refreshAffected, replaceSelection, revealPath, toast],
+  );
 
   /**
    * Finish a successful drag out of the window: the system accepted the entries as a move, so the
@@ -1006,61 +1126,90 @@ export function useFileBrowser({
    * the system may already have moved it, in which case the staged request fails because the
    * source no longer exists; that case is skipped quietly.
    */
-  const removeAfterTransfer = useCallback(async (entries: FsEntry[]) => {
-    if (entries.length === 0) return;
-    try {
-      const outcome = await ops.stageDelete(entries.map((entry) => entry.path));
-      applyChanges(entries.map(entry => entry.path), []);
-      terminalDebug('files-op', { op: 'move-out', itemCount: entries.length, doneCount: outcome.completed.length, errorCount: outcome.errors.length });
-      if (outcome.completed.length > 0) {
-        pushUndo({ kind: 'delete', labelKey: 'files.undo.moveOut', pairs: outcome.completed });
-        toast(
-          !undoEnabled ? t('Moved to the system without application undo') : outcome.completed.length > 1
-            ? t('Moved {{count}} items to the system; undo from the More menu.', { count: outcome.completed.length })
-            : t('Moved to the system; undo from the More menu.'),
-          'success',
+  const removeAfterTransfer = useCallback(
+    async (entries: FsEntry[]) => {
+      if (entries.length === 0) return;
+      try {
+        const outcome = await ops.stageDelete(entries.map((entry) => entry.path));
+        applyChanges(
+          entries.map((entry) => entry.path),
+          [],
         );
-        replaceSelection([]);
+        terminalDebug('files-op', {
+          op: 'move-out',
+          itemCount: entries.length,
+          doneCount: outcome.completed.length,
+          errorCount: outcome.errors.length,
+        });
+        if (outcome.completed.length > 0) {
+          pushUndo({ kind: 'delete', labelKey: 'files.undo.moveOut', pairs: outcome.completed });
+          toast(
+            !undoEnabled
+              ? t('Moved to the system without application undo')
+              : outcome.completed.length > 1
+                ? t('Moved {{count}} items to the system; undo from the More menu.', { count: outcome.completed.length })
+                : t('Moved to the system; undo from the More menu.'),
+            'success',
+          );
+          replaceSelection([]);
+        }
+        refreshAffected(entries.map((entry) => entry.path));
+      } catch (error) {
+        // Failure usually means the system already moved the source away; keep the log, not a dialog.
+        terminalDebug('files-op', { op: 'move-out-failed', itemCount: entries.length, errorType: (error as Error)?.name ?? typeof error });
+        refreshAffected(entries.map((entry) => entry.path));
       }
-      refreshAffected(entries.map((entry) => entry.path));
-    } catch (error) {
-      // Failure usually means the system already moved the source away; keep the log, not a dialog.
-      terminalDebug('files-op', { op: 'move-out-failed', itemCount: entries.length, errorType: (error as Error)?.name ?? typeof error });
-      refreshAffected(entries.map((entry) => entry.path));
-    }
-  }, [applyChanges, ops, pushUndo, refreshAffected, replaceSelection, toast, undoEnabled]);
+    },
+    [applyChanges, ops, pushUndo, refreshAffected, replaceSelection, toast, undoEnabled],
+  );
 
   /** Delete moves entries into staging (undoable); the history window or eviction purges them. */
-  const doDelete = useCallback(async (list: FsEntry[]) => {
-    try {
-      const outcome = await ops.stageDelete(list.map((entry) => entry.path));
-      applyChanges(outcome.completed.map(pair => pair.from), []);
-      terminalDebug('files-op', { op: 'delete', itemCount: list.length, doneCount: outcome.completed.length, errorCount: outcome.errors.length });
-      if (outcome.errors.length > 0) toast(outcome.errors[0]!, 'error');
-      if (outcome.completed.length > 0) {
-        pushUndo({ kind: 'delete', labelKey: 'files.undo.delete', pairs: outcome.completed });
-        toast(
-          !undoEnabled ? t('Deleted without application undo') : outcome.completed.length > 1
-            ? t('Deleted {{count}} items; undo from the More menu.', { count: outcome.completed.length })
-            : t('Deleted; undo from the More menu.'),
-          'success',
+  const doDelete = useCallback(
+    async (list: FsEntry[]) => {
+      try {
+        const outcome = await ops.stageDelete(list.map((entry) => entry.path));
+        applyChanges(
+          outcome.completed.map((pair) => pair.from),
+          [],
         );
-        replaceSelection([]);
+        terminalDebug('files-op', {
+          op: 'delete',
+          itemCount: list.length,
+          doneCount: outcome.completed.length,
+          errorCount: outcome.errors.length,
+        });
+        if (outcome.errors.length > 0) toast(outcome.errors[0]!, 'error');
+        if (outcome.completed.length > 0) {
+          pushUndo({ kind: 'delete', labelKey: 'files.undo.delete', pairs: outcome.completed });
+          toast(
+            !undoEnabled
+              ? t('Deleted without application undo')
+              : outcome.completed.length > 1
+                ? t('Deleted {{count}} items; undo from the More menu.', { count: outcome.completed.length })
+                : t('Deleted; undo from the More menu.'),
+            'success',
+          );
+          replaceSelection([]);
+        }
+        // Deleted entries may live in expanded subdirectories; refresh their parents to avoid ghosts.
+        refreshAffected(outcome.completed.map((pair) => pair.from));
+      } catch (error) {
+        toast(String((error as Error)?.message ?? error), 'error');
       }
-      // Deleted entries may live in expanded subdirectories; refresh their parents to avoid ghosts.
-      refreshAffected(outcome.completed.map((pair) => pair.from));
-    } catch (error) {
-      toast(String((error as Error)?.message ?? error), 'error');
-    }
-  }, [applyChanges, ops, pushUndo, refreshAffected, replaceSelection, toast, undoEnabled]);
+    },
+    [applyChanges, ops, pushUndo, refreshAffected, replaceSelection, toast, undoEnabled],
+  );
 
   // Menus and confirmation.
 
-  const handleContextMenu = useCallback((event: React.MouseEvent, entry: FsEntry) => {
-    event.preventDefault();
-    if (!selection.has(entry.path)) selectOnly(entry.path);
-    setCtxMenu({ x: event.clientX, y: event.clientY, entry });
-  }, [selectOnly, selection]);
+  const handleContextMenu = useCallback(
+    (event: React.MouseEvent, entry: FsEntry) => {
+      event.preventDefault();
+      if (!selection.has(entry.path)) selectOnly(entry.path);
+      setCtxMenu({ x: event.clientX, y: event.clientY, entry });
+    },
+    [selectOnly, selection],
+  );
 
   const closeContextMenu = useCallback(() => setCtxMenu(null), []);
   const openBlankMenu = useCallback((event: React.MouseEvent) => {
@@ -1082,10 +1231,13 @@ export function useFileBrowser({
   }, []);
 
   /** Open the rename input (from the menu or right after creation) and scroll the row into view. */
-  const startRename = useCallback((entry: FsEntry) => {
-    setRenameTarget(entry);
-    revealPath(entry.path);
-  }, [revealPath]);
+  const startRename = useCallback(
+    (entry: FsEntry) => {
+      setRenameTarget(entry);
+      revealPath(entry.path);
+    },
+    [revealPath],
+  );
 
   /** Open the delete confirmation (menu entry). */
   const confirmDelete = useCallback((entries: FsEntry[]) => {
@@ -1138,7 +1290,7 @@ export function useFileBrowser({
     revealPath,
     clipboard,
     cutPaths,
-    undo: undoEnabled ? undoStack[0] ?? null : null,
+    undo: undoEnabled ? (undoStack[0] ?? null) : null,
     undoCount: undoStack.length,
     runUndo,
     copySelection: copyEntries,

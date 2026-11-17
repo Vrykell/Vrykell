@@ -15,15 +15,25 @@ interface LocalPathState {
   remember: (path: string | null) => void;
 }
 
-export const useLocalPathStore = create<LocalPathState>()(persist((set) => ({
-  remembered: null,
-  remember: (path) => set({ remembered: { path } }),
-}), {
-  name: 'vrykell-files-location',
-  partialize: state => ({ remembered: state.remembered }),
-  merge: (saved, current) => {
-    const remembered = (saved as Partial<LocalPathState> | null)?.remembered;
-    return { ...current, remembered: remembered && (remembered.path === null || typeof remembered.path === 'string' && remembered.path.length > 0)
-      ? { path: remembered.path } : null };
-  },
-}));
+export const useLocalPathStore = create<LocalPathState>()(
+  persist(
+    (set) => ({
+      remembered: null,
+      remember: (path) => set({ remembered: { path } }),
+    }),
+    {
+      name: 'vrykell-files-location',
+      partialize: (state) => ({ remembered: state.remembered }),
+      merge: (saved, current) => {
+        const remembered = (saved as Partial<LocalPathState> | null)?.remembered;
+        return {
+          ...current,
+          remembered:
+            remembered && (remembered.path === null || (typeof remembered.path === 'string' && remembered.path.length > 0))
+              ? { path: remembered.path }
+              : null,
+        };
+      },
+    },
+  ),
+);

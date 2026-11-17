@@ -6,7 +6,12 @@ import TagInput from '@ui/fields/TagInput';
 afterEach(cleanup);
 function Example() {
   const [value, setValue] = useState<string[]>([]);
-  return <><TagInput value={value} options={[{ value: 'production', color: 'var(--group-coral)' }]} onChange={setValue} /><output>{value.join(',')}</output></>;
+  return (
+    <>
+      <TagInput value={value} options={[{ value: 'production', color: 'var(--group-coral)' }]} onChange={setValue} />
+      <output>{value.join(',')}</output>
+    </>
+  );
 }
 it('chooses existing tags, creates tags and removes pills without a fake select', () => {
   render(<Example />);
@@ -16,7 +21,8 @@ it('chooses existing tags, creates tags and removes pills without a fake select'
   expect(screen.getByRole('status')).toHaveTextContent('production');
   fireEvent.keyDown(window, { key: 'Escape' });
   const input = screen.getByRole('textbox', { name: '新标签' });
-  fireEvent.change(input, { target: { value: 'api' } }); fireEvent.keyDown(input, { key: 'Enter' });
+  fireEvent.change(input, { target: { value: 'api' } });
+  fireEvent.keyDown(input, { key: 'Enter' });
   expect(screen.getByRole('status')).toHaveTextContent('production,api');
   fireEvent.click(screen.getAllByRole('button', { name: '移除标签' })[0]);
   expect(screen.getByRole('status')).toHaveTextContent('api');

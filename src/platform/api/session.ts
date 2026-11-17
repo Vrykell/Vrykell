@@ -3,14 +3,7 @@ import type { BackendBlockEntry, BackendChatMessage, BackendSessionEntry } from 
 
 export type { BackendChatMessage };
 
-export function createSession(
-  id: string,
-  title: string,
-  timestamp: number,
-  cwd?: string,
-  kind = 'local',
-  payload = '{}',
-): Promise<void> {
+export function createSession(id: string, title: string, timestamp: number, cwd?: string, kind = 'local', payload = '{}'): Promise<void> {
   return invoke('create_session', { id, title, timestamp, cwd: cwd ?? null, kind, payload });
 }
 
@@ -59,12 +52,32 @@ export function listSessions(): Promise<BackendSessionEntry[]> {
 // ── Block persistence ──
 
 export function recordBlock(
-  id: string, sessionId: string, paneId: string | null, command: string,
-  outputRaw: string, outputClean: string, outputHtml: string, exitCode: number | null, status: string,
-  startedAt: number, endedAt: number | null, cwd = '',
+  id: string,
+  sessionId: string,
+  paneId: string | null,
+  command: string,
+  outputRaw: string,
+  outputClean: string,
+  outputHtml: string,
+  exitCode: number | null,
+  status: string,
+  startedAt: number,
+  endedAt: number | null,
+  cwd = '',
 ): Promise<void> {
   return invoke('record_block', {
-    id, sessionId, paneId, command, outputRaw, outputClean, outputHtml, exitCode, status, startedAt, endedAt, cwd,
+    id,
+    sessionId,
+    paneId,
+    command,
+    outputRaw,
+    outputClean,
+    outputHtml,
+    exitCode,
+    status,
+    startedAt,
+    endedAt,
+    cwd,
   });
 }
 
@@ -75,7 +88,12 @@ export function getSessionBlocks(sessionId: string): Promise<BackendBlockEntry[]
 // ── AI conversation persistence ──
 
 export function appendChatMessage(
-  id: string, sessionId: string, role: string, content: string, createdAt: number, parts: string,
+  id: string,
+  sessionId: string,
+  role: string,
+  content: string,
+  createdAt: number,
+  parts: string,
   attachments = '',
   paneId?: string,
 ): Promise<void> {

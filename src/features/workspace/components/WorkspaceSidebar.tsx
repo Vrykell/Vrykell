@@ -16,19 +16,19 @@ import { isMacOS } from '@platform/runtime';
 
 /** Functional navigation disappears completely when collapsed. */
 export default function WorkspaceSidebar({ maxWidth = 400 }: { maxWidth?: number }) {
-  const area = useWorkspaceNavigation(state => state.area);
-  const collapsed = useWorkspaceNavigation(state => state.collapsed);
-  const overlay = useWorkspaceNavigation(state => state.sidebarOverlay);
-  const sidebarWidth = useWorkspaceNavigation(state => state.sidebarDragWidth ?? state.sidebarWidth);
-  const settingsOpen = useUiStore(state => state.settingsOpen);
-  const leftPanelOpen = useDockStore(state => state.leftPanels.length > 0);
+  const area = useWorkspaceNavigation((state) => state.area);
+  const collapsed = useWorkspaceNavigation((state) => state.collapsed);
+  const overlay = useWorkspaceNavigation((state) => state.sidebarOverlay);
+  const sidebarWidth = useWorkspaceNavigation((state) => state.sidebarDragWidth ?? state.sidebarWidth);
+  const settingsOpen = useUiStore((state) => state.settingsOpen);
+  const leftPanelOpen = useDockStore((state) => state.leftPanels.length > 0);
   // The placement preview shows the docked layout, so the settings foot already clears for it.
-  const leftPlacementPreview = useNavigationDrag(state => state.target?.side === 'left' && state.target.openPanel === true);
+  const leftPlacementPreview = useNavigationDrag((state) => state.target?.side === 'left' && state.target.openPanel === true);
   const leftDocked = leftPanelOpen || leftPlacementPreview;
   const toggleSettings = () => useUiStore.getState().setSettingsOpen(!settingsOpen);
   const settingsShortcut = `${isMacOS ? 'Meta' : 'Control'}+,`;
-  const workspaceOrder = useWorkspaceNavigation(state => state.workspaceOrder);
-  const historyLoading = useWorkspaceNavigation(state => state.historyLoading);
+  const workspaceOrder = useWorkspaceNavigation((state) => state.workspaceOrder);
+  const historyLoading = useWorkspaceNavigation((state) => state.historyLoading);
   useEffect(() => {
     let narrow = window.innerWidth <= WORKSPACE_COMPACT_BREAKPOINT;
     const resize = () => {
@@ -36,7 +36,8 @@ export default function WorkspaceSidebar({ maxWidth = 400 }: { maxWidth?: number
       if (next && !narrow) useWorkspaceNavigation.getState().setCollapsed(true);
       narrow = next;
     };
-    window.addEventListener('resize', resize); return () => window.removeEventListener('resize', resize);
+    window.addEventListener('resize', resize);
+    return () => window.removeEventListener('resize', resize);
   }, []);
   const items = [
     { id: 'terminal' as const, label: t(WORKSPACE_AREA_LABELS.terminal), Icon: TerminalPrompt },
@@ -45,12 +46,12 @@ export default function WorkspaceSidebar({ maxWidth = 400 }: { maxWidth?: number
     { id: 'ssh' as const, label: t(WORKSPACE_AREA_LABELS.ssh), Icon: ServerStack },
     { id: 'unified' as const, label: t(WORKSPACE_AREA_LABELS.unified), Icon: Grid },
   ];
-  const open = (id: WorkspaceArea) => id === 'unified' ? openUnifiedWorkspace() : selectWorkspaceArea(id);
-  const orderedItems = workspaceOrder.flatMap(id => {
-    const item = items.find(candidate => candidate.id === id);
+  const open = (id: WorkspaceArea) => (id === 'unified' ? openUnifiedWorkspace() : selectWorkspaceArea(id));
+  const orderedItems = workspaceOrder.flatMap((id) => {
+    const item = items.find((candidate) => candidate.id === id);
     return item ? [item] : [];
   });
-  const itemById = new Map<string, (typeof items)[number]>(items.map(item => [item.id, item]));
+  const itemById = new Map<string, (typeof items)[number]>(items.map((item) => [item.id, item]));
   const startWorkspaceDrag = useListReorderDrag({
     listId: 'workspace-areas',
     edgeDrop: true,
@@ -60,55 +61,139 @@ export default function WorkspaceSidebar({ maxWidth = 400 }: { maxWidth?: number
     },
     accepts: () => true,
   });
-  return <><aside className="workspace-sidebar" data-collapsed={collapsed} data-overlay={overlay || undefined} data-testid="workspace-sidebar" inert={collapsed} aria-hidden={collapsed || undefined}>
-    <div className="workspace-sidebar-heading" data-tauri-drag-region>
-      <span data-tauri-drag-region>{t('Workspaces')}</span>
-      <div className="workspace-sidebar-header-actions">
-        {leftDocked && <IconButton compact data-testid="workspace-settings" aria-label={t('Settings')} data-tip={t('Open settings')}
-          data-dock-btn="settings" data-dock-fixed="true" data-tip-shortcut={settingsShortcut}
-          onClick={toggleSettings}><Settings size={iconSizes.control} /></IconButton>}
-        <IconButton compact data-testid="workspace-history" aria-label={t('All history')} data-tip={t('All history')}
-          data-busy={historyLoading || undefined} onClick={() => selectWorkspaceArea('history')}>
-          <History size={iconSizes.control} className={historyLoading ? 'reload-spin' : undefined} />
-        </IconButton>
-        <IconButton compact className="workspace-sidebar-toggle" data-testid="workspace-sidebar-toggle" aria-label={t('Collapse sidebar')} data-tip={t('Collapse sidebar')}
-          onClick={() => useWorkspaceNavigation.getState().setCollapsed(true)}><PanelLeft size={iconSizes.control} /></IconButton>
+  return (
+    <>
+      <aside
+        className="workspace-sidebar"
+        data-collapsed={collapsed}
+        data-overlay={overlay || undefined}
+        data-testid="workspace-sidebar"
+        inert={collapsed}
+        aria-hidden={collapsed || undefined}>
+        <div className="workspace-sidebar-heading" data-tauri-drag-region>
+          <span data-tauri-drag-region>{t('Workspaces')}</span>
+          <div className="workspace-sidebar-header-actions">
+            {leftDocked && (
+              <IconButton
+                compact
+                data-testid="workspace-settings"
+                aria-label={t('Settings')}
+                data-tip={t('Open settings')}
+                data-dock-btn="settings"
+                data-dock-fixed="true"
+                data-tip-shortcut={settingsShortcut}
+                onClick={toggleSettings}>
+                <Settings size={iconSizes.control} />
+              </IconButton>
+            )}
+            <IconButton
+              compact
+              data-testid="workspace-history"
+              aria-label={t('All history')}
+              data-tip={t('All history')}
+              data-busy={historyLoading || undefined}
+              onClick={() => selectWorkspaceArea('history')}>
+              <History size={iconSizes.control} className={historyLoading ? 'reload-spin' : undefined} />
+            </IconButton>
+            <IconButton
+              compact
+              className="workspace-sidebar-toggle"
+              data-testid="workspace-sidebar-toggle"
+              aria-label={t('Collapse sidebar')}
+              data-tip={t('Collapse sidebar')}
+              onClick={() => useWorkspaceNavigation.getState().setCollapsed(true)}>
+              <PanelLeft size={iconSizes.control} />
+            </IconButton>
+          </div>
+        </div>
+        <nav aria-label={t('Workspaces')} className="workspace-area-navigation" data-reorder-list="workspace-areas">
+          {orderedItems.map(({ id, label, Icon }) => (
+            <Fragment key={id}>
+              <ListReorderPlaceholder listId="workspace-areas" itemId={id} reserveSource />
+              <SidebarItem
+                compact
+                title={label}
+                icon={<Icon size={iconSizes.row} />}
+                active={!settingsOpen && (area === id || (id === 'ssh' && area === 'forwarding'))}
+                testId={`workspace-area-${id}`}
+                dataAttributes={{
+                  role: 'button',
+                  'aria-label': label,
+                  'data-dock-btn': id === 'terminal' ? 'tabs' : id === 'ssh' ? 'ssh' : undefined,
+                  'aria-current': !settingsOpen && (area === id || (id === 'ssh' && area === 'forwarding')) ? 'page' : undefined,
+                }}
+                tabIndex={0}
+                reorderItemId={id}
+                reorderListId="workspace-areas"
+                reorderKind="workspace"
+                onPointerDown={(event) => startWorkspaceDrag(event, { id, kind: 'workspace' })}
+                onClick={() => open(id)}
+                onKeyDown={(event) => {
+                  if (event.key === 'Enter' || event.key === ' ') {
+                    event.preventDefault();
+                    open(id);
+                  }
+                }}
+              />
+              <ListReorderPlaceholder listId="workspace-areas" itemId={id} after />
+            </Fragment>
+          ))}
+        </nav>
+        <div className="workspace-sidebar-tools" data-testid="workspace-left-dock">
+          <SidePanel side="left" />
+        </div>
+        {!leftDocked && (
+          <div className="workspace-sidebar-footer">
+            <SidebarItem
+              compact
+              title={t('Settings')}
+              tooltip={t('Open settings')}
+              icon={<Settings size={iconSizes.row} />}
+              active={settingsOpen}
+              dataAttributes={{
+                'data-dock-btn': 'settings',
+                'data-dock-fixed': 'true',
+                role: 'button',
+                'aria-label': t('Settings'),
+                'aria-pressed': String(settingsOpen),
+                'data-tip-shortcut': settingsShortcut,
+              }}
+              testId="workspace-settings"
+              tabIndex={0}
+              onClick={toggleSettings}
+              onKeyDown={(event) => {
+                if (event.key === 'Enter' || event.key === ' ') {
+                  event.preventDefault();
+                  toggleSettings();
+                }
+              }}
+            />
+          </div>
+        )}
+        <NavigationDragPreview />
+        <ListReorderPreview listId="workspace-areas" variant="icon">
+          {(drag) => {
+            const item = itemById.get(drag.id);
+            if (!item) return null;
+            const Icon = item.Icon;
+            return <Icon size={iconSizes.row} />;
+          }}
+        </ListReorderPreview>
+      </aside>
+      <div className="workspace-sidebar-resize" hidden={collapsed} role="region" aria-label={t('Sidebar resize')}>
+        <ResizeHandle
+          axis="x"
+          edge="right"
+          label={t('Resize workspace sidebar')}
+          testId="workspace-sidebar-resize"
+          valueNow={Math.min(sidebarWidth, maxWidth)}
+          valueMin={160}
+          valueMax={maxWidth}
+          onDelta={(delta) => useWorkspaceNavigation.getState().resizeSidebar(delta, maxWidth)}
+          onUp={() => useWorkspaceNavigation.getState().commitSidebarWidth()}
+          onReset={() => useWorkspaceNavigation.getState().resetSidebarWidth()}
+        />
       </div>
-    </div>
-    <nav aria-label={t('Workspaces')} className="workspace-area-navigation" data-reorder-list="workspace-areas">
-      {orderedItems.map(({ id, label, Icon }) => <Fragment key={id}>
-        <ListReorderPlaceholder listId="workspace-areas" itemId={id} reserveSource />
-        <SidebarItem compact title={label} icon={<Icon size={iconSizes.row} />} active={!settingsOpen && (area === id || id === 'ssh' && area === 'forwarding')}
-          testId={`workspace-area-${id}`} dataAttributes={{ role: 'button', 'aria-label': label, 'data-dock-btn': id === 'terminal' ? 'tabs' : id === 'ssh' ? 'ssh' : undefined, 'aria-current': !settingsOpen && (area === id || id === 'ssh' && area === 'forwarding') ? 'page' : undefined }}
-          tabIndex={0} reorderItemId={id} reorderListId="workspace-areas" reorderKind="workspace"
-          onPointerDown={event => startWorkspaceDrag(event, { id, kind: 'workspace' })}
-          onClick={() => open(id)} onKeyDown={event => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); open(id); } }} />
-        <ListReorderPlaceholder listId="workspace-areas" itemId={id} after />
-      </Fragment>)}
-    </nav>
-    <div className="workspace-sidebar-tools" data-testid="workspace-left-dock">
-      <SidePanel side="left" />
-    </div>
-    {!leftDocked && <div className="workspace-sidebar-footer">
-      <SidebarItem compact title={t('Settings')} tooltip={t('Open settings')} icon={<Settings size={iconSizes.row} />} active={settingsOpen} dataAttributes={{ 'data-dock-btn': 'settings', 'data-dock-fixed': 'true', role: 'button', 'aria-label': t('Settings'), 'aria-pressed': String(settingsOpen), 'data-tip-shortcut': settingsShortcut }} testId="workspace-settings" tabIndex={0}
-        onClick={toggleSettings} onKeyDown={event => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); toggleSettings(); } }} />
-    </div>}
-    <NavigationDragPreview />
-      <ListReorderPreview listId="workspace-areas" variant="icon">
-        {drag => {
-          const item = itemById.get(drag.id);
-          if (!item) return null;
-          const Icon = item.Icon;
-          return <Icon size={iconSizes.row} />;
-        }}
-      </ListReorderPreview>
-  </aside>
-    <div className="workspace-sidebar-resize" hidden={collapsed} role="region" aria-label={t('Sidebar resize')}>
-      <ResizeHandle axis="x" edge="right" label={t('Resize workspace sidebar')} testId="workspace-sidebar-resize"
-        valueNow={Math.min(sidebarWidth, maxWidth)} valueMin={160} valueMax={maxWidth}
-        onDelta={delta => useWorkspaceNavigation.getState().resizeSidebar(delta, maxWidth)}
-        onUp={() => useWorkspaceNavigation.getState().commitSidebarWidth()}
-        onReset={() => useWorkspaceNavigation.getState().resetSidebarWidth()} />
-    </div>
-  </>;
+    </>
+  );
 }

@@ -9,15 +9,17 @@ const LOG_LIMIT = 60;
 
 /** Real connection lines from one chunk of terminal output. */
 export function connectionLogLines(text: string): string[] {
-  return text.slice(-65536)
+  return text
+    .slice(-65536)
     .replace(CONTROL_SEQUENCES, '')
     .split(/\r?\n/)
-    .map(line => redactText(line.trim()).slice(0, 1024))
-    .filter(line => line.length > 0);
+    .map((line) => redactText(line.trim()).slice(0, 1024))
+    .filter((line) => line.length > 0);
 }
 
 /** Messages the client prints by itself, including when an established session drops. */
-const CLIENT_NOTICES = /^(ssh:|Warning:|Connection (closed|reset|timed out)|Connection to .+ closed|Received disconnect|Timeout, server|kex_exchange_identification|Host key verification failed|Permission denied|Too many authentication failures|Authentication failed|Unable to negotiate|no matching host key)/;
+const CLIENT_NOTICES =
+  /^(ssh:|Warning:|Connection (closed|reset|timed out)|Connection to .+ closed|Received disconnect|Timeout, server|kex_exchange_identification|Host key verification failed|Permission denied|Too many authentication failures|Authentication failed|Unable to negotiate|no matching host key)/;
 
 /** Only client notices are retained, even when the shell has no integration markers. */
 export function isSshClientNotice(line: string): boolean {

@@ -27,7 +27,10 @@ vi.mock('@platform/api/acp', () => ({
     },
     models: {
       currentModelId: 'm1',
-      availableModels: [{ modelId: 'm1', name: 'Model One' }, { modelId: 'm2', name: 'Model Two' }],
+      availableModels: [
+        { modelId: 'm1', name: 'Model One' },
+        { modelId: 'm2', name: 'Model Two' },
+      ],
     },
     configOptions: null,
   })),
@@ -60,15 +63,24 @@ describe('harness usage recording', () => {
   it('counts turns, tool calls, context and cost from the protocol updates', () => {
     const store = useHarnessStore.getState();
     store.applyEvent(notification({ sessionUpdate: 'tool_call', toolCallId: 'c1', title: 'Run the tests' }) as never);
-    store.applyEvent(notification({
-      sessionUpdate: 'usage_update', used: 12_000, size: 200_000,
-      cost: { amount: 0.0042, currency: 'USD' },
-    }) as never);
+    store.applyEvent(
+      notification({
+        sessionUpdate: 'usage_update',
+        used: 12_000,
+        size: 200_000,
+        cost: { amount: 0.0042, currency: 'USD' },
+      }) as never,
+    );
     store.applyEvent({ kind: 'stop', sessionId: SESSION, payload: { stopReason: 'end_turn' } } as never);
 
     expect(row()).toMatchObject({
-      source: 'Claude Code', turns: 1, toolCalls: 1,
-      contextUsed: 12_000, contextSize: 200_000, cost: 0.0042, currency: 'USD',
+      source: 'Claude Code',
+      turns: 1,
+      toolCalls: 1,
+      contextUsed: 12_000,
+      contextSize: 200_000,
+      cost: 0.0042,
+      currency: 'USD',
     });
   });
 

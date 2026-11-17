@@ -21,7 +21,7 @@ describe('useFollowBottom', () => {
     registerBlockTerminal('follow-live', block.term);
     const { result, unmount } = renderHook(() => useFollowBottom({ current: el }, [], 'follow-live'));
     try {
-      await new Promise<void>(resolve => block.term.write('line\r\n'.repeat(200), resolve));
+      await new Promise<void>((resolve) => block.term.write('line\r\n'.repeat(200), resolve));
       block.term.scrollToTop();
       expect(block.term.buffer.active.viewportY).toBe(0);
       const input = vi.fn();
@@ -47,7 +47,7 @@ describe('useFollowBottom', () => {
     running.addEventListener('wheel', innerWheel);
     const { rerender } = renderHook(({ dep }) => useFollowBottom({ current: el }, [dep]), { initialProps: { dep: 1 } });
     expect(listen).toHaveBeenCalledWith('wheel', expect.any(Function), { capture: true, passive: true });
-    await new Promise<void>(resolve => requestAnimationFrame(() => resolve()));
+    await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
     el.scrollTop = 700;
     const wheel = new WheelEvent('wheel', { deltaY: -350, bubbles: true, cancelable: true });
     running.dispatchEvent(wheel);
@@ -55,16 +55,21 @@ describe('useFollowBottom', () => {
     expect(innerWheel).toHaveBeenCalledTimes(1);
     expect(el.scrollTop).toBe(700);
     rerender({ dep: 2 });
-    await new Promise<void>(resolve => requestAnimationFrame(() => resolve()));
+    await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
     expect(el.scrollTop).toBe(1000);
   });
   it('keeps following when a bottom jump is followed by a resize before its scroll event', async () => {
     let notify: ResizeObserverCallback = () => {};
-    vi.stubGlobal('ResizeObserver', class {
-      constructor(callback: ResizeObserverCallback) { notify = callback; }
-      observe() {}
-      disconnect() {}
-    });
+    vi.stubGlobal(
+      'ResizeObserver',
+      class {
+        constructor(callback: ResizeObserverCallback) {
+          notify = callback;
+        }
+        observe() {}
+        disconnect() {}
+      },
+    );
     try {
       const el = makeEl(800);
       const ref = { current: el } as React.RefObject<HTMLDivElement>;
@@ -74,7 +79,7 @@ describe('useFollowBottom', () => {
       el.scrollTop = 800;
       Object.defineProperty(el, 'clientHeight', { value: 180, configurable: true });
       notify([], {} as ResizeObserver);
-      await new Promise<void>(resolve => requestAnimationFrame(() => resolve()));
+      await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
       expect(el.scrollTop).toBe(1000);
     } finally {
       vi.unstubAllGlobals();
@@ -83,11 +88,16 @@ describe('useFollowBottom', () => {
   it('observes the complete output wrapper and follows live height changes', async () => {
     let notify: ResizeObserverCallback = () => {};
     const observe = vi.fn();
-    vi.stubGlobal('ResizeObserver', class {
-      constructor(callback: ResizeObserverCallback) { notify = callback; }
-      observe = observe;
-      disconnect() {}
-    });
+    vi.stubGlobal(
+      'ResizeObserver',
+      class {
+        constructor(callback: ResizeObserverCallback) {
+          notify = callback;
+        }
+        observe = observe;
+        disconnect() {}
+      },
+    );
     try {
       const el = makeEl(800);
       const wrapper = document.createElement('div');
@@ -100,7 +110,7 @@ describe('useFollowBottom', () => {
 
       Object.defineProperty(el, 'scrollHeight', { value: 1400, configurable: true });
       notify([] as ResizeObserverEntry[], {} as ResizeObserver);
-      await new Promise<void>(resolve => requestAnimationFrame(() => resolve()));
+      await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
       expect(el.scrollTop).toBe(1400);
     } finally {
       vi.unstubAllGlobals();
@@ -228,11 +238,11 @@ it('retains bottom-following through remounts when output grows while the pane i
   const el = makeEl(800);
   const ref = { current: el };
   const first = renderHook(() => useFollowBottom(ref, [], 'remount-follow'));
-  await new Promise<void>(resolve => requestAnimationFrame(() => resolve()));
+  await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
   first.unmount();
   Object.defineProperty(el, 'scrollHeight', { value: 1800, configurable: true });
   renderHook(() => useFollowBottom(ref, [], 'remount-follow'));
-  await new Promise<void>(resolve => requestAnimationFrame(() => resolve()));
+  await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
   expect(el.scrollTop).toBe(1800);
 });
 
@@ -240,13 +250,13 @@ it('retains a paused reading position through remounts and background output', a
   const el = makeEl(800);
   const ref = { current: el };
   const first = renderHook(() => useFollowBottom(ref, [], 'remount-reading'));
-  await new Promise<void>(resolve => requestAnimationFrame(() => resolve()));
+  await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
   el.scrollTop = 300;
   el.dispatchEvent(new Event('scroll'));
   first.unmount();
   Object.defineProperty(el, 'scrollHeight', { value: 1800, configurable: true });
   renderHook(() => useFollowBottom(ref, [], 'remount-reading'));
-  await new Promise<void>(resolve => requestAnimationFrame(() => resolve()));
+  await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
   expect(el.scrollTop).toBe(300);
 });
 
@@ -254,7 +264,7 @@ it('keeps following fractional programmatic offsets and content-clamp scroll eve
   const el = makeEl(800);
   const ref = { current: el };
   const { rerender } = renderHook(({ dep }) => useFollowBottom(ref, [dep]), { initialProps: { dep: 1 } });
-  await new Promise<void>(resolve => requestAnimationFrame(() => resolve()));
+  await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
   el.scrollTop += 0.25;
   el.dispatchEvent(new Event('scroll'));
   Object.defineProperty(el, 'scrollHeight', { value: 700, configurable: true });
@@ -262,7 +272,7 @@ it('keeps following fractional programmatic offsets and content-clamp scroll eve
   el.dispatchEvent(new Event('scroll'));
   Object.defineProperty(el, 'scrollHeight', { value: 1800, configurable: true });
   rerender({ dep: 2 });
-  await new Promise<void>(resolve => requestAnimationFrame(() => resolve()));
+  await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
   expect(el.scrollTop).toBe(1800);
 });
 
@@ -276,19 +286,28 @@ it('captures a reading anchor below the pinned title overlay', async () => {
   scroll.appendChild(content);
   parent.append(scroll, title);
   document.body.appendChild(parent);
-  const rect = (top: number, bottom: number): DOMRect => ({ top, bottom, left: 0, right: 600,
-    width: 600, height: bottom - top, x: 0, y: top, toJSON: () => ({}) });
+  const rect = (top: number, bottom: number): DOMRect => ({
+    top,
+    bottom,
+    left: 0,
+    right: 600,
+    width: 600,
+    height: bottom - top,
+    x: 0,
+    y: top,
+    toJSON: () => ({}),
+  });
   vi.spyOn(scroll, 'getBoundingClientRect').mockReturnValue(rect(100, 300));
   vi.spyOn(title, 'getBoundingClientRect').mockReturnValue(rect(100, 160));
   const original = Object.getOwnPropertyDescriptor(document, 'elementFromPoint');
   const point = vi.fn(() => content);
   Object.defineProperty(document, 'elementFromPoint', { configurable: true, value: point });
   const { unmount } = renderHook(() => useFollowBottom({ current: scroll }, []));
-  await new Promise<void>(resolve => requestAnimationFrame(() => resolve()));
+  await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
   scroll.scrollTop = 300;
   scroll.dispatchEvent(new Event('scroll'));
   expect(point).not.toHaveBeenCalled();
-  await new Promise(resolve => setTimeout(resolve, 150));
+  await new Promise((resolve) => setTimeout(resolve, 150));
   expect(point).toHaveBeenLastCalledWith(80, 168);
   unmount();
   if (original) Object.defineProperty(document, 'elementFromPoint', original);

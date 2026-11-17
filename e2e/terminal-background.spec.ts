@@ -4,10 +4,14 @@ import { setupTauriMock, emitPtyOutput } from './tauri-mock';
 for (const mode of ['block', 'classic'] as const) {
   test(`${mode} terminal uses the same background in both themes and custom overrides`, async ({ page }) => {
     await setupTauriMock(page);
-    await page.addInitScript(openMode => {
-      localStorage.setItem('vrykell-agent-settings', JSON.stringify({
-        state: { global: { openModeByShell: { zsh: openMode } }, overrides: {} }, version: 8,
-      }));
+    await page.addInitScript((openMode) => {
+      localStorage.setItem(
+        'vrykell-agent-settings',
+        JSON.stringify({
+          state: { global: { openModeByShell: { zsh: openMode } }, overrides: {} },
+          version: 8,
+        }),
+      );
     }, mode);
     await page.goto('/');
     const pane = page.locator('.terminal-pane').first();
@@ -21,7 +25,7 @@ for (const mode of ['block', 'classic'] as const) {
       await expect(pane).toBeVisible();
       const expected = await page.evaluate(() => {
         const color = getComputedStyle(document.documentElement).getPropertyValue('--xterm-bg').trim();
-        return `rgb(${[1, 3, 5].map(offset => parseInt(color.slice(offset, offset + 2), 16)).join(', ')})`;
+        return `rgb(${[1, 3, 5].map((offset) => parseInt(color.slice(offset, offset + 2), 16)).join(', ')})`;
       });
       await expect(pane).toHaveCSS('background-color', expected);
       const cursor = await page.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue('--xterm-cursor').trim());

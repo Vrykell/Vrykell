@@ -8,7 +8,7 @@ test('routes input and manual fullscreen to a running block placed in the unifie
   await expect(page.getByPlaceholder(/输入命令/)).toBeVisible();
   await page.waitForFunction(async () => {
     const path = '/src/features/terminal/stores/terminal.ts';
-    const { useTerminalStore } = await import(path) as typeof import('../src/features/terminal/stores/terminal');
+    const { useTerminalStore } = (await import(path)) as typeof import('../src/features/terminal/stores/terminal');
     return Object.values(useTerminalStore.getState().startupStates).includes('ready');
   });
   await emitPtyOutput(page, `\x1b]133;E;${btoa('sleep 100')}\x07\x1b]133;C\x07`);
@@ -17,7 +17,10 @@ test('routes input and manual fullscreen to a running block placed in the unifie
   await page.getByTestId('workspace-area-unified').click();
   const workspace = page.getByTestId('unified-workspace');
   await openWorkspaceResource(page);
-  const pane = workspace.locator('.unified-pane').filter({ has: page.locator('.terminal-pane') }).first();
+  const pane = workspace
+    .locator('.unified-pane')
+    .filter({ has: page.locator('.terminal-pane') })
+    .first();
   await expect(pane.locator('.terminal-pane')).toBeVisible();
   await pane.click({ position: { x: 120, y: 220 } });
 

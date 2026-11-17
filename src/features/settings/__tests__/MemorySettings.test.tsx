@@ -5,7 +5,10 @@ import { MemorySettings } from '../pages/MemorySettings';
 const storage = vi.hoisted(() => ({ memoryStats: vi.fn(), organize: vi.fn() }));
 vi.mock('@features/agent/services/platform', () => storage);
 vi.mock('@features/workspace/services/workspaceActions', () => ({ organizeMemoryWithAssistant: storage.organize }));
-afterEach(() => { cleanup(); storage.memoryStats.mockReset(); });
+afterEach(() => {
+  cleanup();
+  storage.memoryStats.mockReset();
+});
 
 it('shows bounded aggregate status without loading or displaying memory content', async () => {
   storage.memoryStats.mockResolvedValue({ total: 100_000, active: 60_000, pending: 10_000, expired: 20_000, inactive: 10_000 });

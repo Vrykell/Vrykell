@@ -23,7 +23,10 @@ beforeEach(() => {
   useHarnessWorkspace.setState({ connections: [], selected: '' });
   dispose = startWorkbenchRuntime();
 });
-afterEach(() => { dispose(); vi.clearAllMocks(); });
+afterEach(() => {
+  dispose();
+  vi.clearAllMocks();
+});
 
 it('selects existing start pages on repeated visits to empty workspaces', () => {
   const workspace = useWorkspaceStore.getState();
@@ -32,14 +35,14 @@ it('selects existing start pages on repeated visits to empty workspaces', () => 
     for (const area of ['code', 'ai'] as const) {
       selectWorkspaceArea(area);
       const state = useWorkspaceStore.getState();
-      expect(state.tabs.find(tab => tab.id === state.activeId)?.kind).toBe(area === 'ai' ? 'start-ai' : 'start-code');
+      expect(state.tabs.find((tab) => tab.id === state.activeId)?.kind).toBe(area === 'ai' ? 'start-ai' : 'start-code');
       expect(useWorkspaceNavigation.getState().lastTabs[area]).toBe(state.activeId);
       selectWorkspaceArea('terminal');
     }
   }
 });
 
-it.each(['history', 'ai-history', 'usage'] as const)('restores the selected %s page alongside open content tabs', kind => {
+it.each(['history', 'ai-history', 'usage'] as const)('restores the selected %s page alongside open content tabs', (kind) => {
   const workspace = useWorkspaceStore.getState();
   workspace.addTab();
   if (kind !== 'history') {
@@ -71,7 +74,7 @@ it('restores the last file and terminal after viewing different resources in the
   selectWorkspaceArea('terminal');
   expect(useWorkspaceStore.getState().activeId).toBe(firstTerminal);
   selectWorkspaceArea('code');
-  expect(useWorkspaceStore.getState().tabs.find(tab => tab.kind === 'editor')).toMatchObject({ selected: first });
+  expect(useWorkspaceStore.getState().tabs.find((tab) => tab.kind === 'editor')).toMatchObject({ selected: first });
   selectWorkspaceArea('unified');
   expect(useWorkbenchStore.getState().snapshot.selected.unified).toBe(unified);
   expect(useWorkspaceStore.getState().activeId).toBe(secondTerminal);
@@ -82,7 +85,7 @@ it('falls back to an open content tab when the remembered utility page has been 
   const terminal = workspace.addTab();
   const history = workspace.addTab({ kind: 'history' });
   selectWorkspaceArea('ssh');
-  useWorkspaceStore.setState(state => ({ tabs: state.tabs.filter(tab => tab.id !== history) }));
+  useWorkspaceStore.setState((state) => ({ tabs: state.tabs.filter((tab) => tab.id !== history) }));
   selectWorkspaceArea('terminal');
   expect(useWorkspaceStore.getState().activeId).toBe(terminal);
 });
@@ -109,7 +112,7 @@ it('falls back after a remembered content tab closes while another workspace is 
   const second = workspace.addTab();
   activateContainer(first);
   selectWorkspaceArea('ssh');
-  useWorkspaceStore.setState(state => ({ tabs: state.tabs.filter(tab => tab.id !== first) }));
+  useWorkspaceStore.setState((state) => ({ tabs: state.tabs.filter((tab) => tab.id !== first) }));
   selectWorkspaceArea('terminal');
   expect(useWorkspaceStore.getState().activeId).toBe(second);
 });

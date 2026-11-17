@@ -139,7 +139,7 @@ test.describe('File panel', () => {
     await expect(page.locator('[data-testid^="tab-row-"]', { hasText: 'project' })).toHaveCount(1);
 
     // Switch back to the files panel; the drive view has no current folder, so the menu hides the unavailable new-tab action
-    if (!await tree.isVisible()) await page.locator('[data-dock-btn="files"]').click();
+    if (!(await tree.isVisible())) await page.locator('[data-dock-btn="files"]').click();
     await expect(tree).toBeVisible();
     await page.getByText('此电脑').click();
     await expect(page.getByTestId('disk-card-e2e-root')).toBeVisible({ timeout: 3000 });
@@ -148,7 +148,9 @@ test.describe('File panel', () => {
     await expect(page.getByRole('button', { name: '下载管理' })).toBeVisible();
   });
 
-  test('the file tree stays in the original directory (remembered within the session) after a downloads round trip instead of returning to the terminal cwd', async ({ page }) => {
+  test('the file tree stays in the original directory (remembered within the session) after a downloads round trip instead of returning to the terminal cwd', async ({
+    page,
+  }) => {
     const tree = page.getByTestId('local-file-tree');
     await tree.locator('[data-testid="file-row"][data-path="/home/e2e/Documents"]').dblclick();
     await expect(tree).toHaveAttribute('data-path', '/home/e2e/Documents');
@@ -193,15 +195,19 @@ test.describe('File panel', () => {
     await expect(page.getByRole('button', { name: '重命名' })).toHaveCount(0);
   });
 
-  test('paste target: right-clicking a folder pastes into it, right-clicking a file pastes beside it, and Ctrl+V pastes into the current directory', async ({ page }) => {
+  test('paste target: right-clicking a folder pastes into it, right-clicking a file pastes beside it, and Ctrl+V pastes into the current directory', async ({
+    page,
+  }) => {
     await page.evaluate(() => {
-      const ipc = (window as unknown as { __TAURI_INTERNALS__: { invoke: (command: string, args?: Record<string, unknown>) => Promise<unknown> } }).__TAURI_INTERNALS__;
+      const ipc = (
+        window as unknown as { __TAURI_INTERNALS__: { invoke: (command: string, args?: Record<string, unknown>) => Promise<unknown> } }
+      ).__TAURI_INTERNALS__;
       const original = ipc.invoke;
       ipc.invoke = async (command, args) => {
         const result = await original(command, args);
         // Expanded destinations must list their own children rather than repeat the root fixture.
         if (command === 'fs_list' && args?.path === '/home/e2e/Documents') {
-          return (result as Array<{ path: string }>).filter(entry => entry.path.slice(0, entry.path.lastIndexOf('/')) === args.path);
+          return (result as Array<{ path: string }>).filter((entry) => entry.path.slice(0, entry.path.lastIndexOf('/')) === args.path);
         }
         return result;
       };
@@ -214,13 +220,15 @@ test.describe('File panel', () => {
     await page.getByRole('button', { name: '复制', exact: true }).click();
     await tree.locator('[data-testid="file-row"][data-path="/home/e2e/Documents"]').click({ button: 'right' });
     await page.getByRole('button', { name: '粘贴', exact: true }).click();
-    await expect.poll(async () => (await fsOps(page)).filter((op) => op.op === 'copy'))
+    await expect
+      .poll(async () => (await fsOps(page)).filter((op) => op.op === 'copy'))
       .toContainEqual({ op: 'copy', path: '/home/e2e/notes.txt', destDir: '/home/e2e/Documents' });
 
     // Right-click a file: paste into that file's directory (not the current one)
     await notes.click({ button: 'right' });
     await page.getByRole('button', { name: '粘贴', exact: true }).click();
-    await expect.poll(async () => (await fsOps(page)).filter((op) => op.op === 'copy'))
+    await expect
+      .poll(async () => (await fsOps(page)).filter((op) => op.op === 'copy'))
       .toContainEqual({ op: 'copy', path: '/home/e2e/notes.txt', destDir: '/home/e2e' });
 
     // Right-click blank space: paste into the current directory
@@ -235,7 +243,8 @@ test.describe('File panel', () => {
     // Ctrl+V: paste into the current directory
     await notes.click();
     await page.keyboard.press('ControlOrMeta+v');
-    await expect.poll(async () => (await fsOps(page)).filter((op) => op.op === 'copy'))
+    await expect
+      .poll(async () => (await fsOps(page)).filter((op) => op.op === 'copy'))
       .toContainEqual({ op: 'copy', path: '/home/e2e/notes.txt', destDir: '/home/e2e/project' });
   });
 
@@ -248,22 +257,26 @@ test.describe('File panel', () => {
     await notes.click({ button: 'right' });
     await page.getByRole('button', { name: '删除', exact: true }).click();
     await page.locator('[data-testid="confirm-ok"]').click();
-    await expect.poll(async () => (await fsOps(page)).filter((op) => op.op === 'delete'))
+    await expect
+      .poll(async () => (await fsOps(page)).filter((op) => op.op === 'delete'))
       .toContainEqual({ op: 'delete', path: '/home/e2e/notes.txt' });
     await documents.click({ button: 'right' });
     await page.getByRole('button', { name: '删除', exact: true }).click();
     await page.locator('[data-testid="confirm-ok"]').click();
-    await expect.poll(async () => (await fsOps(page)).filter((op) => op.op === 'delete'))
+    await expect
+      .poll(async () => (await fsOps(page)).filter((op) => op.op === 'delete'))
       .toContainEqual({ op: 'delete', path: '/home/e2e/Documents' });
 
     // The more menu shows the remaining steps; undoing twice restores both
     await page.getByTestId('local-more-btn').click();
     await page.getByRole('button', { name: /^回退删除/ }).click();
-    await expect.poll(async () => (await fsOps(page)).filter((op) => op.op === 'restore'))
+    await expect
+      .poll(async () => (await fsOps(page)).filter((op) => op.op === 'restore'))
       .toContainEqual({ op: 'restore', path: '/home/e2e/Documents' });
     await page.getByTestId('local-more-btn').click();
     await page.getByRole('button', { name: /^回退删除/ }).click();
-    await expect.poll(async () => (await fsOps(page)).filter((op) => op.op === 'restore'))
+    await expect
+      .poll(async () => (await fsOps(page)).filter((op) => op.op === 'restore'))
       .toContainEqual({ op: 'restore', path: '/home/e2e/notes.txt' });
     // No undo entries remain once the stack is empty
     await page.getByTestId('local-more-btn').click();
@@ -284,7 +297,8 @@ test.describe('File panel', () => {
     await expect(page.getByTestId('file-drag-preview')).toBeVisible();
     await page.mouse.up();
 
-    await expect.poll(async () => (await fsOps(page)).filter((op) => op.op === 'move'))
+    await expect
+      .poll(async () => (await fsOps(page)).filter((op) => op.op === 'move'))
       .toContainEqual({ op: 'move', path: '/home/e2e/notes.txt', destDir: '/home/e2e/Documents' });
   });
 
@@ -411,8 +425,8 @@ test.describe('File panel', () => {
   test('the blank-area context menu and the ⋯ menu list the same actions', async ({ page }) => {
     const tree = page.getByTestId('local-file-tree');
     const menu = page.getByRole('menu', { name: '操作菜单' });
-    const menuItems = () => menu.evaluate((el) => [...el.querySelectorAll('button')]
-      .map((button) => (button as HTMLElement).innerText.trim()).filter(Boolean));
+    const menuItems = () =>
+      menu.evaluate((el) => [...el.querySelectorAll('button')].map((button) => (button as HTMLElement).innerText.trim()).filter(Boolean));
 
     await page.getByTestId('local-more-btn').click();
     const fromMore = await menuItems();
@@ -436,8 +450,9 @@ test.describe('File panel', () => {
 
     // A file created outside the panel only shows up on the next read.
     await page.evaluate(() => {
-      (window as unknown as { __FS_EXTRA_ENTRIES__: { name: string; path: string; is_dir: boolean }[] }).__FS_EXTRA_ENTRIES__ =
-        [{ name: 'terminal.log', path: '/home/e2e/project/terminal.log', is_dir: false }];
+      (window as unknown as { __FS_EXTRA_ENTRIES__: { name: string; path: string; is_dir: boolean }[] }).__FS_EXTRA_ENTRIES__ = [
+        { name: 'terminal.log', path: '/home/e2e/project/terminal.log', is_dir: false },
+      ];
     });
     await expect(externalRow).toHaveCount(0);
 
@@ -448,7 +463,9 @@ test.describe('File panel', () => {
     await expect(tree).toHaveAttribute('data-path', '/home/e2e/project');
 
     // Blank-area right click: an entry removed outside disappears.
-    await page.evaluate(() => { (window as unknown as { __FS_EXTRA_ENTRIES__: unknown[] }).__FS_EXTRA_ENTRIES__ = []; });
+    await page.evaluate(() => {
+      (window as unknown as { __FS_EXTRA_ENTRIES__: unknown[] }).__FS_EXTRA_ENTRIES__ = [];
+    });
     await expect(externalRow).toBeVisible();
     const box = (await tree.boundingBox())!;
     await page.mouse.click(box.x + 40, box.y + box.height - 12, { button: 'right' });
@@ -456,7 +473,9 @@ test.describe('File panel', () => {
     await expect(externalRow).toHaveCount(0);
   });
 
-  test('the context menu creates items in the directory under the click point, renames them immediately, auto-numbers duplicates and undoes with the real path', async ({ page }) => {
+  test('the context menu creates items in the directory under the click point, renames them immediately, auto-numbers duplicates and undoes with the real path', async ({
+    page,
+  }) => {
     const tree = page.getByTestId('local-file-tree');
     /** Right-click the blank area (locate by the element bounds so the click does not land on a row) */
     const rightClickBlank = async () => {
@@ -469,7 +488,7 @@ test.describe('File panel', () => {
     const input = page.locator('[data-testid="rename-input"]');
     await expect(input).toHaveValue('NewFolder');
     expect(await fsOps(page)).toContainEqual({ op: 'create-dir', path: '/home/e2e/project/NewFolder' });
-    await input.press('Enter');   // Unchanged name: no rename request
+    await input.press('Enter'); // Unchanged name: no rename request
     expect(await fsOps(page)).not.toContainEqual(expect.objectContaining({ op: 'rename' }));
 
     // Right-click a file row -> the new file lands beside that file
@@ -514,7 +533,9 @@ test.describe('File panel', () => {
     expect(await fsOps(page)).toContainEqual({ op: 'delete', path: '/home/e2e/project/notes (1).txt' });
   });
 
-  test('creating a file from a folder context menu: it lands inside the folder, is renamed immediately and appears in the child list after submitting', async ({ page }) => {
+  test('creating a file from a folder context menu: it lands inside the folder, is renamed immediately and appears in the child list after submitting', async ({
+    page,
+  }) => {
     await page.getByText('Documents').first().click({ button: 'right' });
     await page.getByRole('button', { name: '新建文件', exact: true }).click();
     const input = page.locator('[data-testid="rename-input"]');

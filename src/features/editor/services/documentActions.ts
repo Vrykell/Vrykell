@@ -9,7 +9,7 @@ import { useEditorDocuments } from '../stores/documents';
 const pendingDestinations = new Set<string>();
 
 export function newEditorFile() {
-  const used = new Set(useSessionStore.getState().tabs.flatMap(tab => tab.kind === 'editor' ? tab.files.map(file => file.path) : []));
+  const used = new Set(useSessionStore.getState().tabs.flatMap((tab) => (tab.kind === 'editor' ? tab.files.map((file) => file.path) : [])));
   let number = 1;
   while (used.has(t('Untitled {{number}}', { number }) + '.txt')) number += 1;
   const file = { path: t('Untitled {{number}}', { number }) + '.txt', draftId: crypto.randomUUID() };
@@ -32,7 +32,8 @@ export async function saveDocument(file: EditorFile, saveAs = false, closing = f
     const saved = await useEditorDocuments.getState().saveAs(file, target, closing);
     if (saved && !closing) {
       // Rebind the placement before the native tab changes, so the draft's pane is not pruned.
-      const previousId = `file:${editorFileKey(file)}`; const nextId = `file:${editorFileKey(target)}`;
+      const previousId = `file:${editorFileKey(file)}`;
+      const nextId = `file:${editorFileKey(target)}`;
       runWithoutWorkbenchSync(() => {
         rebindWorkspaceResourceId(previousId, nextId);
         useSessionStore.getState().replaceEditorFile(file, target);
@@ -42,5 +43,7 @@ export async function saveDocument(file: EditorFile, saveAs = false, closing = f
   } catch (reason) {
     useToastStore.getState().addToast(t('Could not save file: {{error}}', { error: String(reason) }), 'error');
     return false;
-  } finally { pendingDestinations.delete(key); }
+  } finally {
+    pendingDestinations.delete(key);
+  }
 }

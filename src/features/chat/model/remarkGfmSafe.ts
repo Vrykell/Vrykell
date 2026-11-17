@@ -34,8 +34,7 @@ interface ProcessorData {
 export default function remarkGfmSafe(this: unknown) {
   const data = (this as { data(): ProcessorData }).data();
   const micromarkExtensions = data.micromarkExtensions ?? (data.micromarkExtensions = []);
-  const fromMarkdownExtensions =
-    data.fromMarkdownExtensions ?? (data.fromMarkdownExtensions = []);
+  const fromMarkdownExtensions = data.fromMarkdownExtensions ?? (data.fromMarkdownExtensions = []);
 
   micromarkExtensions.push(gfmFootnote(), gfmStrikethrough(), gfmTable(), gfmTaskListItem());
   fromMarkdownExtensions.push(

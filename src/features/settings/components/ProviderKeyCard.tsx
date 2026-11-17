@@ -15,8 +15,12 @@ import { OutlineButton } from '@ui/actions/OutlineButton';
 import { Copy, Eye, EyeOff, Key, Pencil, Trash2, iconSizes } from '@ui/icons';
 import { writeClipboardText } from '@platform/clipboard';
 import {
-  clearProviderKey, providerFetchModels, providerKeyHint, providerKeyReveal,
-  useAiConfigStore, type ModelProfile,
+  clearProviderKey,
+  providerFetchModels,
+  providerKeyHint,
+  providerKeyReveal,
+  useAiConfigStore,
+  type ModelProfile,
 } from '@features/agent';
 import { providerHasKey, type ProviderRow } from '@features/settings/model/providerList';
 import { SettingsGroup, Field } from './ui';
@@ -25,7 +29,11 @@ import { selectModel } from '../model/modelWrites';
 
 type Toast = (msg: string, type: 'info' | 'success' | 'error') => void;
 
-export default function ProviderKeyCard({ row, toast, keyEditRequest = 0 }: {
+export default function ProviderKeyCard({
+  row,
+  toast,
+  keyEditRequest = 0,
+}: {
   row: ProviderRow<ModelProfile>;
   toast: Toast;
   /** Bumped by the page when the provider menu asks to edit this key. */
@@ -33,7 +41,7 @@ export default function ProviderKeyCard({ row, toast, keyEditRequest = 0 }: {
 }) {
   const aiCfg = useAiConfigStore();
   const keySet = providerHasKey(row.id, aiCfg);
-  const current = row.models.some(model => model.id === aiCfg.activeModel);
+  const current = row.models.some((model) => model.id === aiCfg.activeModel);
   const [hint, setHint] = useState<string | null>(null);
   const [revealed, setRevealed] = useState<string | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -49,9 +57,15 @@ export default function ProviderKeyCard({ row, toast, keyEditRequest = 0 }: {
       return;
     }
     void providerKeyHint(row.id)
-      .then((value) => { if (!cancelled) setHint(value); })
-      .catch(() => { if (!cancelled) setHint(null); });
-    return () => { cancelled = true; };
+      .then((value) => {
+        if (!cancelled) setHint(value);
+      })
+      .catch(() => {
+        if (!cancelled) setHint(null);
+      });
+    return () => {
+      cancelled = true;
+    };
   }, [row.id, keySet, revision]);
 
   // The provider menu's "edit key" opens the editor for the selected provider.
@@ -73,7 +87,7 @@ export default function ProviderKeyCard({ row, toast, keyEditRequest = 0 }: {
 
   const copy = async () => {
     try {
-      const key = revealed ?? await providerKeyReveal(row.id);
+      const key = revealed ?? (await providerKeyReveal(row.id));
       await writeClipboardText(key ?? '');
       toast(t('API key copied'), 'success');
     } catch (error) {
@@ -95,7 +109,7 @@ export default function ProviderKeyCard({ row, toast, keyEditRequest = 0 }: {
       const latest = useAiConfigStore.getState();
       const selected = latest.selectedProvider ?? latest.lastSelectedProvider;
       if (!current && (!selected || selected === row.id) && latest.activeModel === activeAtStart) {
-        const target = row.models.find(model => model.model === latest.model) ?? row.models[0];
+        const target = row.models.find((model) => model.model === latest.model) ?? row.models[0];
         if (target) await selectModel(target.id);
       }
       toast(t('Connection works: {{count}} models', { count: models.length }), 'success');
@@ -111,8 +125,7 @@ export default function ProviderKeyCard({ row, toast, keyEditRequest = 0 }: {
       <Field
         layout="stacked"
         title={t('Provider API Key')}
-        description={t('Models from the current provider share one key, stored only on this device.')}
-      >
+        description={t('Models from the current provider share one key, stored only on this device.')}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
           {keySet ? (
             <div data-testid="provider-key-row" className="settings-key-row">
@@ -120,28 +133,42 @@ export default function ProviderKeyCard({ row, toast, keyEditRequest = 0 }: {
                 {revealed ?? hint ?? '••••••••'}
               </span>
               <span className="settings-key-actions">
-                <IconButton data-testid="provider-key-reveal"
+                <IconButton
+                  data-testid="provider-key-reveal"
                   aria-label={t(revealed !== null ? 'Hide API key' : 'Reveal API key')}
                   data-tip={t(revealed !== null ? 'Hide API key' : 'Reveal API key')}
                   onClick={() => void toggleReveal()}>
                   {revealed !== null ? <EyeOff size={iconSizes.control} /> : <Eye size={iconSizes.control} />}
                 </IconButton>
-                <IconButton data-testid="provider-key-copy"
-                  aria-label={t('Copy API key')} data-tip={t('Copy API key')} onClick={() => void copy()}>
+                <IconButton
+                  data-testid="provider-key-copy"
+                  aria-label={t('Copy API key')}
+                  data-tip={t('Copy API key')}
+                  onClick={() => void copy()}>
                   <Copy size={iconSizes.control} />
                 </IconButton>
-                <IconButton data-testid="provider-key-replace"
-                  aria-label={t('Edit API key')} data-tip={t('Edit API key')} onClick={() => setDialogOpen(true)}>
+                <IconButton
+                  data-testid="provider-key-replace"
+                  aria-label={t('Edit API key')}
+                  data-tip={t('Edit API key')}
+                  onClick={() => setDialogOpen(true)}>
                   <Pencil size={iconSizes.control} />
                 </IconButton>
-                <IconButton tone="danger" data-testid="provider-key-clear"
-                  aria-label={t('Clear API key')} data-tip={t('Clear API key')} onClick={() => void clear()}>
+                <IconButton
+                  tone="danger"
+                  data-testid="provider-key-clear"
+                  aria-label={t('Clear API key')}
+                  data-tip={t('Clear API key')}
+                  onClick={() => void clear()}>
                   <Trash2 size={iconSizes.control} />
                 </IconButton>
               </span>
             </div>
           ) : (
-            <button type="button" data-testid="provider-key-add" className="settings-key-row settings-key-empty"
+            <button
+              type="button"
+              data-testid="provider-key-add"
+              className="settings-key-row settings-key-empty"
               onClick={() => setDialogOpen(true)}>
               <Key size={14} aria-hidden="true" />
               <span className="settings-key-add-label">{t('Add API key')}</span>
@@ -159,7 +186,7 @@ export default function ProviderKeyCard({ row, toast, keyEditRequest = 0 }: {
         toast={toast}
         onClose={() => {
           setDialogOpen(false);
-          setRevision(current => current + 1);
+          setRevision((current) => current + 1);
         }}
       />
     </SettingsGroup>

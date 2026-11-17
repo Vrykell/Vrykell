@@ -18,18 +18,13 @@ export function installGlobalErrorHandlers() {
   window.addEventListener('error', (event) => {
     // Only runtime errors; skip resource load failures (e.g. <img src=404>)
     if (event instanceof ErrorEvent) {
-      console.error(
-        `[global] ${event.filename}:${event.lineno}:${event.colno} ${event.message}`,
-      );
+      console.error(`[global] ${event.filename}:${event.lineno}:${event.colno} ${event.message}`);
     }
     // Do not call preventDefault(): keep the browser's default reporting
   });
 
   window.addEventListener('unhandledrejection', (event) => {
-    console.error(
-      '[global] Unhandled Promise rejection:',
-      event.reason,
-    );
+    console.error('[global] Unhandled Promise rejection:', event.reason);
     // Do not call preventDefault(): keep the browser's default behavior
   });
 }

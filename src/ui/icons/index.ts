@@ -101,14 +101,14 @@ export const iconSizes = { navigation: 24, row: 20, control: 18, compact: 16, co
 
 /** Preserve native icon geometry while sharing sizing and theme inheritance. */
 function createAppIcon(Icon: FluentIcon): AppIcon {
-  const AppIcon = forwardRef<SVGSVGElement, AppIconProps>(({
-    size = 24, color = 'currentColor', style, ...props
-  }, ref) => createElement(Icon, {
-    focusable: false,
-    ...props,
-    style: { width: props.width ?? size, height: props.height ?? size, color, flexShrink: 0, ...style },
-    ref,
-  }));
+  const AppIcon = forwardRef<SVGSVGElement, AppIconProps>(({ size = 24, color = 'currentColor', style, ...props }, ref) =>
+    createElement(Icon, {
+      focusable: false,
+      ...props,
+      style: { width: props.width ?? size, height: props.height ?? size, color, flexShrink: 0, ...style },
+      ref,
+    }),
+  );
   AppIcon.displayName = Icon.displayName;
   return AppIcon;
 }
@@ -121,18 +121,36 @@ export const ArrowUp = createAppIcon(ArrowUp24Regular);
 export const ArrowDown = createAppIcon(ArrowDown24Regular);
 export const ArrowSort = createAppIcon(ArrowSort24Regular);
 export const ArrowLeftRight = createAppIcon(ArrowSwap24Regular);
-export const ServerStack: AppIcon = forwardRef<SVGSVGElement, AppIconProps>(function ServerStack({ size = 24, color = 'currentColor', style, ...props }, ref) {
-  return createElement('svg', { ...props, ref, viewBox: '0 0 24 24', fill: 'none', focusable: false, style: { width: size, height: size, color, flexShrink: 0, ...style } },
+export const ServerStack: AppIcon = forwardRef<SVGSVGElement, AppIconProps>(function ServerStack(
+  { size = 24, color = 'currentColor', style, ...props },
+  ref,
+) {
+  return createElement(
+    'svg',
+    {
+      ...props,
+      ref,
+      viewBox: '0 0 24 24',
+      fill: 'none',
+      focusable: false,
+      style: { width: size, height: size, color, flexShrink: 0, ...style },
+    },
     createElement('rect', { x: 3, y: 4, width: 18, height: 6, rx: 1, stroke: 'currentColor', strokeWidth: 1.6 }),
     createElement('rect', { x: 3, y: 14, width: 18, height: 6, rx: 1, stroke: 'currentColor', strokeWidth: 1.6 }),
-    createElement('path', { d: 'M16 7h2M16 17h2', stroke: 'currentColor', strokeWidth: 1.6, strokeLinecap: 'round' }));
+    createElement('path', { d: 'M16 7h2M16 17h2', stroke: 'currentColor', strokeWidth: 1.6, strokeLinecap: 'round' }),
+  );
 });
 export const DollarSign: AppIcon = forwardRef<SVGSVGElement, AppIconProps>(function DollarSign({ size = 24, style, ...props }, ref) {
-  return createElement('svg', { ...props, ref, viewBox: '0 0 24 24', fill: 'none',
-    style: { width: size, height: size, flexShrink: 0, ...style } }, createElement('path', {
-    d: 'M12 3v18M17 6.5C15.5 5 13.5 5 12 5c-3 0-5 1.5-5 3.5S9 12 12 12s5 1.5 5 3.5S15 19 12 19c-2 0-4-.5-5-2',
-    stroke: 'currentColor', strokeWidth: 1.8, strokeLinecap: 'round',
-  }));
+  return createElement(
+    'svg',
+    { ...props, ref, viewBox: '0 0 24 24', fill: 'none', style: { width: size, height: size, flexShrink: 0, ...style } },
+    createElement('path', {
+      d: 'M12 3v18M17 6.5C15.5 5 13.5 5 12 5c-3 0-5 1.5-5 3.5S9 12 12 12s5 1.5 5 3.5S15 19 12 19c-2 0-4-.5-5-2',
+      stroke: 'currentColor',
+      strokeWidth: 1.8,
+      strokeLinecap: 'round',
+    }),
+  );
 });
 export const Bot = createAppIcon(Bot24Regular);
 export const Brain = createAppIcon(Brain24Regular);
@@ -219,16 +237,33 @@ export const Store = createAppIcon(BuildingShop24Regular);
 export const Sun = createAppIcon(WeatherSunny24Regular);
 export const TextFont = createAppIcon(TextFont24Regular);
 /** Shared console frame, prompt and cursor for terminal and command surfaces. */
-export const TerminalPrompt: AppIcon = forwardRef<SVGSVGElement, AppIconProps>(function TerminalPrompt({ size = 24, color = 'currentColor', style, title, ...props }, ref) {
+export const TerminalPrompt: AppIcon = forwardRef<SVGSVGElement, AppIconProps>(function TerminalPrompt(
+  { size = 24, color = 'currentColor', style, title, ...props },
+  ref,
+) {
   const label = props['aria-label'] ?? title;
-  return createElement('svg', { focusable: false, 'aria-hidden': label ? undefined : true, role: label ? 'img' : undefined,
-    ...props, 'aria-label': label, ref, viewBox: '0 0 24 24', fill: 'none',
-    style: { width: props.width ?? size, height: props.height ?? size, color, flexShrink: 0, ...style } },
+  return createElement(
+    'svg',
+    {
+      focusable: false,
+      'aria-hidden': label ? undefined : true,
+      role: label ? 'img' : undefined,
+      ...props,
+      'aria-label': label,
+      ref,
+      viewBox: '0 0 24 24',
+      fill: 'none',
+      style: { width: props.width ?? size, height: props.height ?? size, color, flexShrink: 0, ...style },
+    },
     createElement('rect', { x: 3.5, y: 3.5, width: 17, height: 17, rx: 1.75, stroke: 'currentColor', strokeWidth: 1.5 }),
     createElement('path', {
       d: 'm7 9 3.5 3-3.5 3M12.5 15H17',
-      stroke: 'currentColor', strokeWidth: 1.5, strokeLinecap: 'round', strokeLinejoin: 'round',
-    }));
+      stroke: 'currentColor',
+      strokeWidth: 1.5,
+      strokeLinecap: 'round',
+      strokeLinejoin: 'round',
+    }),
+  );
 });
 export const Terminal = TerminalPrompt;
 export const SquareTerminal = TerminalPrompt;

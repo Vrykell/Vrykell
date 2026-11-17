@@ -1,10 +1,25 @@
 import { describe, it, expect } from 'vitest';
 import {
-  leaf, splitLeaf, replaceLeaf, removeLeaf, leaves, countLeaves,
-  leafRects, dropTargets, moveTargets, dividers, setRatio, findLeaf, leafDepth,
-  maxRowPanes, minTerminalWidth, MIN_PANE_WIDTH, DIVIDER_SIZE,
+  leaf,
+  splitLeaf,
+  replaceLeaf,
+  removeLeaf,
+  leaves,
+  countLeaves,
+  leafRects,
+  dropTargets,
+  moveTargets,
+  dividers,
+  setRatio,
+  findLeaf,
+  leafDepth,
+  maxRowPanes,
+  minTerminalWidth,
+  MIN_PANE_WIDTH,
+  DIVIDER_SIZE,
   collectLayoutCells,
-  parseWindowLayout, mapTerminals,
+  parseWindowLayout,
+  mapTerminals,
   type TerminalSpec,
 } from '@features/workspace/model/windowLayout';
 import { fitWorkspacePanes, terminalWorkspaceLayout } from './workspaceResources';
@@ -12,24 +27,38 @@ import { fitWorkspacePanes, terminalWorkspaceLayout } from './workspaceResources
 const t = (id: string, kind: 'local' | 'ssh' = 'local'): TerminalSpec => ({ id, kind });
 
 it('maps terminal metadata through shared traversal without changing unchanged nodes', () => {
-  const first = leaf(t('a')); const pair = splitLeaf(first, 'a', 'row', 'second', t('b'));
-  expect(mapTerminals(pair, terminal => terminal)).toBe(pair);
-  const mapped = mapTerminals(pair, terminal => terminal.id === 'b' ? { ...terminal, cwd: '/updated' } : terminal);
+  const first = leaf(t('a'));
+  const pair = splitLeaf(first, 'a', 'row', 'second', t('b'));
+  expect(mapTerminals(pair, (terminal) => terminal)).toBe(pair);
+  const mapped = mapTerminals(pair, (terminal) => (terminal.id === 'b' ? { ...terminal, cwd: '/updated' } : terminal));
   expect(leaves(mapped)).toEqual([t('a'), { ...t('b'), cwd: '/updated' }]);
   expect(mapped.type === 'split' && mapped.first).toBe(first);
 });
 
 it('validates legacy layouts before resource hydration, bounds nesting and rejects duplicate identities', () => {
-  const a = leaf(t('a')); const b = leaf(t('b'));
+  const a = leaf(t('a'));
+  const b = leaf(t('b'));
   const pair = { type: 'split', dir: 'row', ratio: 0.5, first: a, second: b };
   expect(parseWindowLayout(pair)).toEqual(pair);
   expect(parseWindowLayout({ ...pair, dir: 'col', ratio: -3 })).toMatchObject({ ratio: 0.2 });
-  expect(parseWindowLayout(leaf({ id: 'ssh', kind: 'ssh', ssh: { name: 'Host', host: 'host', autoReconnect: true } }))).toMatchObject({ terminal: { ssh: { autoReconnect: true } } });
-  for (const value of [null, 1, {}, leaf({ id: '', kind: 'local' }), leaf(t('ssh', 'ssh')), { ...pair, second: a },
-    { ...pair, dir: 'invalid' }, { ...pair, ratio: Infinity }, { ...pair, ratio: 'half' }, { ...pair, second: null },
+  expect(parseWindowLayout(leaf({ id: 'ssh', kind: 'ssh', ssh: { name: 'Host', host: 'host', autoReconnect: true } }))).toMatchObject({
+    terminal: { ssh: { autoReconnect: true } },
+  });
+  for (const value of [
+    null,
+    1,
+    {},
+    leaf({ id: '', kind: 'local' }),
+    leaf(t('ssh', 'ssh')),
+    { ...pair, second: a },
+    { ...pair, dir: 'invalid' },
+    { ...pair, ratio: Infinity },
+    { ...pair, ratio: 'half' },
+    { ...pair, second: null },
     { ...pair, first: { ...pair, first: { ...pair, first: { ...pair, first: a } } } },
     { ...pair, first: pair, second: { ...pair, first: leaf(t('c')), second: { ...pair, first: leaf(t('d')), second: leaf(t('e')) } } },
-  ]) expect(parseWindowLayout(value)).toBeNull();
+  ])
+    expect(parseWindowLayout(value)).toBeNull();
 });
 
 it('caps terminal containers and updates only the selected nested divider', () => {
@@ -40,7 +69,7 @@ it('caps terminal containers and updates only the selected nested divider', () =
   expect(splitLeaf(layout, 'a', 'row', 'second', t('e'))).toBe(layout);
   expect(setRatio(leaf(t('a')), 'a', 'b', 1)).toEqual(leaf(t('a')));
   const resized = setRatio(layout, 'c', 'd', 0.3);
-  expect(dividers(resized).find(divider => divider.aId === 'c' && divider.bId === 'd')?.ratio).toBe(0.3);
+  expect(dividers(resized).find((divider) => divider.aId === 'c' && divider.bId === 'd')?.ratio).toBe(0.3);
 });
 
 describe('windowLayout basics', () => {
@@ -121,8 +150,12 @@ describe('windowLayout geometry', () => {
     const removed = removeLeaf(before, 'a')!;
     const after = splitLeaf(removed, 'b', 'col', 'second', t('a'), 0.5);
 
-    const idsBefore = collectLayoutCells(before).map((c) => c.terminalId).sort();
-    const idsAfter = collectLayoutCells(after).map((c) => c.terminalId).sort();
+    const idsBefore = collectLayoutCells(before)
+      .map((c) => c.terminalId)
+      .sort();
+    const idsAfter = collectLayoutCells(after)
+      .map((c) => c.terminalId)
+      .sort();
     expect(idsAfter).toEqual(idsBefore); // Same terminals, only position and structure changed.
     expect(idsAfter).toEqual(['a', 'b', 'c']);
   });
@@ -135,9 +168,7 @@ describe('windowLayout geometry', () => {
     expect(ds).toHaveLength(2);
 
     // Exactly one root divider covers the whole window; the nested divider has a proper subset region.
-    const root = ds.find((d) =>
-      d.region.x === 0 && d.region.y === 0 && d.region.w === 1 && d.region.h === 1,
-    );
+    const root = ds.find((d) => d.region.x === 0 && d.region.y === 0 && d.region.w === 1 && d.region.h === 1);
     expect(root).toBeDefined();
     const inner = ds.find((d) => d !== root);
     expect(inner).toBeDefined();

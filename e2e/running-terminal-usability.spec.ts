@@ -8,7 +8,7 @@ test.beforeEach(async ({ page }) => {
   // Inject the command only after the mock shell has finished its startup prompt.
   await page.waitForFunction(async () => {
     const path = '/src/features/terminal/stores/terminal.ts';
-    const { useTerminalStore } = await import(path) as typeof import('../src/features/terminal/stores/terminal');
+    const { useTerminalStore } = (await import(path)) as typeof import('../src/features/terminal/stores/terminal');
     return Object.values(useTerminalStore.getState().startupStates).includes('ready');
   });
   await emitPtyOutput(page, '\x1b]133;E;Y2xhdWRl\x07\x1b]133;C\x07');
@@ -24,12 +24,7 @@ test('a running command block shows uniformly sized icon action buttons', async 
   await expect(block.locator('.command-block-actions')).toHaveCSS('opacity', '0');
   await block.hover();
   await expect(block.locator('.command-block-actions')).toHaveCSS('opacity', '1');
-  const actions = [
-    '重绘终端',
-    '终止命令',
-    '结束前台应用',
-    '进入全屏交互',
-  ];
+  const actions = ['重绘终端', '终止命令', '结束前台应用', '进入全屏交互'];
   for (const label of actions) {
     const button = block.getByRole('button', { name: label, exact: true });
     const bounds = (await button.boundingBox())!;
@@ -87,10 +82,14 @@ test('a running block no longer stacks a second xterm scrollbar', async ({ page 
 
 test('End returns to the running output tail without sending application keys', async ({ page }) => {
   await emitPtyOutput(page, Array.from({ length: 2000 }, (_, index) => `tail row ${index}\r\n`).join(''));
-  await expect.poll(() => page.evaluate(() => {
-    const scope = window as unknown as { __vrykellTerms: Map<string, { buffer: { active: { baseY: number } } }> };
-    return [...scope.__vrykellTerms].find(([key]) => key.startsWith('block:'))?.[1].buffer.active.baseY ?? 0;
-  })).toBeGreaterThan(1000);
+  await expect
+    .poll(() =>
+      page.evaluate(() => {
+        const scope = window as unknown as { __vrykellTerms: Map<string, { buffer: { active: { baseY: number } } }> };
+        return [...scope.__vrykellTerms].find(([key]) => key.startsWith('block:'))?.[1].buffer.active.baseY ?? 0;
+      }),
+    )
+    .toBeGreaterThan(1000);
   await page.evaluate(() => {
     const scope = window as unknown as { __vrykellTerms: Map<string, { scrollToTop(): void }> };
     const entry = [...scope.__vrykellTerms].find(([key]) => key.startsWith('block:'))!;
@@ -101,12 +100,16 @@ test('End returns to the running output tail without sending application keys', 
   const before = await ptyWrites(page);
   await page.getByTestId('running-term').locator('.xterm-helper-textarea').focus();
   await page.keyboard.press('End');
-  await expect.poll(() => page.evaluate(() => {
-    const scope = window as unknown as { __vrykellTerms: Map<string, { buffer: { active: { viewportY: number; baseY: number } } }> };
-    const buffer = [...scope.__vrykellTerms].find(([key]) => key.startsWith('block:'))![1].buffer.active;
-    const history = document.querySelector<HTMLElement>('.terminal-block-scroll')!;
-    return buffer.viewportY === buffer.baseY && history.scrollHeight - history.clientHeight - history.scrollTop < 2;
-  })).toBe(true);
+  await expect
+    .poll(() =>
+      page.evaluate(() => {
+        const scope = window as unknown as { __vrykellTerms: Map<string, { buffer: { active: { viewportY: number; baseY: number } } }> };
+        const buffer = [...scope.__vrykellTerms].find(([key]) => key.startsWith('block:'))![1].buffer.active;
+        const history = document.querySelector<HTMLElement>('.terminal-block-scroll')!;
+        return buffer.viewportY === buffer.baseY && history.scrollHeight - history.clientHeight - history.scrollTop < 2;
+      }),
+    )
+    .toBe(true);
   expect(await ptyWrites(page)).toEqual(before);
 });
 
@@ -134,7 +137,10 @@ test('intermediate repaint frames do not make the running block height oscillate
     const element = document.querySelector<HTMLElement>('[data-testid^="running-block-"]')!;
     const samples: number[] = [];
     (window as unknown as Record<string, unknown>).__repaintHeightSamples = samples;
-    const step = () => { samples.push(element.getBoundingClientRect().height); if (samples.length < 80) requestAnimationFrame(step); };
+    const step = () => {
+      samples.push(element.getBoundingClientRect().height);
+      if (samples.length < 80) requestAnimationFrame(step);
+    };
     requestAnimationFrame(step);
   });
   for (let cycle = 0; cycle < 3; cycle++) {
@@ -156,7 +162,7 @@ test('split repaint frames during typing do not shrink the running terminal or r
   const block = page.locator('[data-testid^="running-block-"]').first();
   const initialTop = (await block.boundingBox())!.y;
   const scroll = page.locator('[data-testid^="terminal-scroll-"]').first();
-  const initialScrollTop = await scroll.evaluate(element => element.scrollTop);
+  const initialScrollTop = await scroll.evaluate((element) => element.scrollTop);
   await expect.poll(async () => (await ptyResizes(page)).length).toBeGreaterThan(0);
   const resizes = (await ptyResizes(page)).length;
   for (const character of ['a', 'b', 'c']) {
@@ -168,7 +174,10 @@ test('split repaint frames during typing do not shrink the running terminal or r
       const element = document.querySelector<HTMLElement>('[data-testid="running-term"]')!;
       const samples: number[] = [];
       (window as unknown as Record<string, unknown>).__runningHeightSamples = samples;
-      const step = () => { samples.push(element.getBoundingClientRect().height); if (samples.length < 30) requestAnimationFrame(step); };
+      const step = () => {
+        samples.push(element.getBoundingClientRect().height);
+        if (samples.length < 30) requestAnimationFrame(step);
+      };
       requestAnimationFrame(step);
     });
     await emitPtyOutput(page, '\x1b[H\x1b[2Jrepainting-' + character);
@@ -176,7 +185,7 @@ test('split repaint frames during typing do not shrink the running terminal or r
     await expectAnyTermContains(page, 'input-ready-' + character);
     expect((await host.boundingBox())!.height).toBe(initialHeight);
     expect((await block.boundingBox())!.y).toBe(initialTop);
-    expect(await scroll.evaluate(element => element.scrollTop)).toBe(initialScrollTop);
+    expect(await scroll.evaluate((element) => element.scrollTop)).toBe(initialScrollTop);
     const samples = await page.evaluate(() => (window as unknown as { __runningHeightSamples: number[] }).__runningHeightSamples);
     expect(Math.min(...samples)).toBe(initialHeight);
   }

@@ -3,9 +3,15 @@ import { boundedFontSize, boundedTerminalRenderer, terminalFontFamily, uiFontFam
 
 describe('font preferences', () => {
   it('persists explicit native font choices separately from bundled defaults', async () => {
-    useTypographyStore.getState().update({ uiFontPreset: 'system', terminalFontPreset: 'system-default', editorFontPreset: 'system-default' });
+    useTypographyStore
+      .getState()
+      .update({ uiFontPreset: 'system', terminalFontPreset: 'system-default', editorFontPreset: 'system-default' });
     await useTypographyStore.persist.rehydrate();
-    expect(useTypographyStore.getState()).toMatchObject({ uiFontPreset: 'system', terminalFontPreset: 'system-default', editorFontPreset: 'system-default' });
+    expect(useTypographyStore.getState()).toMatchObject({
+      uiFontPreset: 'system',
+      terminalFontPreset: 'system-default',
+      editorFontPreset: 'system-default',
+    });
     expect(uiFontFamily('system')).toMatch(/^system-ui,/);
     expect(uiFontFamily('system')).not.toContain('Noto Sans SC');
     expect(terminalFontFamily('system-default')).toMatch(/^monospace,/);
@@ -35,12 +41,32 @@ describe('font preferences', () => {
     expect(uiFontFamily('JetBrains Mono')).toBe(terminalFontFamily('JetBrains Mono'));
   });
   it('persists and validates editor metrics independently of terminal and chat metrics', async () => {
-    useTypographyStore.getState().update({ editorFontSize: 18, editorFontPreset: 'Maple Mono', editorFontWeight: 550, editorLineHeight: 1.8 });
+    useTypographyStore
+      .getState()
+      .update({ editorFontSize: 18, editorFontPreset: 'Maple Mono', editorFontWeight: 550, editorLineHeight: 1.8 });
     await useTypographyStore.persist.rehydrate();
-    expect(useTypographyStore.getState()).toMatchObject({ editorFontSize: 18, editorFontPreset: 'Maple Mono', editorFontWeight: 550, editorLineHeight: 1.8, terminalFontSize: 14, chatFontSize: 14 });
-    localStorage.setItem('vrykell-typography', JSON.stringify({ version: 0, state: { editorFontSize: 999, editorFontPreset: 'missing', editorFontWeight: NaN, editorLineHeight: 99 } }));
+    expect(useTypographyStore.getState()).toMatchObject({
+      editorFontSize: 18,
+      editorFontPreset: 'Maple Mono',
+      editorFontWeight: 550,
+      editorLineHeight: 1.8,
+      terminalFontSize: 14,
+      chatFontSize: 14,
+    });
+    localStorage.setItem(
+      'vrykell-typography',
+      JSON.stringify({
+        version: 0,
+        state: { editorFontSize: 999, editorFontPreset: 'missing', editorFontWeight: NaN, editorLineHeight: 99 },
+      }),
+    );
     await useTypographyStore.persist.rehydrate();
-    expect(useTypographyStore.getState()).toMatchObject({ editorFontSize: 24, editorFontPreset: 'system', editorFontWeight: 400, editorLineHeight: 2 });
+    expect(useTypographyStore.getState()).toMatchObject({
+      editorFontSize: 24,
+      editorFontPreset: 'system',
+      editorFontWeight: 400,
+      editorLineHeight: 2,
+    });
   });
   beforeEach(() => {
     useTypographyStore.getState().reset();
@@ -75,7 +101,11 @@ describe('font preferences', () => {
     useTypographyStore.getState().update({ uiFontSize: 15, terminalFontSize: 18 });
     expect(document.documentElement.style.getPropertyValue('--terminal-font-size')).toBe('18px');
     expect(document.documentElement.style.getPropertyValue('--ui-font-scale')).toBe(String(15 / 13));
-    expect(JSON.parse(localStorage.getItem('vrykell-typography')!).state).toMatchObject({ uiFontSize: 15, terminalFontSize: 18, terminalRenderer: 'webgl' });
+    expect(JSON.parse(localStorage.getItem('vrykell-typography')!).state).toMatchObject({
+      uiFontSize: 15,
+      terminalFontSize: 18,
+      terminalRenderer: 'webgl',
+    });
   });
 
   it('keeps the renderer preference and rejects unknown values', async () => {
@@ -128,8 +158,15 @@ it('validates font preferences, migrates older settings and resets all metrics',
   useTypographyStore.getState().update({ terminalFontPreset: 'Maple Mono NF CN', terminalFontWeight: 350, terminalLineHeight: 1.2 });
   expect(document.documentElement.style.getPropertyValue('--terminal-font-family')).toContain('"Maple Mono NF CN"');
   expect(document.documentElement.style.getPropertyValue('--terminal-font-weight')).toBe('350');
-  expect(JSON.parse(localStorage.getItem('vrykell-typography')!).state).toMatchObject({ terminalFontPreset: 'Maple Mono NF CN', terminalFontWeight: 350, terminalLineHeight: 1.2 });
-  localStorage.setItem('vrykell-typography', JSON.stringify({ version: 0, state: { terminalFontPreset: 'unknown', terminalFontWeight: 10000, terminalLineHeight: 'bad' } }));
+  expect(JSON.parse(localStorage.getItem('vrykell-typography')!).state).toMatchObject({
+    terminalFontPreset: 'Maple Mono NF CN',
+    terminalFontWeight: 350,
+    terminalLineHeight: 1.2,
+  });
+  localStorage.setItem(
+    'vrykell-typography',
+    JSON.stringify({ version: 0, state: { terminalFontPreset: 'unknown', terminalFontWeight: 10000, terminalLineHeight: 'bad' } }),
+  );
   await useTypographyStore.persist.rehydrate();
   expect(useTypographyStore.getState()).toMatchObject({ terminalFontPreset: 'system', terminalFontWeight: 900, terminalLineHeight: 1 });
   useTypographyStore.getState().reset();

@@ -16,8 +16,7 @@ export type { ProviderKind };
 
 export function baseUrlForProvider(baseUrl: string, provider: ProviderKind): string {
   const current = baseUrl.trim().replace(/\/+$/, '');
-  return !current || Object.values(DEFAULT_BASE_URLS).includes(current)
-    ? DEFAULT_BASE_URLS[provider] : baseUrl;
+  return !current || Object.values(DEFAULT_BASE_URLS).includes(current) ? DEFAULT_BASE_URLS[provider] : baseUrl;
 }
 
 /** The base URL a request will actually use: defaults resolved, trailing slashes trimmed. */
@@ -60,7 +59,10 @@ const proxyFetches = new Map<string, typeof fetch>();
 function getProxyFetch(provider: ProviderKind, sessionId?: string): typeof fetch {
   const key = `${provider}|${sessionId ?? ''}`;
   let proxy = proxyFetches.get(key);
-  if (!proxy) { proxy = createProxyFetch(provider, sessionId); proxyFetches.set(key, proxy); }
+  if (!proxy) {
+    proxy = createProxyFetch(provider, sessionId);
+    proxyFetches.set(key, proxy);
+  }
   return proxy;
 }
 
@@ -88,22 +90,18 @@ export function createChatModel(cfg: ChatModelConfig) {
  * Anthropic requires the key `web_search` and Gemini `google_search` (the provider identifies
  * them by name).
  */
-export function createNativeWebSearchTool(
-  provider: ProviderKind,
-): { name: string; tool: Tool } | null {
+export function createNativeWebSearchTool(provider: ProviderKind): { name: string; tool: Tool } | null {
   const fetchImpl = getProxyFetch(provider);
   switch (provider) {
     case 'anthropic':
       return {
         name: 'web_search',
-        tool: createAnthropic({ apiKey: 'proxy-managed', fetch: fetchImpl }).tools
-          .webSearch_20250305({ maxUses: 5 }) as Tool,
+        tool: createAnthropic({ apiKey: 'proxy-managed', fetch: fetchImpl }).tools.webSearch_20250305({ maxUses: 5 }) as Tool,
       };
     case 'gemini':
       return {
         name: 'google_search',
-        tool: createGoogleGenerativeAI({ apiKey: 'proxy-managed', fetch: fetchImpl }).tools
-          .googleSearch({}) as Tool,
+        tool: createGoogleGenerativeAI({ apiKey: 'proxy-managed', fetch: fetchImpl }).tools.googleSearch({}) as Tool,
       };
     default:
       return null;

@@ -18,15 +18,8 @@ export {
   type TerminalScreen,
 } from '@features/terminal/stores/terminal';
 
-export {
-  useBlockStore,
-  selectBlocks,
-} from '@features/terminal/stores/blocks';
+export { useBlockStore, selectBlocks } from '@features/terminal/stores/blocks';
 
-export {
-  useInputStore,
-  selectPaneInput,
-  type PaneInput,
-} from '@features/terminal/stores/input';
+export { useInputStore, selectPaneInput, type PaneInput } from '@features/terminal/stores/input';
 
 export { useHistoryStore } from '@features/terminal/stores/history';

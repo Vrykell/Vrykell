@@ -48,8 +48,13 @@ function toConnection(candidate: SshConfigCandidate): SshConnection {
 
 const hint: React.CSSProperties = { fontSize: 'calc(11px * var(--ui-font-scale))', color: 'var(--text-muted)' };
 const ghostBtn: React.CSSProperties = {
-  display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 6,
-  padding: '6px 12px', minHeight: 34, flexShrink: 0,
+  display: 'inline-flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  gap: 6,
+  padding: '6px 12px',
+  minHeight: 34,
+  flexShrink: 0,
   fontSize: 'calc(12px * var(--ui-font-scale))',
 };
 
@@ -77,7 +82,10 @@ export default function SshImportModal({ open, onClose, onImported }: Props) {
   useEffect(() => {
     if (!open) return;
     let cancelled = false;
-    setError(null); setFailures({}); setDone(new Set()); setProgress({ completed: 0, total: 0 });
+    setError(null);
+    setFailures({});
+    setDone(new Set());
+    setProgress({ completed: 0, total: 0 });
     setCandidates([]);
     setSelected(new Set());
     setLoading(true);
@@ -95,7 +103,9 @@ export default function SshImportModal({ open, onClose, onImported }: Props) {
       .finally(() => {
         if (!cancelled) setLoading(false);
       });
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, [open, attempt]);
 
   const importable = candidates.filter((candidate) => !taken.has(address(candidate)) && !done.has(candidate.name));
@@ -116,9 +126,11 @@ export default function SshImportModal({ open, onClose, onImported }: Props) {
 
   const doImport = async () => {
     if (busy.current) return;
-    const picked = importable.filter(candidate => selected.has(candidate.name));
+    const picked = importable.filter((candidate) => selected.has(candidate.name));
     if (!picked.length) return;
-    busy.current = true; setImporting(true); setProgress({ completed: 0, total: picked.length });
+    busy.current = true;
+    setImporting(true);
+    setProgress({ completed: 0, total: picked.length });
     const errors: Record<string, string> = {};
     const succeeded = new Set(done);
     let imported = 0;
@@ -127,29 +139,49 @@ export default function SshImportModal({ open, onClose, onImported }: Props) {
       const invalid = validateSshConnection(connection);
       try {
         if (invalid) throw new Error(invalid);
-        await save(connection); succeeded.add(candidate.name); imported += 1; onImported?.(connection);
-      } catch (reason) { errors[candidate.name] = String((reason as Error)?.message ?? reason); }
+        await save(connection);
+        succeeded.add(candidate.name);
+        imported += 1;
+        onImported?.(connection);
+      } catch (reason) {
+        errors[candidate.name] = String((reason as Error)?.message ?? reason);
+      }
       setProgress({ completed: index + 1, total: picked.length });
     }
-    setDone(succeeded); setFailures(errors); setSelected(new Set(Object.keys(errors)));
-    busy.current = false; setImporting(false);
+    setDone(succeeded);
+    setFailures(errors);
+    setSelected(new Set(Object.keys(errors)));
+    busy.current = false;
+    setImporting(false);
     if (!Object.keys(errors).length) {
-      useToastStore.getState().addToast(t('ssh.import.done', { n: imported }), 'success'); onClose();
+      useToastStore.getState().addToast(t('ssh.import.done', { n: imported }), 'success');
+      onClose();
     }
   };
-  useDialogKeyboard(dialog, open, { onClose, disabled: importing, onSubmit: () => { void doImport(); } });
+  useDialogKeyboard(dialog, open, {
+    onClose,
+    disabled: importing,
+    onSubmit: () => {
+      void doImport();
+    },
+  });
 
   if (!open) return null;
 
   return (
     <div
       style={{
-        position: 'fixed', inset: 0, zIndex: 9996,
-        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        position: 'fixed',
+        inset: 0,
+        zIndex: 9996,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
         background: 'var(--overlay)',
       }}
-      onClick={() => { if (!busy.current) onClose(); }}
-    >
+      onClick={() => {
+        if (!busy.current) onClose();
+      }}>
       <div
         ref={dialog}
         tabIndex={-1}
@@ -158,11 +190,16 @@ export default function SshImportModal({ open, onClose, onImported }: Props) {
         aria-modal="true"
         aria-label={t('ssh.import.title')}
         style={{
-          width: 480, maxWidth: 'calc(100vw - 32px)', maxHeight: 'calc(100dvh - 24px)', overflow: 'hidden',
-          padding: 16, display: 'flex', flexDirection: 'column', gap: 12,
+          width: 480,
+          maxWidth: 'calc(100vw - 32px)',
+          maxHeight: 'calc(100dvh - 24px)',
+          overflow: 'hidden',
+          padding: 16,
+          display: 'flex',
+          flexDirection: 'column',
+          gap: 12,
         }}
-        onClick={(event) => event.stopPropagation()}
-      >
+        onClick={(event) => event.stopPropagation()}>
         <div style={{ fontSize: 'calc(13px * var(--ui-font-scale))', fontWeight: 'var(--fw-semibold)', color: 'var(--text-primary)' }}>
           {t('ssh.import.title')}
         </div>
@@ -173,58 +210,74 @@ export default function SshImportModal({ open, onClose, onImported }: Props) {
             tone="error"
             title={t('ssh.import.loadFailed')}
             details={error}
-            actions={<button type="button" onClick={() => setAttempt(value => value + 1)}>{t('Retry')}</button>}
+            actions={
+              <button type="button" onClick={() => setAttempt((value) => value + 1)}>
+                {t('Retry')}
+              </button>
+            }
             style={{ overflowWrap: 'anywhere' }}
           />
         ) : (
           <div
             data-testid="ssh-import-list"
             className="scroll-region"
-            style={{ overflowY: 'auto', minHeight: 0, display: 'flex', flexDirection: 'column', gap: 6 }}
-          >
+            style={{ overflowY: 'auto', minHeight: 0, display: 'flex', flexDirection: 'column', gap: 6 }}>
             {loading && <div style={{ ...hint, padding: 8 }}>{t('Loading hosts…')}</div>}
-            {!loading && candidates.length === 0 && (
-              <div style={{ ...hint, padding: 8 }}>{t('ssh.import.empty')}</div>
-            )}
+            {!loading && candidates.length === 0 && <div style={{ ...hint, padding: 8 }}>{t('ssh.import.empty')}</div>}
             {candidates.map((candidate) => {
               const duplicate = taken.has(address(candidate));
               const imported = done.has(candidate.name);
               return (
-                <div key={candidate.name}><label className="ssh-import-row" style={{ opacity: duplicate || imported ? 0.6 : 1 }}>
-                  <Checkbox
-                    type="checkbox"
-                    checked={imported || (!duplicate && selected.has(candidate.name))}
-                    disabled={duplicate || imported || importing}
-                    onChange={() => toggle(candidate.name)}
-                    data-testid={`ssh-import-${candidate.name}`}
-                    style={{ marginTop: 2 }}
-                  />
-                  <span style={{ display: 'flex', flexDirection: 'column', minWidth: 0 }}>
-                    <span>{candidate.name}</span>
-                    <span style={{ ...hint, overflowWrap: 'anywhere' }}>
-                      {`${candidate.user ? `${candidate.user}@` : ''}${candidate.host}:${candidate.port ?? 22}`}
-                      {imported ? ` · ${t('Imported')}` : duplicate ? ` · ${t('ssh.import.exists')}` : ''}
+                <div key={candidate.name}>
+                  <label className="ssh-import-row" style={{ opacity: duplicate || imported ? 0.6 : 1 }}>
+                    <Checkbox
+                      type="checkbox"
+                      checked={imported || (!duplicate && selected.has(candidate.name))}
+                      disabled={duplicate || imported || importing}
+                      onChange={() => toggle(candidate.name)}
+                      data-testid={`ssh-import-${candidate.name}`}
+                      style={{ marginTop: 2 }}
+                    />
+                    <span style={{ display: 'flex', flexDirection: 'column', minWidth: 0 }}>
+                      <span>{candidate.name}</span>
+                      <span style={{ ...hint, overflowWrap: 'anywhere' }}>
+                        {`${candidate.user ? `${candidate.user}@` : ''}${candidate.host}:${candidate.port ?? 22}`}
+                        {imported ? ` · ${t('Imported')}` : duplicate ? ` · ${t('ssh.import.exists')}` : ''}
+                      </span>
                     </span>
-                  </span>
-                </label>{failures[candidate.name] && <ErrorBox compact tone="error" title={candidate.name}>{failures[candidate.name]}</ErrorBox>}</div>
+                  </label>
+                  {failures[candidate.name] && (
+                    <ErrorBox compact tone="error" title={candidate.name}>
+                      {failures[candidate.name]}
+                    </ErrorBox>
+                  )}
+                </div>
               );
             })}
           </div>
         )}
 
-        {Object.keys(failures).length > 0 && <ErrorBox compact tone="info">{t('Imported {{n}}. Failed {{failed}}. Retry the selected failed hosts.', { n: done.size, failed: Object.keys(failures).length })}</ErrorBox>}
+        {Object.keys(failures).length > 0 && (
+          <ErrorBox compact tone="info">
+            {t('Imported {{n}}. Failed {{failed}}. Retry the selected failed hosts.', {
+              n: done.size,
+              failed: Object.keys(failures).length,
+            })}
+          </ErrorBox>
+        )}
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
           <OutlineButton
             type="button"
             style={ghostBtn}
             data-testid="ssh-import-select-all"
             onClick={toggleAll}
-            disabled={importing || importable.length === 0}
-          >
+            disabled={importing || importable.length === 0}>
             {t('ssh.import.selectAll')}
           </OutlineButton>
           <div style={{ flex: 1 }} />
-          <OutlineButton type="button" style={ghostBtn} onClick={onClose} disabled={importing}>{t('Dismiss')}</OutlineButton>
+          <OutlineButton type="button" style={ghostBtn} onClick={onClose} disabled={importing}>
+            {t('Dismiss')}
+          </OutlineButton>
           <button
             type="button"
             data-testid="ssh-import-confirm"
@@ -232,12 +285,20 @@ export default function SshImportModal({ open, onClose, onImported }: Props) {
             onClick={() => void doImport()}
             disabled={importing || selected.size === 0}
             style={{
-              minHeight: 34, padding: '6px 18px', fontSize: 'calc(13px * var(--ui-font-scale))', border: 'none',
-              borderRadius: 'var(--radius-inner)', background: 'var(--primary-button-bg)',
-              color: 'var(--primary-button-text)', cursor: 'pointer',
-            }}
-          >
-            {importing ? t('Importing {{n}}/{{total}}…', { n: progress.completed, total: progress.total }) : Object.keys(failures).length ? t('Retry failed imports') : t('ssh.import.action')}
+              minHeight: 34,
+              padding: '6px 18px',
+              fontSize: 'calc(13px * var(--ui-font-scale))',
+              border: 'none',
+              borderRadius: 'var(--radius-inner)',
+              background: 'var(--primary-button-bg)',
+              color: 'var(--primary-button-text)',
+              cursor: 'pointer',
+            }}>
+            {importing
+              ? t('Importing {{n}}/{{total}}…', { n: progress.completed, total: progress.total })
+              : Object.keys(failures).length
+                ? t('Retry failed imports')
+                : t('ssh.import.action')}
           </button>
         </div>
       </div>

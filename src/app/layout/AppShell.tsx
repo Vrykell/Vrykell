@@ -14,10 +14,12 @@ import { requestTerminalSplit } from '@features/workspace/services/unifiedWorksp
 export default function AppShell() {
   const wallpaperDataUrl = useTerminalThemeStore((state) => state.wallpaperDataUrl);
   const appOpacity = useTerminalThemeStore((state) => state.config.opacity);
-  const desktopTint = useTerminalThemeStore(state => state.config.desktopTint ?? true);
+  const desktopTint = useTerminalThemeStore((state) => state.config.desktopTint ?? true);
   const { mode } = useTheme();
   const effectiveOpacity = wallpaperDataUrl ? appOpacity : 1;
-  useEffect(() => { void syncWindowMaterial(desktopTint, mode); }, [desktopTint, mode]);
+  useEffect(() => {
+    void syncWindowMaterial(desktopTint, mode);
+  }, [desktopTint, mode]);
 
   const handleSplitPick = useCallback((spec: TerminalSpec) => {
     useUiStore.getState().closeSplitPicker();
@@ -29,7 +31,9 @@ export default function AppShell() {
   useEffect(() => {
     const root = document.documentElement;
     root.style.setProperty('--app-opacity', String(effectiveOpacity));
-    return () => { root.style.removeProperty('--app-opacity'); };
+    return () => {
+      root.style.removeProperty('--app-opacity');
+    };
   }, [effectiveOpacity]);
 
   return (
@@ -63,8 +67,7 @@ export default function AppShell() {
           background: 'transparent',
           color: 'var(--text-primary)',
           opacity: effectiveOpacity,
-        }}
-      >
+        }}>
         <div className="application-chrome" aria-hidden="true" />
         <WorkspaceShell />
         <ApplicationOverlays onPickSplit={handleSplitPick} />

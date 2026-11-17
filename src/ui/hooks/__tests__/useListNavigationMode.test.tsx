@@ -4,7 +4,12 @@ import { useListNavigationMode } from '../useListNavigationMode';
 
 function Example() {
   const navigation = useListNavigationMode();
-  return <div {...navigation.props} data-testid="list"><button>First</button><button>Second</button></div>;
+  return (
+    <div {...navigation.props} data-testid="list">
+      <button>First</button>
+      <button>Second</button>
+    </div>
+  );
 }
 
 describe('list navigation mode', () => {

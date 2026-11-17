@@ -10,10 +10,23 @@ import { t } from '@i18n';
 import type { ChatMessage } from '@features/chat';
 import { applyHarnessUpdate, harnessUpdate, upsertHarnessTool } from '@features/chat/model/harnessTranscript';
 import {
-  acpAnswerPermission, acpCancel, acpClose, acpOpen, acpPrompt, acpSetConfigOption, acpSetMode, acpSetModel,
-  onAcpSession, acpAppToolResult,
-  type AcpConfigOption, type AcpSessionEvent, type AcpSessionModes, type AcpSessionModels, type AgentDescription,
-  type HarnessOpenResult, type AcpQuestion,
+  acpAnswerPermission,
+  acpCancel,
+  acpClose,
+  acpOpen,
+  acpPrompt,
+  acpSetConfigOption,
+  acpSetMode,
+  acpSetModel,
+  onAcpSession,
+  acpAppToolResult,
+  type AcpConfigOption,
+  type AcpSessionEvent,
+  type AcpSessionModes,
+  type AcpSessionModels,
+  type AgentDescription,
+  type HarnessOpenResult,
+  type AcpQuestion,
 } from '@platform/api/acp';
 import { useUsageStore } from '@features/agent/stores/usage';
 import { useHarnessSessionRefs } from './harnessSessions';
@@ -119,10 +132,27 @@ interface HarnessStore {
 }
 
 const fresh = (harness: string): HarnessSession => ({
-  queuedInputs: [], stopping: false,
-  harness, sessionId: null, cwd: '', agent: null, messages: [], pending: false, opening: false, error: null, errorDetails: null, authRequired: false, note: null,
-  modes: null, models: null, configOptions: null, plan: [], context: null, commands: [],
-  permission: null, permissionGeneration: 0,
+  queuedInputs: [],
+  stopping: false,
+  harness,
+  sessionId: null,
+  cwd: '',
+  agent: null,
+  messages: [],
+  pending: false,
+  opening: false,
+  error: null,
+  errorDetails: null,
+  authRequired: false,
+  note: null,
+  modes: null,
+  models: null,
+  configOptions: null,
+  plan: [],
+  context: null,
+  commands: [],
+  permission: null,
+  permissionGeneration: 0,
 });
 
 /** sessionId → tabId, so an event finds its page. */
@@ -140,10 +170,13 @@ function drainHarnessQueue(tabId: string) {
   const session = useHarnessStore.getState().byTab[tabId];
   if (!session || session.pending || session.opening || session.stopping || !session.queuedInputs?.length) return;
   const [next, ...rest] = session.queuedInputs;
-  patch(tabId, current => ({ ...current, queuedInputs: rest }));
+  patch(tabId, (current) => ({ ...current, queuedInputs: rest }));
   if (next) void useHarnessStore.getState().prompt(tabId, next.text, next.attachments);
 }
-function stopApplicationTools(tabId: string) { applicationSessions.get(tabId)?.close(); applicationSessions.delete(tabId); }
+function stopApplicationTools(tabId: string) {
+  applicationSessions.get(tabId)?.close();
+  applicationSessions.delete(tabId);
+}
 
 /** How long a turn may go without reply content or tool activity before it is stopped. The
  *  protocol has no heartbeat, and an adapter that never answers a prompt would otherwise hold it
@@ -161,13 +194,16 @@ function disarmFirstResponse(tabId: string) {
 
 function armFirstResponse(tabId: string) {
   disarmFirstResponse(tabId);
-  firstResponseTimers.set(tabId, setTimeout(() => {
-    firstResponseTimers.delete(tabId);
-    const session = useHarnessStore.getState().byTab[tabId];
-    // A card the user has to answer is not a silent agent: the clock belongs to the agent only.
-    if (!session?.pending || session.stopping || session.permission) return;
-    void stopUnansweredTurn(tabId);
-  }, HARNESS_FIRST_RESPONSE_TIMEOUT_MS));
+  firstResponseTimers.set(
+    tabId,
+    setTimeout(() => {
+      firstResponseTimers.delete(tabId);
+      const session = useHarnessStore.getState().byTab[tabId];
+      // A card the user has to answer is not a silent agent: the clock belongs to the agent only.
+      if (!session?.pending || session.stopping || session.permission) return;
+      void stopUnansweredTurn(tabId);
+    }, HARNESS_FIRST_RESPONSE_TIMEOUT_MS),
+  );
 }
 
 /** Stop a turn the agent never began, and say so. The session stays usable: a closed connection
@@ -177,27 +213,31 @@ async function stopUnansweredTurn(tabId: string) {
   if (!session?.pending || session.stopping || session.permission || !session.sessionId) return;
   turnVersions.set(tabId, (turnVersions.get(tabId) ?? 0) + 1);
   stopApplicationTools(tabId);
-  patch(tabId, current => ({
+  patch(tabId, (current) => ({
     ...failHarnessTurn(current, t('The agent did not respond in time; the turn was stopped.')),
-    stopping: true, interrupted: true,
+    stopping: true,
+    interrupted: true,
   }));
   let timer: ReturnType<typeof setTimeout> | undefined;
-  const acknowledged = await new Promise<boolean>(resolve => {
+  const acknowledged = await new Promise<boolean>((resolve) => {
     cancellationAcks.set(tabId, () => resolve(true));
     timer = setTimeout(() => resolve(false), 1200);
     void acpCancel(session.sessionId!).catch(() => resolve(false));
   });
-  clearTimeout(timer); cancellationAcks.delete(tabId);
+  clearTimeout(timer);
+  cancellationAcks.delete(tabId);
   if (useHarnessStore.getState().byTab[tabId]?.sessionId !== session.sessionId) return;
   if (!acknowledged) {
     tabOfSession.delete(session.sessionId);
-    patch(tabId, current => ({ ...current, sessionId: null }));
+    patch(tabId, (current) => ({ ...current, sessionId: null }));
     void acpClose(session.sessionId).catch(() => undefined);
   }
-  patch(tabId, current => ({
-    ...current, stopping: false,
+  patch(tabId, (current) => ({
+    ...current,
+    stopping: false,
     error: t('The agent did not respond in time; the turn was stopped.'),
-    errorDetails: null, authRequired: false,
+    errorDetails: null,
+    authRequired: false,
   }));
   queueMicrotask(() => drainHarnessQueue(tabId));
 }
@@ -207,8 +247,14 @@ export function bindHarnessEvents(): Promise<void> {
   if (binding) return binding;
   terminalDebug('harness-events-binding');
   binding = onAcpSession((event) => useHarnessStore.getState().applyEvent(event))
-    .then(() => { terminalDebug('harness-events-bound'); })
-    .catch((error: unknown) => { terminalDebug('harness-events-bind-failed'); binding = null; throw error; });
+    .then(() => {
+      terminalDebug('harness-events-bound');
+    })
+    .catch((error: unknown) => {
+      terminalDebug('harness-events-bind-failed');
+      binding = null;
+      throw error;
+    });
   return binding;
 }
 
@@ -227,19 +273,38 @@ function failHarnessTurn(session: HarnessSession, message: string, details: stri
   if (session.pending && !session.stopping) {
     const last = messages[messages.length - 1];
     const failure = { pending: false, error: true, errorSummary: message, errorText: [message, details].filter(Boolean).join('\n\n') };
-    messages = last?.role === 'assistant'
-      ? [...messages.slice(0, -1), { ...last, ...failure }]
-      : [...messages, { id: `harness-error-${Date.now()}-${inputSequence++}`, role: 'assistant', content: '', createdAt: Date.now(), ...failure }];
+    messages =
+      last?.role === 'assistant'
+        ? [...messages.slice(0, -1), { ...last, ...failure }]
+        : [
+            ...messages,
+            { id: `harness-error-${Date.now()}-${inputSequence++}`, role: 'assistant', content: '', createdAt: Date.now(), ...failure },
+          ];
   }
-  return { ...session, messages, pending: false, permission: null, permissionQueue: [], questions: [], error: message, errorDetails: details, authRequired };
+  return {
+    ...session,
+    messages,
+    pending: false,
+    permission: null,
+    permissionQueue: [],
+    questions: [],
+    error: message,
+    errorDetails: details,
+    authRequired,
+  };
 }
 
 /** Tool reports count as a reply; session metadata and thoughts alone do not. */
 function hasHarnessReply(messages: ChatMessage[]): boolean {
   let questionIndex = messages.length - 1;
   while (questionIndex >= 0 && messages[questionIndex]!.role !== 'user') questionIndex -= 1;
-  return messages.slice(questionIndex + 1).some(message => message.role === 'assistant'
-    && (!!message.content.trim() || !!message.parts?.some(part => part.kind === 'tool' || !!part.text.trim())));
+  return messages
+    .slice(questionIndex + 1)
+    .some(
+      (message) =>
+        message.role === 'assistant' &&
+        (!!message.content.trim() || !!message.parts?.some((part) => part.kind === 'tool' || !!part.text.trim())),
+    );
 }
 
 interface RestoredConfig {
@@ -256,7 +321,7 @@ interface RestoredConfig {
 async function restoreSessionConfig(harness: string, result: HarnessOpenResult): Promise<RestoredConfig | null> {
   const preference = useHarnessConfigPrefs.getState().prefs[harness];
   if (!preference) return null;
-  const selectable = (result.configOptions ?? []).filter(option => option.type === 'select');
+  const selectable = (result.configOptions ?? []).filter((option) => option.type === 'select');
   let configOptions = result.configOptions;
   for (const option of selectable) {
     const remembered = preference.config[option.id];
@@ -265,8 +330,8 @@ async function restoreSessionConfig(harness: string, result: HarnessOpenResult):
     try {
       const next = await acpSetConfigOption(result.sessionId, option.id, remembered);
       if (Array.isArray(next)) configOptions = next;
-      else if (configOptions) configOptions = configOptions.map(entry =>
-        entry.id === option.id ? { ...entry, currentValue: remembered } : entry);
+      else if (configOptions)
+        configOptions = configOptions.map((entry) => (entry.id === option.id ? { ...entry, currentValue: remembered } : entry));
     } catch {
       // The agent no longer accepts this value: leave its configuration untouched.
       break;
@@ -274,41 +339,64 @@ async function restoreSessionConfig(harness: string, result: HarnessOpenResult):
   }
   let modes = result.modes;
   const mode = preference.mode;
-  if (!selectable.some(isPermissionOption) && mode && modes && modes.currentModeId !== mode
-      && modes.availableModes.some(entry => entry.id === mode)) {
+  if (
+    !selectable.some(isPermissionOption) &&
+    mode &&
+    modes &&
+    modes.currentModeId !== mode &&
+    modes.availableModes.some((entry) => entry.id === mode)
+  ) {
     try {
       await acpSetMode(result.sessionId, mode);
       modes = { ...modes, currentModeId: mode };
-    } catch { /* Keep the mode the agent chose. */ }
+    } catch {
+      /* Keep the mode the agent chose. */
+    }
   }
   let models = result.models;
   const model = preference.model;
-  if (!selectable.some(isModelOption) && model && models && models.currentModelId !== model
-      && models.availableModels.some(entry => entry.modelId === model)) {
+  if (
+    !selectable.some(isModelOption) &&
+    model &&
+    models &&
+    models.currentModelId !== model &&
+    models.availableModels.some((entry) => entry.modelId === model)
+  ) {
     try {
       await acpSetModel(result.sessionId, model);
       models = { ...models, currentModelId: model };
-    } catch { /* Keep the model the agent chose. */ }
+    } catch {
+      /* Keep the model the agent chose. */
+    }
   }
   return { configOptions, modes, models };
 }
 
 export const useHarnessStore = create<HarnessStore>()((set, get) => ({
   byTab: {},
-  cancelQueuedInput: (tabId, id) => patch(tabId, current => ({ ...current, queuedInputs: current.queuedInputs?.filter(item => item.id !== id) })),
+  cancelQueuedInput: (tabId, id) =>
+    patch(tabId, (current) => ({ ...current, queuedInputs: current.queuedInputs?.filter((item) => item.id !== id) })),
 
   setExecutionPane: (tabId, paneId) => {
     const session = get().byTab[tabId];
-    if (!session || session.pending || session.stopping || (session.executionPaneId ?? null) === paneId || (paneId && !executionPaneSpec(paneId))) return;
+    if (
+      !session ||
+      session.pending ||
+      session.stopping ||
+      (session.executionPaneId ?? null) === paneId ||
+      (paneId && !executionPaneSpec(paneId))
+    )
+      return;
     clearSessionGrants(session.toolContextId ?? tabId);
-    patch(tabId, current => ({ ...current, executionPaneId: paneId, toolContextId: `${session.sessionId}:app:${++toolScopeSequence}` }));
+    patch(tabId, (current) => ({ ...current, executionPaneId: paneId, toolContextId: `${session.sessionId}:app:${++toolScopeSequence}` }));
   },
 
   open: async (tabId, harness, cwd, newSession = false, resumeSessionId) => {
     // One open per tab prevents a remount racing the first attempt from starting an extra process.
     if (get().byTab[tabId]?.opening) return;
     disarmFirstResponse(tabId);
-    const version = (openVersions.get(tabId) ?? 0) + 1; openVersions.set(tabId, version);
+    const version = (openVersions.get(tabId) ?? 0) + 1;
+    openVersions.set(tabId, version);
     if (!(tabId in get().byTab)) {
       set((state) => ({ byTab: { ...state.byTab, [tabId]: fresh(harness) } }));
     }
@@ -323,10 +411,12 @@ export const useHarnessStore = create<HarnessStore>()((set, get) => ({
       // Read the local copy alongside the agent handshake: the agent's replay wins when it can
       // provide one, but a running turn or an agent without `session/load` must not lose the
       // transcript that was already visible here.
-      const retainedRequest = resume ? loadHarnessTranscript(harness, resume).catch((error: unknown) => {
-        terminalDebug('harness-transcript-load-failed', { harness, sessionId: resume, reason: String(error).slice(0, 200) });
-        return null;
-      }) : Promise.resolve(null);
+      const retainedRequest = resume
+        ? loadHarnessTranscript(harness, resume).catch((error: unknown) => {
+            terminalDebug('harness-transcript-load-failed', { harness, sessionId: resume, reason: String(error).slice(0, 200) });
+            return null;
+          })
+        : Promise.resolve(null);
       const [result, retained] = await Promise.all([acpOpen(harness, cwd, resume, applicationToolCatalog()), retainedRequest]);
       const known = get().byTab[tabId];
       if (!known || openVersions.get(tabId) !== version) {
@@ -354,38 +444,71 @@ export const useHarnessStore = create<HarnessStore>()((set, get) => ({
       // creating a second row from the preserved messages. The fallback agent session itself is
       // deliberately not remembered while the local copy remains the visible conversation.
       const transcriptSessionId = resume ?? result.resumeSessionId ?? result.sessionId;
-      const note = useLocal && retained?.pending
-        ? t('The turn did not finish; the partial transcript is shown.')
-        : useLocal && !resumed ? t('The agent could not reopen this session; the local copy is shown.') : null;
+      const note =
+        useLocal && retained?.pending
+          ? t('The turn did not finish; the partial transcript is shown.')
+          : useLocal && !resumed
+            ? t('The agent could not reopen this session; the local copy is shown.')
+            : null;
       patch(tabId, (current) => {
-        const next = replayEvents({
-          ...current, opening: false, stopping: false, sessionId: result.sessionId,
-          resumeSessionId: result.resumeSessionId ?? result.sessionId, transcriptSessionId, cwd: result.cwd || cwd,
-          messages: useLocal
-            ? (retained!.pending ? interruptedTranscript(retained!.messages) : retained!.messages)
-            : replayHasTranscript(replayed) ? [] : current.messages,
-          agent: result.agent, error: null, appToolsConnected: result.appToolsConnected ?? false, toolContextId: `${result.sessionId}:app:${++toolScopeSequence}`,
-          modes: restored?.modes ?? result.modes ?? null,
-          models: restored?.models ?? result.models ?? null,
-          configOptions: restored?.configOptions ?? result.configOptions ?? null,
-          note: null,
-        }, useLocal ? replayMetadata(replayed) : replayed);
+        const next = replayEvents(
+          {
+            ...current,
+            opening: false,
+            stopping: false,
+            sessionId: result.sessionId,
+            resumeSessionId: result.resumeSessionId ?? result.sessionId,
+            transcriptSessionId,
+            cwd: result.cwd || cwd,
+            messages: useLocal
+              ? retained!.pending
+                ? interruptedTranscript(retained!.messages)
+                : retained!.messages
+              : replayHasTranscript(replayed)
+                ? []
+                : current.messages,
+            agent: result.agent,
+            error: null,
+            appToolsConnected: result.appToolsConnected ?? false,
+            toolContextId: `${result.sessionId}:app:${++toolScopeSequence}`,
+            modes: restored?.modes ?? result.modes ?? null,
+            models: restored?.models ?? result.models ?? null,
+            configOptions: restored?.configOptions ?? result.configOptions ?? null,
+            note: null,
+          },
+          useLocal ? replayMetadata(replayed) : replayed,
+        );
         // The fallback warning describes the displayed transcript, so a replayed notice cannot
         // replace it while the conversation still comes from the local copy.
         return note ? { ...next, note } : next;
       });
-      if (get().byTab[tabId]?.messages.some(hasChatContent)) useHarnessSessionRefs.getState().remember(harness, {
-        sessionId: transcriptSessionId, cwd: result.cwd || cwd, at: Date.now(),
-      });
+      if (get().byTab[tabId]?.messages.some(hasChatContent))
+        useHarnessSessionRefs.getState().remember(harness, {
+          sessionId: transcriptSessionId,
+          cwd: result.cwd || cwd,
+          at: Date.now(),
+        });
       const queued = openingEvents.get(result.sessionId) ?? [];
-      terminalDebug('harness-session-mapped', { tabId, sessionId: result.sessionId, replayedCount: replayed.length, bufferedCount: queued.length });
+      terminalDebug('harness-session-mapped', {
+        tabId,
+        sessionId: result.sessionId,
+        replayedCount: replayed.length,
+        bufferedCount: queued.length,
+      });
       openingEvents.delete(result.sessionId);
       for (const event of queued) get().applyEvent(event);
       queueMicrotask(() => drainHarnessQueue(tabId));
     } catch (error) {
-      if (openVersions.get(tabId) === version) patch(tabId, (session) => ({ ...session, opening: false, error: String((error as Error)?.message ?? error), errorDetails: null, authRequired: false }));
+      if (openVersions.get(tabId) === version)
+        patch(tabId, (session) => ({
+          ...session,
+          opening: false,
+          error: String((error as Error)?.message ?? error),
+          errorDetails: null,
+          authRequired: false,
+        }));
     } finally {
-      if (!Object.values(get().byTab).some(session => session.opening)) openingEvents.clear();
+      if (!Object.values(get().byTab).some((session) => session.opening)) openingEvents.clear();
     }
   },
 
@@ -402,45 +525,89 @@ export const useHarnessStore = create<HarnessStore>()((set, get) => ({
     session = get().byTab[tabId];
     if (!session || inputVersions.get(tabId) !== inputVersion || openVersions.get(tabId) !== openVersion) return false;
     if (content.unsupported.length) {
-      useToastStore.getState().addToast(t('ACP agents cannot read this attachment: {{name}}', { name: content.unsupported.join(', ') }), 'error');
+      useToastStore
+        .getState()
+        .addToast(t('ACP agents cannot read this attachment: {{name}}', { name: content.unsupported.join(', ') }), 'error');
       return false;
     }
     if (session.pending || session.stopping || session.opening) {
-      patch(tabId, current => ({ ...current, queuedInputs: [...(current.queuedInputs ?? []), {
-        id: `queued-${Date.now()}-${inputSequence++}`, text: text.trim(),
-        ...(attachments.length ? { attachments } : {}),
-      }] }));
+      patch(tabId, (current) => ({
+        ...current,
+        queuedInputs: [
+          ...(current.queuedInputs ?? []),
+          {
+            id: `queued-${Date.now()}-${inputSequence++}`,
+            text: text.trim(),
+            ...(attachments.length ? { attachments } : {}),
+          },
+        ],
+      }));
       return true;
     }
-    const version = (turnVersions.get(tabId) ?? 0) + 1; turnVersions.set(tabId, version);
+    const version = (turnVersions.get(tabId) ?? 0) + 1;
+    turnVersions.set(tabId, version);
     if (!session.sessionId) {
-      patch(tabId, current => ({ ...current, pending: true }));
+      patch(tabId, (current) => ({ ...current, pending: true }));
       await get().open(tabId, session.harness, session.cwd, false, session.resumeSessionId);
       if (turnVersions.get(tabId) !== version) return false;
       session = get().byTab[tabId];
-      if (!session?.sessionId) { patch(tabId, current => ({ ...current, pending: false })); return false; }
+      if (!session?.sessionId) {
+        patch(tabId, (current) => ({ ...current, pending: false }));
+        return false;
+      }
     }
     // The protocol only allows image content when the agent advertised it during the handshake.
     if (content.images.length && !harnessSupportsImages(session.agent?.agentCapabilities)) {
-      patch(tabId, current => ({ ...current, pending: false }));
+      patch(tabId, (current) => ({ ...current, pending: false }));
       useToastStore.getState().addToast(t('This agent does not accept images.'), 'error');
       return false;
     }
     const sessionId = session.sessionId;
-    terminalDebug('harness-prompt-dispatched', { tabId, sessionId, messageCount: session.messages.length, attachmentCount: attachments.length });
+    terminalDebug('harness-prompt-dispatched', {
+      tabId,
+      sessionId,
+      messageCount: session.messages.length,
+      attachmentCount: attachments.length,
+    });
     const question: ChatMessage = {
-      id: `harness-question-${Date.now()}-${inputSequence++}`, role: 'user', content: text.trim(), createdAt: Date.now(),
+      id: `harness-question-${Date.now()}-${inputSequence++}`,
+      role: 'user',
+      content: text.trim(),
+      createdAt: Date.now(),
       ...(attachments.length ? { attachments } : {}),
     };
-    patch(tabId, (current) => ({ ...current, messages: [...current.messages, question], pending: true, interrupted: false, note: null, error: null, errorDetails: null, authRequired: false }));
-    useHarnessSessionRefs.getState().remember(session.harness, { sessionId: session.transcriptSessionId ?? session.resumeSessionId ?? sessionId, cwd: session.cwd, at: Date.now() });
+    patch(tabId, (current) => ({
+      ...current,
+      messages: [...current.messages, question],
+      pending: true,
+      interrupted: false,
+      note: null,
+      error: null,
+      errorDetails: null,
+      authRequired: false,
+    }));
+    useHarnessSessionRefs.getState().remember(session.harness, {
+      sessionId: session.transcriptSessionId ?? session.resumeSessionId ?? sessionId,
+      cwd: session.cwd,
+      at: Date.now(),
+    });
     stopApplicationTools(tabId);
     const paneId = session.executionPaneId ?? null;
     const toolEnvironment = paneId ? environmentForPane(paneId) : null;
-    applicationSessions.set(tabId, new ApplicationToolSession({ tabId: session.toolContextId ?? tabId, paneId, remote: executionPaneSpec(paneId)?.kind === 'ssh' }, run => {
-      if (turnVersions.get(tabId) !== version) return;
-      patch(tabId, current => ({ ...current, messages: upsertHarnessTool(current.messages, run, { paneId: paneId ?? undefined, environment: toolEnvironment }) }));
-    }, { agentWorkspaceDirectory: session.cwd, terminal: toolEnvironment }));
+    applicationSessions.set(
+      tabId,
+      new ApplicationToolSession(
+        { tabId: session.toolContextId ?? tabId, paneId, remote: executionPaneSpec(paneId)?.kind === 'ssh' },
+        (run) => {
+          if (turnVersions.get(tabId) !== version) return;
+          patch(tabId, (current) => ({
+            ...current,
+            messages: upsertHarnessTool(current.messages, run, { paneId: paneId ?? undefined, environment: toolEnvironment }),
+          }));
+        },
+        { agentWorkspaceDirectory: session.cwd, terminal: toolEnvironment },
+      ),
+    );
     try {
       armFirstResponse(tabId);
       await acpPrompt(sessionId, content.text, content.images);
@@ -448,7 +615,7 @@ export const useHarnessStore = create<HarnessStore>()((set, get) => ({
       if (turnVersions.get(tabId) !== version || get().byTab[tabId]?.sessionId !== sessionId) return true;
       disarmFirstResponse(tabId);
       stopApplicationTools(tabId);
-      patch(tabId, current => failHarnessTurn(current, String((error as Error)?.message ?? error)));
+      patch(tabId, (current) => failHarnessTurn(current, String((error as Error)?.message ?? error)));
       queueMicrotask(() => drainHarnessQueue(tabId));
     }
     return true;
@@ -463,24 +630,34 @@ export const useHarnessStore = create<HarnessStore>()((set, get) => ({
     turnVersions.set(tabId, (turnVersions.get(tabId) ?? 0) + 1);
     if (!session.sessionId) {
       openVersions.set(tabId, (openVersions.get(tabId) ?? 0) + 1);
-      patch(tabId, current => ({ ...current, opening: false, pending: false, permission: null }));
+      patch(tabId, (current) => ({ ...current, opening: false, pending: false, permission: null }));
       return;
     }
-    patch(tabId, current => ({ ...current, pending: false, stopping: true, interrupted: true, permission: null, permissionQueue: [], questions: [], note: t('Harness stopped.') }));
+    patch(tabId, (current) => ({
+      ...current,
+      pending: false,
+      stopping: true,
+      interrupted: true,
+      permission: null,
+      permissionQueue: [],
+      questions: [],
+      note: t('Harness stopped.'),
+    }));
     let timer: ReturnType<typeof setTimeout> | undefined;
-    const acknowledged = await new Promise<boolean>(resolve => {
+    const acknowledged = await new Promise<boolean>((resolve) => {
       cancellationAcks.set(tabId, () => resolve(true));
       timer = setTimeout(() => resolve(false), 1200);
       void acpCancel(session.sessionId!).catch(() => resolve(false));
     });
-    clearTimeout(timer); cancellationAcks.delete(tabId);
+    clearTimeout(timer);
+    cancellationAcks.delete(tabId);
     if (get().byTab[tabId]?.sessionId !== session.sessionId) return;
     if (!acknowledged) {
       tabOfSession.delete(session.sessionId);
-      patch(tabId, current => ({ ...current, sessionId: null, stopping: false, opening: false }));
+      patch(tabId, (current) => ({ ...current, sessionId: null, stopping: false, opening: false }));
       void acpClose(session.sessionId).catch(() => undefined);
     } else {
-      patch(tabId, current => ({ ...current, stopping: false }));
+      patch(tabId, (current) => ({ ...current, stopping: false }));
       // A queued input is not part of the turn being stopped: keep it and start it as the
       // next turn once the session has acknowledged the cancellation.
       drainHarnessQueue(tabId);
@@ -496,11 +673,14 @@ export const useHarnessStore = create<HarnessStore>()((set, get) => ({
       useHarnessConfigPrefs.getState().remember(session.harness, { mode: modeId });
       // The agent may also send a current_mode_update; writing the value here keeps the control
       // responsive even for agents that stay quiet.
-      patch(tabId, (current) => current.modes
-        ? { ...current, modes: { ...current.modes, currentModeId: modeId } }
-        : current);
+      patch(tabId, (current) => (current.modes ? { ...current, modes: { ...current.modes, currentModeId: modeId } } : current));
     } catch (error) {
-      patch(tabId, (current) => ({ ...current, error: String((error as Error)?.message ?? error), errorDetails: null, authRequired: false }));
+      patch(tabId, (current) => ({
+        ...current,
+        error: String((error as Error)?.message ?? error),
+        errorDetails: null,
+        authRequired: false,
+      }));
     }
   },
 
@@ -510,11 +690,14 @@ export const useHarnessStore = create<HarnessStore>()((set, get) => ({
     try {
       await acpSetModel(session.sessionId, modelId);
       useHarnessConfigPrefs.getState().remember(session.harness, { model: modelId });
-      patch(tabId, (current) => current.models
-        ? { ...current, models: { ...current.models, currentModelId: modelId } }
-        : current);
+      patch(tabId, (current) => (current.models ? { ...current, models: { ...current.models, currentModelId: modelId } } : current));
     } catch (error) {
-      patch(tabId, (current) => ({ ...current, error: String((error as Error)?.message ?? error), errorDetails: null, authRequired: false }));
+      patch(tabId, (current) => ({
+        ...current,
+        error: String((error as Error)?.message ?? error),
+        errorDetails: null,
+        authRequired: false,
+      }));
     }
   },
 
@@ -529,7 +712,12 @@ export const useHarnessStore = create<HarnessStore>()((set, get) => ({
         configOptions: Array.isArray(configOptions) ? configOptions : current.configOptions,
       }));
     } catch (error) {
-      patch(tabId, (current) => ({ ...current, error: String((error as Error)?.message ?? error), errorDetails: null, authRequired: false }));
+      patch(tabId, (current) => ({
+        ...current,
+        error: String((error as Error)?.message ?? error),
+        errorDetails: null,
+        authRequired: false,
+      }));
     }
   },
 
@@ -538,7 +726,8 @@ export const useHarnessStore = create<HarnessStore>()((set, get) => ({
     disarmFirstResponse(tabId);
     openVersions.set(tabId, (openVersions.get(tabId) ?? 0) + 1);
     turnVersions.set(tabId, (turnVersions.get(tabId) ?? 0) + 1);
-    cancellationAcks.get(tabId)?.(); cancellationAcks.delete(tabId);
+    cancellationAcks.get(tabId)?.();
+    cancellationAcks.delete(tabId);
     stopApplicationTools(tabId);
     const session = get().byTab[tabId];
     clearSessionGrants(session?.toolContextId ?? tabId);
@@ -563,42 +752,82 @@ export const useHarnessStore = create<HarnessStore>()((set, get) => ({
     // belongs to the card that is gone, so it is dropped instead of applied to the new one.
     if (request.generation !== generation) return;
     // Clear it first: a card that is answered twice would answer an already-resolved request.
-    patch(tabId, (current) => ({ ...current, permission: current.permissionQueue?.[0] ?? null, permissionQueue: current.permissionQueue?.slice(1) }));
+    patch(tabId, (current) => ({
+      ...current,
+      permission: current.permissionQueue?.[0] ?? null,
+      permissionQueue: current.permissionQueue?.slice(1),
+    }));
     try {
       await acpAnswerPermission(session.sessionId, request.toolCallId, optionId);
     } catch (error) {
-      patch(tabId, (current) => ({ ...current, error: String((error as Error)?.message ?? error), errorDetails: null, authRequired: false }));
+      patch(tabId, (current) => ({
+        ...current,
+        error: String((error as Error)?.message ?? error),
+        errorDetails: null,
+        authRequired: false,
+      }));
     }
   },
 
   applyEvent: (event) => {
     const tabId = tabOfSession.get(event.sessionId);
     const update = harnessUpdate(event.payload);
-    const updateKind = ['agent_message_chunk', 'agent_thought_chunk', 'user_message_chunk', 'tool_call', 'tool_call_update',
-      'plan', 'usage_update', 'current_mode_update', 'config_option_update', 'available_commands_update', 'notice'].includes(String(update.sessionUpdate))
-      ? String(update.sessionUpdate) : 'other';
+    const updateKind = [
+      'agent_message_chunk',
+      'agent_thought_chunk',
+      'user_message_chunk',
+      'tool_call',
+      'tool_call_update',
+      'plan',
+      'usage_update',
+      'current_mode_update',
+      'config_option_update',
+      'available_commands_update',
+      'notice',
+    ].includes(String(update.sessionUpdate))
+      ? String(update.sessionUpdate)
+      : 'other';
     terminalDebug('harness-event-received', { sessionId: event.sessionId, tabId: tabId ?? null, kind: event.kind, updateKind });
     if (event.kind === 'update' && ['tool_call', 'tool_call_update'].includes(updateKind)) {
-      terminalDebug('harness-tool-status', { sessionId: event.sessionId, status: ['pending', 'in_progress', 'completed', 'failed'].includes(String(update.status)) ? update.status : 'other' });
+      terminalDebug('harness-tool-status', {
+        sessionId: event.sessionId,
+        status: ['pending', 'in_progress', 'completed', 'failed'].includes(String(update.status)) ? update.status : 'other',
+      });
     }
     if (!tabId) {
-      const opening = Object.values(get().byTab).some(session => session.opening);
+      const opening = Object.values(get().byTab).some((session) => session.opening);
       let buffered = false;
       if (opening) {
         const queued = openingEvents.get(event.sessionId) ?? [];
-        if (queued.length < 1000) { openingEvents.set(event.sessionId, [...queued, event]); buffered = true; }
+        if (queued.length < 1000) {
+          openingEvents.set(event.sessionId, [...queued, event]);
+          buffered = true;
+        }
       }
-      terminalDebug('harness-event-unmapped', { sessionId: event.sessionId, kind: event.kind, opening, buffered, mappedCount: tabOfSession.size });
+      terminalDebug('harness-event-unmapped', {
+        sessionId: event.sessionId,
+        kind: event.kind,
+        opening,
+        buffered,
+        mappedCount: tabOfSession.size,
+      });
       return;
     }
     const session = get().byTab[tabId];
     // Metadata can arrive while the model request is failing, so it does not confirm progress.
     const content = update.content as { text?: unknown } | undefined;
     const hasText = typeof content?.text === 'string' && !!content.text.trim();
-    if (event.kind === 'stop' || event.kind === 'error' || event.kind === 'permission' || event.kind === 'elicitation'
-      || event.kind === 'app-tool' && event.payload.method === 'call'
-      || event.kind === 'update' && (['tool_call', 'tool_call_update'].includes(String(update.sessionUpdate))
-        || ['agent_message_chunk', 'agent_thought_chunk'].includes(String(update.sessionUpdate)) && hasText)) disarmFirstResponse(tabId);
+    if (
+      event.kind === 'stop' ||
+      event.kind === 'error' ||
+      event.kind === 'permission' ||
+      event.kind === 'elicitation' ||
+      (event.kind === 'app-tool' && event.payload.method === 'call') ||
+      (event.kind === 'update' &&
+        (['tool_call', 'tool_call_update'].includes(String(update.sessionUpdate)) ||
+          (['agent_message_chunk', 'agent_thought_chunk'].includes(String(update.sessionUpdate)) && hasText)))
+    )
+      disarmFirstResponse(tabId);
     if (session?.stopping && (event.kind === 'update' || event.kind === 'permission' || event.kind === 'elicitation')) {
       terminalDebug('harness-event-ignored', { tabId, kind: event.kind, reason: 'stopping' });
       return;
@@ -611,29 +840,40 @@ export const useHarnessStore = create<HarnessStore>()((set, get) => ({
       }
     }
     if (event.kind === 'app-tool') {
-      if (event.payload.method === 'cancel') { stopApplicationTools(tabId); return; }
+      if (event.payload.method === 'cancel') {
+        stopApplicationTools(tabId);
+        return;
+      }
       const requestId = event.payload.requestId;
       const name = event.payload.name;
       if (typeof requestId !== 'string' || typeof name !== 'string') return;
       const tools = applicationSessions.get(tabId);
-      const result = session?.pending && tools ? tools.call(requestId, name, event.payload.arguments)
-        : Promise.resolve({ content: [{ type: 'text', text: 'The agent turn is no longer active.' }], isError: true });
-      void result.then(payload => acpAppToolResult(event.sessionId, requestId, payload)).catch(() => undefined);
+      const result =
+        session?.pending && tools
+          ? tools.call(requestId, name, event.payload.arguments)
+          : Promise.resolve({ content: [{ type: 'text', text: 'The agent turn is no longer active.' }], isError: true });
+      void result.then((payload) => acpAppToolResult(event.sessionId, requestId, payload)).catch(() => undefined);
       return;
     }
     if (event.kind === 'elicitation') {
       const question = event.payload as unknown as AcpQuestion;
       if (!question.requestId || !Array.isArray(question.form?.fields) || session?.interrupted) return;
-      patch(tabId, current => ({ ...current, questions: [...(current.questions ?? []).filter(item => item.requestId !== question.requestId), question].slice(-8) }));
+      patch(tabId, (current) => ({
+        ...current,
+        questions: [...(current.questions ?? []).filter((item) => item.requestId !== question.requestId), question].slice(-8),
+      }));
       return;
     }
     if (event.kind === 'elicitation-end') {
-      patch(tabId, current => ({ ...current, questions: current.questions?.filter(item => item.requestId !== event.payload.requestId) }));
+      patch(tabId, (current) => ({
+        ...current,
+        questions: current.questions?.filter((item) => item.requestId !== event.payload.requestId),
+      }));
       return;
     }
     if (event.kind === 'stop' || event.kind === 'error') {
       stopApplicationTools(tabId);
-      patch(tabId, current => ({ ...current, questions: [], permissionQueue: [] }));
+      patch(tabId, (current) => ({ ...current, questions: [], permissionQueue: [] }));
     }
     if (event.kind === 'error' && event.payload.reason === 'transport') {
       // The process is gone: forget the id so the next prompt reopens, and free the backend entry.
@@ -646,9 +886,15 @@ export const useHarnessStore = create<HarnessStore>()((set, get) => ({
     patch(tabId, (current) => foldSessionEvent(current, event));
     const updated = get().byTab[tabId];
     terminalDebug('harness-event-applied', {
-      tabId, sessionId: event.sessionId, kind: event.kind, updateKind,
-      sessionExists: !!updated, pending: updated?.pending, hasError: !!updated?.error,
-      messageCount: updated?.messages.length ?? 0, transcriptChanged: session?.messages !== updated?.messages,
+      tabId,
+      sessionId: event.sessionId,
+      kind: event.kind,
+      updateKind,
+      sessionExists: !!updated,
+      pending: updated?.pending,
+      hasError: !!updated?.error,
+      messageCount: updated?.messages.length ?? 0,
+      transcriptChanged: session?.messages !== updated?.messages,
     });
     if (event.kind === 'stop' || event.kind === 'error') {
       if (session?.stopping) cancellationAcks.get(tabId)?.();
@@ -698,22 +944,31 @@ function foldSessionEvent(session: HarnessSession, event: AcpSessionEvent): Harn
       const reason = String(event.payload.stopReason ?? '');
       if (session.pending && !session.stopping && reason !== 'cancelled') {
         if (reason === 'error') return failHarnessTurn(session, t('The harness failed.'));
-        if (!hasHarnessReply(session.messages)) return failHarnessTurn(session,
-          t('The agent ended the turn without a reply. Check its model, sign-in and service quota, then try again.'));
+        if (!hasHarnessReply(session.messages))
+          return failHarnessTurn(
+            session,
+            t('The agent ended the turn without a reply. Check its model, sign-in and service quota, then try again.'),
+          );
       }
-      const note = reason === 'cancelled'
-        ? t('Harness stopped.')
-        : reason && reason !== 'end_turn' ? t('The harness stopped the turn: {{reason}}', { reason }) : null;
+      const note =
+        reason === 'cancelled'
+          ? t('Harness stopped.')
+          : reason && reason !== 'end_turn'
+            ? t('The harness stopped the turn: {{reason}}', { reason })
+            : null;
       return { ...session, pending: false, permission: null, note };
     }
     case 'error': {
       // Our own transport message is localized; an agent's error text travels as the agent wrote it.
       const transport = event.payload.reason === 'transport';
-      const message = transport
-        ? t('The agent closed the connection.')
-        : String(event.payload.message ?? t('The harness failed.'));
+      const message = transport ? t('The agent closed the connection.') : String(event.payload.message ?? t('The harness failed.'));
       return {
-        ...failHarnessTurn(session, message, typeof event.payload.details === 'string' ? event.payload.details : null, event.payload.authRequired === true),
+        ...failHarnessTurn(
+          session,
+          message,
+          typeof event.payload.details === 'string' ? event.payload.details : null,
+          event.payload.authRequired === true,
+        ),
         // A dead connection is reopened by the next prompt or the retry action, not reused.
         sessionId: transport ? null : session.sessionId,
       };
@@ -725,16 +980,22 @@ function foldSessionEvent(session: HarnessSession, event: AcpSessionEvent): Harn
       if (!toolCallId) return session;
       const options = Array.isArray(event.payload.options) ? event.payload.options : [];
       const request = {
-        toolCallId, generation: session.permissionGeneration + 1,
+        toolCallId,
+        generation: session.permissionGeneration + 1,
         title: String(toolCall.title ?? toolCallId),
-        options: options.map(option => {
-          const entry = (option ?? {}) as Record<string, unknown>;
-          return { optionId: String(entry.optionId ?? ''), name: String(entry.name ?? entry.optionId ?? '') };
-        }).filter(option => option.optionId),
+        options: options
+          .map((option) => {
+            const entry = (option ?? {}) as Record<string, unknown>;
+            return { optionId: String(entry.optionId ?? ''), name: String(entry.name ?? entry.optionId ?? '') };
+          })
+          .filter((option) => option.optionId),
       };
       if (session.permission && session.permission.toolCallId !== toolCallId) {
-        return { ...session, permissionGeneration: request.generation,
-          permissionQueue: [...(session.permissionQueue ?? []).filter(item => item.toolCallId !== toolCallId), request].slice(0, 16) };
+        return {
+          ...session,
+          permissionGeneration: request.generation,
+          permissionQueue: [...(session.permissionQueue ?? []).filter((item) => item.toolCallId !== toolCallId), request].slice(0, 16),
+        };
       }
       return {
         ...session,
@@ -753,20 +1014,20 @@ function replayEvents(session: HarnessSession, events: AcpSessionEvent[]): Harne
   return events.reduce((current, event) => foldSessionEvent(current, event), session);
 }
 
-const TRANSCRIPT_UPDATES = new Set([
-  'user_message_chunk', 'agent_message_chunk', 'agent_thought_chunk', 'tool_call', 'tool_call_update',
-]);
+const TRANSCRIPT_UPDATES = new Set(['user_message_chunk', 'agent_message_chunk', 'agent_thought_chunk', 'tool_call', 'tool_call_update']);
 
 /** A replay that carries no messages cannot replace a local transcript that has content. */
 function replayHasTranscript(events: readonly AcpSessionEvent[]): boolean {
-  return events.some(event => event.kind === 'update'
-    && TRANSCRIPT_UPDATES.has(String(harnessUpdate(event.payload).sessionUpdate ?? '')));
+  return events.some(
+    (event) => event.kind === 'update' && TRANSCRIPT_UPDATES.has(String(harnessUpdate(event.payload).sessionUpdate ?? '')),
+  );
 }
 
 /** Keep session state that travels in a replay while the transcript itself comes from the local copy. */
 function replayMetadata(events: readonly AcpSessionEvent[]): AcpSessionEvent[] {
-  return events.filter(event => event.kind === 'update'
-    && !TRANSCRIPT_UPDATES.has(String(harnessUpdate(event.payload).sessionUpdate ?? '')));
+  return events.filter(
+    (event) => event.kind === 'update' && !TRANSCRIPT_UPDATES.has(String(harnessUpdate(event.payload).sessionUpdate ?? '')),
+  );
 }
 
 /** A local copy saved while a turn was running has no final reply; mark the visible partial answer. */
@@ -775,7 +1036,10 @@ function interruptedTranscript(messages: ChatMessage[]): ChatMessage[] {
   const failure = { pending: false, error: true, errorSummary: summary, errorText: summary };
   const last = messages[messages.length - 1];
   if (last?.role === 'assistant') return [...messages.slice(0, -1), { ...stopChatMessage(last), ...failure }];
-  return [...messages, { id: `harness-interrupted-${Date.now()}-${inputSequence++}`, role: 'assistant', content: '', createdAt: Date.now(), ...failure }];
+  return [
+    ...messages,
+    { id: `harness-interrupted-${Date.now()}-${inputSequence++}`, role: 'assistant', content: '', createdAt: Date.now(), ...failure },
+  ];
 }
 
 /**

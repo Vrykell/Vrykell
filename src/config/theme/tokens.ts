@@ -107,35 +107,35 @@ export interface ThemePalette {
   dangerAction: string;
   dangerActionText: string;
   errorDim: string;
-  errorLight: string;   // Light red for failed command text and similar
+  errorLight: string; // Light red for failed command text and similar
   warning: string;
 
   // Command block text
-  blockCmdText: string;       // Normal command text
-  blockCmdFailed: string;     // Failed command text
-  blockDivider: string;       // 1px divider between blocks
+  blockCmdText: string; // Normal command text
+  blockCmdFailed: string; // Failed command text
+  blockDivider: string; // 1px divider between blocks
 
   // Display-only command syntax colors.
   cmdProgram: string;
   cmdArgument: string;
   cmdNumber: string;
   cmdVariable: string;
-  cmdFlag: string;            // --flag
-  cmdPath: string;            // /path/to/file
-  cmdPipe: string;            // | pipe
-  cmdRedirect: string;        // > >> redirect
-  cmdString: string;          // "quoted string"
+  cmdFlag: string; // --flag
+  cmdPath: string; // /path/to/file
+  cmdPipe: string; // | pipe
+  cmdRedirect: string; // > >> redirect
+  cmdString: string; // "quoted string"
 
   // Search highlight background
   searchHighlightBg: string;
 
   // Terminal/shell status dots
-  shellConnected: string;     // Green dot
-  shellDisconnected: string;  // Gray dot
+  shellConnected: string; // Green dot
+  shellDisconnected: string; // Gray dot
 
   // Overlays & shadows
-  overlay: string;        // Modal scrim
-  overlayLight: string;   // Lighter scrim (history panel)
+  overlay: string; // Modal scrim
+  overlayLight: string; // Lighter scrim (history panel)
   shadowSm: string;
   shadowMd: string;
   shadowLg: string;
@@ -145,12 +145,12 @@ export interface ThemePalette {
   accentBgStrong: string; // Brighter accent background for the active state
   successBg: string;
   errorBg: string;
-  errorBadgeBg: string;       // Failed exit-code badge
+  errorBadgeBg: string; // Failed exit-code badge
 
   // Special
   tuiBanner: string;
   codeBg: string;
-  commandBlockBg: string;     // Subtle command block background
+  commandBlockBg: string; // Subtle command block background
   aiBlockBg: string;
   failedBlockBg: string;
   scrollbarThumb: string;
@@ -184,32 +184,66 @@ export interface ThemePalette {
 
 // Structural colors have one source; component roles reuse these surface levels.
 const DARK_SURFACES = {
-  content: '#141414', canvas: '#202020', sidebar: '#28282B', card: '#282828',
-  field: '#3C3C3C', elevated: '#303030', control: '#282828', hover: '#454545',
-  border: '#38393B', borderStrong: '#4B4E52',
+  content: '#141414',
+  canvas: '#202020',
+  sidebar: '#28282B',
+  card: '#282828',
+  field: '#3C3C3C',
+  elevated: '#303030',
+  control: '#282828',
+  hover: '#454545',
+  border: '#38393B',
+  borderStrong: '#4B4E52',
 } as const;
 
 const LIGHT_SURFACES = {
-  content: '#FFFFFF', canvas: '#FAFBFC', sidebar: '#DFE7F1', card: '#EBEEF2',
-  field: '#FFFFFF', elevated: '#FFFFFF', control: '#F8FAFC', hover: '#E3E3E3',
-  border: '#D2D9E2', borderStrong: '#ACBAC9',
+  content: '#FFFFFF',
+  canvas: '#FAFBFC',
+  sidebar: '#DFE7F1',
+  card: '#EBEEF2',
+  field: '#FFFFFF',
+  elevated: '#FFFFFF',
+  control: '#F8FAFC',
+  hover: '#E3E3E3',
+  border: '#D2D9E2',
+  borderStrong: '#ACBAC9',
 } as const;
 
 // Syntax, charts, group swatches and session icons share these accent families.
 const DARK_ACCENTS = {
-  blue: '#52ACFF', green: '#30D158', violet: '#DF7FFF', amber: '#F5C400',
-  cyan: '#00CFA5', rose: '#FF5CA8', orange: '#FF9F0A', coral: '#FF7066',
-  sky: '#32BFFF', magenta: '#E97AFF',
+  blue: '#52ACFF',
+  green: '#30D158',
+  violet: '#DF7FFF',
+  amber: '#F5C400',
+  cyan: '#00CFA5',
+  rose: '#FF5CA8',
+  orange: '#FF9F0A',
+  coral: '#FF7066',
+  sky: '#32BFFF',
+  magenta: '#E97AFF',
 } as const;
 const LIGHT_ACCENTS = {
-  blue: '#005DCA', green: '#167C32', violet: '#842FC7', amber: '#8B5800',
-  cyan: '#007564', rose: '#B02571', orange: '#A34A00', coral: '#B53F38',
-  sky: '#006BAD', magenta: '#9C219F',
+  blue: '#005DCA',
+  green: '#167C32',
+  violet: '#842FC7',
+  amber: '#8B5800',
+  cyan: '#007564',
+  rose: '#B02571',
+  orange: '#A34A00',
+  coral: '#B53F38',
+  sky: '#006BAD',
+  magenta: '#9C219F',
 } as const;
 /** Decorative group hues stay vivid on light surfaces; text and syntax keep LIGHT_ACCENTS. */
 const LIGHT_GROUP_ACCENTS = {
-  blue: '#2478E8', green: '#1F9D4D', violet: '#A855F7', amber: '#CC8F00',
-  cyan: '#00A991', rose: '#EC4899', orange: '#D2691E', coral: '#F26355',
+  blue: '#2478E8',
+  green: '#1F9D4D',
+  violet: '#A855F7',
+  amber: '#CC8F00',
+  cyan: '#00A991',
+  rose: '#EC4899',
+  orange: '#D2691E',
+  coral: '#F26355',
 } as const;
 
 const dark: ThemePalette = {
@@ -540,10 +574,17 @@ export type ThemeMode = 'dark' | 'light';
 export const themes: Record<ThemeMode, ThemePalette> = { dark, light };
 
 const PRESET_CACHE_KEY = 'vrykell-theme-presets';
-export interface ThemePresetSelection { darkPreset?: string; lightPreset?: string }
+export interface ThemePresetSelection {
+  darkPreset?: string;
+  lightPreset?: string;
+}
 
 export function cacheThemePresets(selection: ThemePresetSelection): void {
-  try { localStorage.setItem(PRESET_CACHE_KEY, JSON.stringify(selection)); } catch { /* storage unavailable */ }
+  try {
+    localStorage.setItem(PRESET_CACHE_KEY, JSON.stringify(selection));
+  } catch {
+    /* storage unavailable */
+  }
 }
 
 export function readThemePresets(): ThemePresetSelection {
@@ -555,7 +596,9 @@ export function readThemePresets(): ThemePresetSelection {
       return resolveThemePreset(mode, typeof id === 'string' ? id : undefined).id;
     };
     return { darkPreset: value('dark'), lightPreset: value('light') };
-  } catch { return {}; }
+  } catch {
+    return {};
+  }
 }
 
 export function getPresetPalette(mode: ThemeMode, id?: string): ThemePalette {
@@ -572,19 +615,25 @@ export function readThemePreference(): ThemePreference {
   try {
     const stored = localStorage.getItem(THEME_PREFERENCE_KEY);
     if (stored === 'dark' || stored === 'light' || stored === 'system') return stored;
-  } catch { /* storage unavailable */ }
+  } catch {
+    /* storage unavailable */
+  }
   return 'dark';
 }
 
 export function persistThemePreference(preference: ThemePreference): void {
-  try { localStorage.setItem(THEME_PREFERENCE_KEY, preference); } catch { /* storage unavailable */ }
+  try {
+    localStorage.setItem(THEME_PREFERENCE_KEY, preference);
+  } catch {
+    /* storage unavailable */
+  }
 }
 
 /** Resolve a stored choice to the palette mode that should be applied. */
 export function resolveThemeMode(preference: ThemePreference): ThemeMode {
   if (preference !== 'system') return preference;
-  const prefersDark = typeof window !== 'undefined' && typeof window.matchMedia === 'function'
-    && window.matchMedia('(prefers-color-scheme: dark)').matches;
+  const prefersDark =
+    typeof window !== 'undefined' && typeof window.matchMedia === 'function' && window.matchMedia('(prefers-color-scheme: dark)').matches;
   return prefersDark ? 'dark' : 'light';
 }
 
@@ -755,7 +804,11 @@ export function getCurrentTheme(): ThemeMode {
 /** Converts a #rgb / #rrggbb hex color to an rgba() string (alpha 0..1); falls back to black when parsing fails. */
 export function hexToRgba(hex: string, alpha: number): string {
   let h = hex.trim().replace(/^#/, '');
-  if (h.length === 3) h = h.split('').map((c) => c + c).join('');
+  if (h.length === 3)
+    h = h
+      .split('')
+      .map((c) => c + c)
+      .join('');
   if (!/^[0-9a-fA-F]{6}$/.test(h)) return `rgba(0, 0, 0, ${alpha})`;
   const r = parseInt(h.slice(0, 2), 16);
   const g = parseInt(h.slice(2, 4), 16);

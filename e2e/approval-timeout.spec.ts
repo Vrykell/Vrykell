@@ -12,10 +12,13 @@ test.describe('approval timeout', () => {
     await mockAnthropicToolCall(page, 'write_file', { path: '/home/e2e/project/note.txt', content: 'hi' });
     // A three-second deadline keeps the test quick; the setting itself offers whole minutes.
     await page.addInitScript(() => {
-      localStorage.setItem('vrykell-permissions', JSON.stringify({
-        version: 3,
-        state: { levels: {}, mode: 'standard', approvalTimeoutSeconds: 3 },
-      }));
+      localStorage.setItem(
+        'vrykell-permissions',
+        JSON.stringify({
+          version: 3,
+          state: { levels: {}, mode: 'standard', approvalTimeoutSeconds: 3 },
+        }),
+      );
     });
     await setupTauriMock(page, {});
     await page.goto('/');

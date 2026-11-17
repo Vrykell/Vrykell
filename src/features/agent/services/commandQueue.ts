@@ -57,21 +57,29 @@ function blockedResult(blocked: BlockedCommand): CommandResult {
     code: BLOCKED_CODE,
     requiresUserAction: true,
     error: cause
-      ? t('The previous command did not complete: {{cause}} Wait until the terminal is ready, or end this turn and send a new message.', { cause })
+      ? t('The previous command did not complete: {{cause}} Wait until the terminal is ready, or end this turn and send a new message.', {
+          cause,
+        })
       : t('The previous command did not complete. Wait until the terminal is ready, or end this turn and send a new message.'),
   };
 }
 
 function cancelledResult(): CommandResult {
   return {
-    ok: false, completed: false, output: '', code: 'COMMAND_ABORTED',
+    ok: false,
+    completed: false,
+    output: '',
+    code: 'COMMAND_ABORTED',
     error: t('Command cancelled before execution.'),
   };
 }
 
 function failedResult(): CommandResult {
   return {
-    ok: false, completed: false, output: '', code: FAILED_CODE,
+    ok: false,
+    completed: false,
+    output: '',
+    code: FAILED_CODE,
     error: t('The previous tool call failed. End this turn and send a new message before requesting more commands.'),
   };
 }
@@ -90,9 +98,7 @@ export function createCommandQueue(options: CommandQueueOptions = {}) {
       }
       if (blocked) {
         // A call queued before the boundary stays blocked even if the terminal became ready.
-        const recoverable = blocked.kind === 'until-ready'
-          && submittedAt >= blocked.generation
-          && options.isReady?.() === true;
+        const recoverable = blocked.kind === 'until-ready' && submittedAt >= blocked.generation && options.isReady?.() === true;
         if (recoverable) blocked = null;
         else return blockedResult(blocked);
       }
@@ -103,9 +109,12 @@ export function createCommandQueue(options: CommandQueueOptions = {}) {
       }
       return result;
     });
-    tail = queued.then(() => undefined, () => {
-      blocked = { result: failedResult(), kind: 'hard', generation: ++generation };
-    });
+    tail = queued.then(
+      () => undefined,
+      () => {
+        blocked = { result: failedResult(), kind: 'hard', generation: ++generation };
+      },
+    );
     return queued;
   };
 }

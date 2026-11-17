@@ -25,7 +25,10 @@ const ask = (title = 'Run a command') => ({
   sessionId: 's1',
   payload: {
     toolCall: { toolCallId: 'call-1', title },
-    options: [{ optionId: 'allow', name: 'Allow' }, { optionId: 'deny', name: 'Deny' }],
+    options: [
+      { optionId: 'allow', name: 'Allow' },
+      { optionId: 'deny', name: 'Deny' },
+    ],
   },
 });
 
@@ -38,7 +41,8 @@ beforeEach(async () => {
 describe('harness permission answers', () => {
   it('queues independent permission requests without replacing the active decision', async () => {
     useHarnessStore.getState().applyEvent(ask('First') as never);
-    const second = ask('Second'); second.payload.toolCall.toolCallId = 'call-2';
+    const second = ask('Second');
+    second.payload.toolCall.toolCallId = 'call-2';
     useHarnessStore.getState().applyEvent(second as never);
     expect(useHarnessStore.getState().byTab[TAB]!.permission?.title).toBe('First');
     await useHarnessStore.getState().answerPermission(TAB, 1, 'allow');

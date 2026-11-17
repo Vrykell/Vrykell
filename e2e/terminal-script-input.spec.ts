@@ -19,7 +19,8 @@ test('an AI multiline script enters its terminal draft and runs only after an ex
   const run = page.locator('.chat-exchange:visible').last().getByRole('button', { name: '在终端运行', exact: true });
   await expect(run).toBeVisible();
   const before = (await ptyWrites(page)).length;
-  await page.keyboard.press('Escape'); await run.click();
+  await page.keyboard.press('Escape');
+  await run.click();
   const input = page.locator('[data-terminal-input]:visible');
   await expect(input).toHaveValue(script);
   await expect(input).toBeFocused();
@@ -58,7 +59,9 @@ test('pasting a multiline script from the idle terminal menu preserves it withou
   await page.goto('/');
   const input = page.locator('[data-terminal-input]:visible');
   await expect(input).toBeVisible();
-  await page.evaluate(() => { (window as unknown as { __CLIPBOARD_TEXT__: string }).__CLIPBOARD_TEXT__ = 'echo one\necho two\n'; });
+  await page.evaluate(() => {
+    (window as unknown as { __CLIPBOARD_TEXT__: string }).__CLIPBOARD_TEXT__ = 'echo one\necho two\n';
+  });
   const before = (await ptyWrites(page)).length;
   await page.locator('.terminal-pane:visible').first().click({ button: 'right' });
   await page.getByRole('menu', { name: '操作菜单' }).getByRole('button', { name: /粘贴/ }).click();
@@ -75,10 +78,12 @@ test('a native paste with even one trailing newline asks before writing to an un
   const input = page.getByTestId('running-term').locator('.xterm-helper-textarea');
   await expect(input).toBeAttached();
   const before = (await ptyWrites(page)).length;
-  const paste = () => input.evaluate(element => {
-    const data = new DataTransfer(); data.setData('text/plain', 'echo pasted\n');
-    element.dispatchEvent(new ClipboardEvent('paste', { clipboardData: data, bubbles: true, cancelable: true }));
-  });
+  const paste = () =>
+    input.evaluate((element) => {
+      const data = new DataTransfer();
+      data.setData('text/plain', 'echo pasted\n');
+      element.dispatchEvent(new ClipboardEvent('paste', { clipboardData: data, bubbles: true, cancelable: true }));
+    });
   await paste();
   await expect(page.getByTestId('confirm-dialog')).toBeVisible();
   expect((await ptyWrites(page)).slice(before)).toEqual([]);

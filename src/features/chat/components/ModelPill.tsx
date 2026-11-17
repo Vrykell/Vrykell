@@ -12,7 +12,7 @@ import { t } from '@i18n';
  * transparent until hovered.
  */
 import { useEffect, useRef, useState } from 'react';
-import { iconSizes, ChevronDown, type AppIcon  } from '@ui/icons';
+import { iconSizes, ChevronDown, type AppIcon } from '@ui/icons';
 import { useAiConfigStore, useAgentSettings } from '@features/agent';
 import { modelHue, modelMark } from '@features/agent/components/modelIcon';
 import ModelPicker from '@features/chat/components/ModelPicker';
@@ -53,34 +53,40 @@ export default function ModelPill({ showThinking = true }: { showThinking?: bool
   return (
     <div
       ref={pillRef}
-      className="model-pill" data-picker-open={pickerOpen} data-level-open={levelOpen}
+      className="model-pill"
+      data-picker-open={pickerOpen}
+      data-level-open={levelOpen}
       data-testid="model-pill"
       style={{
-        position: 'relative', flexShrink: showThinking ? 0 : 1, minWidth: 0, maxWidth: '100%',
+        position: 'relative',
+        flexShrink: showThinking ? 0 : 1,
+        minWidth: 0,
+        maxWidth: '100%',
         width: levelOpen && lockedWidth ? lockedWidth : 'fit-content',
-        height: 32, boxSizing: 'border-box',
-        display: 'flex', alignItems: 'stretch',
+        height: 32,
+        boxSizing: 'border-box',
+        display: 'flex',
+        alignItems: 'stretch',
         borderRadius: 'var(--radius-card)',
         overflow: levelOpen ? 'visible' : 'hidden',
         transition: 'background 0.12s ease',
-      }}
-    >
+      }}>
       {levelOpen ? (
         /* Effort menu: covers the pill in place with the same width and top alignment. */
         <>
-          <div
-            style={{ position: 'fixed', inset: 0, zIndex: 9998 }}
-            onClick={() => setLevelOpen(false)}
-          />
+          <div style={{ position: 'fixed', inset: 0, zIndex: 9998 }} onClick={() => setLevelOpen(false)} />
           <div
             data-testid="think-level-menu"
             className="workspace-floating"
             style={{
-              position: 'absolute', top: 0, left: 0, zIndex: 9999,
-              width: '100%', boxSizing: 'border-box',
+              position: 'absolute',
+              top: 0,
+              left: 0,
+              zIndex: 9999,
+              width: '100%',
+              boxSizing: 'border-box',
               padding: 4,
-            }}
-          >
+            }}>
             <div style={{ fontSize: 'calc(10px * var(--ui-font-scale))', color: 'var(--text-muted)', padding: '4px 8px 2px' }}>
               {t('Thinking effort')}
             </div>
@@ -89,7 +95,8 @@ export default function ModelPill({ showThinking = true }: { showThinking?: bool
               return (
                 <button
                   key={lv}
-                  className="workspace-floating-row" data-selected={on}
+                  className="workspace-floating-row"
+                  data-selected={on}
                   data-testid={`think-option-${lv}`}
                   aria-pressed={on}
                   onClick={() => {
@@ -103,13 +110,20 @@ export default function ModelPill({ showThinking = true }: { showThinking?: bool
                     if (!on) e.currentTarget.style.background = 'transparent';
                   }}
                   style={{
-                    display: 'flex', alignItems: 'center', gap: 6, width: '100%',
-                    height: 30, padding: '0 8px', boxSizing: 'border-box',
-                    fontSize: 'calc(12px * var(--ui-font-scale))', textAlign: 'left',
-                    border: 'none', borderRadius: 'var(--radius-inner)', cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 6,
+                    width: '100%',
+                    height: 30,
+                    padding: '0 8px',
+                    boxSizing: 'border-box',
+                    fontSize: 'calc(12px * var(--ui-font-scale))',
+                    textAlign: 'left',
+                    border: 'none',
+                    borderRadius: 'var(--radius-inner)',
+                    cursor: 'pointer',
                     color: on ? 'var(--text-primary)' : 'var(--text-secondary)',
-                  }}
-                >
+                  }}>
                   <span style={{ flex: 1 }}>{levelText(lv)}</span>
                 </button>
               );
@@ -126,45 +140,65 @@ export default function ModelPill({ showThinking = true }: { showThinking?: bool
             data-tip-description={name}
             onClick={() => setPickerOpen(true)}
             style={{
-              flex: showThinking ? '0 0 auto' : '1 1 auto', minWidth: 0, display: 'flex', alignItems: 'center', gap: 6,
-              padding: showThinking ? '0 10px 0 12px' : '0 10px', background: 'transparent', border: 'none',
+              flex: showThinking ? '0 0 auto' : '1 1 auto',
+              minWidth: 0,
+              display: 'flex',
+              alignItems: 'center',
+              gap: 6,
+              padding: showThinking ? '0 10px 0 12px' : '0 10px',
+              background: 'transparent',
+              border: 'none',
               cursor: 'pointer',
-            }}
-          >
+            }}>
             <Icon size={iconSizes.row} style={{ color: iconHue, flexShrink: 0 }} />
             <span
               style={{
-                fontSize: 'calc(12px * var(--ui-font-scale))', fontWeight: 'var(--fw-medium)', color: 'var(--text-primary)',
-                whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
-              }}
-            >
+                fontSize: 'calc(12px * var(--ui-font-scale))',
+                fontWeight: 'var(--fw-medium)',
+                color: 'var(--text-primary)',
+                whiteSpace: 'nowrap',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+              }}>
               {displayName}
             </span>
             {!showThinking && <ChevronDown size={12} style={{ color: 'var(--text-muted)', flexShrink: 0 }} />}
           </button>
-          {showThinking && <><span
-            style={{
-              width: 1, margin: '4px 0', flexShrink: 0,
-              background: 'var(--border-strong)',
-            }}
-          />
-          {/* Effort area (about 30%): opens the effort menu in place. */}
-          <button
-            data-testid="pill-level"
-            data-tip={`${t('Thinking effort')}: ${levelLabel}`}
-            onClick={() => {
-              setLockedWidth(pillRef.current?.offsetWidth ?? null);
-              setLevelOpen(true);
-            }}
-            style={{
-              flex: 3, minWidth: 0, display: 'flex', alignItems: 'center',
-              justifyContent: 'center', gap: 3, padding: '0 8px',
-              background: 'transparent', border: 'none', cursor: 'pointer',
-            }}
-          >
-            <span style={{ fontSize: 'calc(11px * var(--ui-font-scale))', color: 'var(--text-secondary)' }}>{levelLabel}</span>
-            <ChevronDown size={iconSizes.compact} style={{ color: 'var(--text-muted)', flexShrink: 0 }} />
-          </button></>}
+          {showThinking && (
+            <>
+              <span
+                style={{
+                  width: 1,
+                  margin: '4px 0',
+                  flexShrink: 0,
+                  background: 'var(--border-strong)',
+                }}
+              />
+              {/* Effort area (about 30%): opens the effort menu in place. */}
+              <button
+                data-testid="pill-level"
+                data-tip={`${t('Thinking effort')}: ${levelLabel}`}
+                onClick={() => {
+                  setLockedWidth(pillRef.current?.offsetWidth ?? null);
+                  setLevelOpen(true);
+                }}
+                style={{
+                  flex: 3,
+                  minWidth: 0,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: 3,
+                  padding: '0 8px',
+                  background: 'transparent',
+                  border: 'none',
+                  cursor: 'pointer',
+                }}>
+                <span style={{ fontSize: 'calc(11px * var(--ui-font-scale))', color: 'var(--text-secondary)' }}>{levelLabel}</span>
+                <ChevronDown size={iconSizes.compact} style={{ color: 'var(--text-muted)', flexShrink: 0 }} />
+              </button>
+            </>
+          )}
         </>
       )}
 

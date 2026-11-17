@@ -15,10 +15,15 @@ test.describe('new tab type quick settings', () => {
       await page.setViewportSize({ width, height: 800 });
       for (const menu of await page.getByRole('menu').all()) {
         // Menus reposition on resize; poll until the new placement settles.
-        await expect.poll(async () => {
-          const bounds = (await menu.boundingBox())!;
-          return bounds.x >= 8 && bounds.x + bounds.width <= width - 8;
-        }, { message: `menu stays on screen at ${width}px` }).toBe(true);
+        await expect
+          .poll(
+            async () => {
+              const bounds = (await menu.boundingBox())!;
+              return bounds.x >= 8 && bounds.x + bounds.width <= width - 8;
+            },
+            { message: `menu stays on screen at ${width}px` },
+          )
+          .toBe(true);
       }
       await page.screenshot({ path: info.outputPath(`nested-settings-${width}.png`) });
     }
@@ -26,27 +31,31 @@ test.describe('new tab type quick settings', () => {
     await expect(settings).toBeFocused();
     await page.getByRole('menuitemradio', { name: '设为默认终端' }).click();
     await expect(restored).toHaveAttribute('data-shell-mark', 'bash');
-    await page.reload(); await ensureTabsOpen(page);
+    await page.reload();
+    await ensureTabsOpen(page);
     await expect(restored).toHaveAttribute('data-shell-mark', 'bash');
     await page.screenshot({ path: info.outputPath('restored-default-color.png') });
   });
   test.beforeEach(async ({ page }, info) => {
     await setupTauriMock(page);
-    if (info.title.startsWith('restored default shell')) await page.addInitScript(() => {
-      const api = (window as unknown as { __TAURI_INTERNALS__: { invoke: (command: string, args?: Record<string, unknown>) => Promise<unknown> } }).__TAURI_INTERNALS__;
-      const original = api.invoke;
-      api.invoke = async (command, args) => {
-        const result = await original(command, args);
-        if (command !== 'list_sessions' && command !== 'get_session') return result;
-        const update = (row: { id: string; payload: string }) => {
-          if (row.id !== 't1') return row;
-          const payload = JSON.parse(row.payload) as { layout: { terminal: { shellType?: string } } };
-          delete payload.layout.terminal.shellType;
-          return { ...row, payload: JSON.stringify(payload) };
+    if (info.title.startsWith('restored default shell'))
+      await page.addInitScript(() => {
+        const api = (
+          window as unknown as { __TAURI_INTERNALS__: { invoke: (command: string, args?: Record<string, unknown>) => Promise<unknown> } }
+        ).__TAURI_INTERNALS__;
+        const original = api.invoke;
+        api.invoke = async (command, args) => {
+          const result = await original(command, args);
+          if (command !== 'list_sessions' && command !== 'get_session') return result;
+          const update = (row: { id: string; payload: string }) => {
+            if (row.id !== 't1') return row;
+            const payload = JSON.parse(row.payload) as { layout: { terminal: { shellType?: string } } };
+            delete payload.layout.terminal.shellType;
+            return { ...row, payload: JSON.stringify(payload) };
+          };
+          return Array.isArray(result) ? result.map(update) : result ? update(result as { id: string; payload: string }) : result;
         };
-        return Array.isArray(result) ? result.map(update) : result ? update(result as { id: string; payload: string }) : result;
-      };
-    });
+      });
     await page.goto('/');
     await ensureTabsOpen(page);
   });
@@ -74,10 +83,15 @@ test.describe('new tab type quick settings', () => {
     // A tab created with this type starts in the new mode
     await zsh.click();
     await expect(page.locator('[data-testid^="tab-row-"]')).toHaveCount(2);
-    await expect.poll(() => page.evaluate(() =>
-      (window as unknown as { __PTY_SPAWNS__: { shell?: string; openMode?: string }[] }).__PTY_SPAWNS__
-        .some(spawn => spawn.shell === 'zsh' && spawn.openMode === 'classic'),
-    )).toBe(true);
+    await expect
+      .poll(() =>
+        page.evaluate(() =>
+          (window as unknown as { __PTY_SPAWNS__: { shell?: string; openMode?: string }[] }).__PTY_SPAWNS__.some(
+            (spawn) => spawn.shell === 'zsh' && spawn.openMode === 'classic',
+          ),
+        ),
+      )
+      .toBe(true);
   });
 
   test('right-clicking a terminal type sets it as the default terminal', async ({ page }) => {
@@ -104,10 +118,12 @@ test.describe('new tab type quick settings', () => {
     await page.getByRole('menuitemradio', { name: '自动重连' }).click();
 
     // Reopen the menu after the save completes; the checked state is updated
-    await expect.poll(async () => {
-      await row.click({ button: 'right' });
-      return page.getByRole('menuitemradio', { name: '自动重连' }).getAttribute('aria-checked');
-    }).toBe('true');
+    await expect
+      .poll(async () => {
+        await row.click({ button: 'right' });
+        return page.getByRole('menuitemradio', { name: '自动重连' }).getAttribute('aria-checked');
+      })
+      .toBe('true');
     await page.keyboard.press('Escape');
 
     // Edit connection opens the SSH form; closing it returns to the picker

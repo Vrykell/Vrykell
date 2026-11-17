@@ -7,9 +7,26 @@
  * a letter tile or a generic robot, so a list shows the real service wherever one is recognisable.
  */
 import {
-  AnthropicMark, DeepSeekMark, GeminiMark, GroqMark, MistralMark, MoonshotMark, OllamaMark,
-  OpenAIMark, OpenCodeMark, OpenRouterMark, QwenMark, SiliconFlowMark, XaiMark, ZhipuMark,
-  HunyuanMark, MinimaxMark, LongCatMark, StepfunMark, MiMoMark, MetaMark,
+  AnthropicMark,
+  DeepSeekMark,
+  GeminiMark,
+  GroqMark,
+  MistralMark,
+  MoonshotMark,
+  OllamaMark,
+  OpenAIMark,
+  OpenCodeMark,
+  OpenRouterMark,
+  QwenMark,
+  SiliconFlowMark,
+  XaiMark,
+  ZhipuMark,
+  HunyuanMark,
+  MinimaxMark,
+  LongCatMark,
+  StepfunMark,
+  MiMoMark,
+  MetaMark,
 } from '@ui/icons/brandMarks';
 import { Cpu, Server, type AppIcon } from '@ui/icons';
 import { providerDefinition } from '@config/providers';
@@ -17,9 +34,28 @@ import { t, type I18nKey } from '@i18n';
 import type { ProviderKind } from '@features/agent/services/provider';
 
 export type ModelVendor =
-  | 'anthropic' | 'openai' | 'gemini' | 'deepseek' | 'moonshot' | 'zhipu' | 'qwen' | 'siliconflow'
-  | 'openrouter' | 'groq' | 'xai' | 'mistral' | 'ollama' | 'opencode' | 'local' | 'generic'
-  | 'hunyuan' | 'minimax' | 'longcat' | 'stepfun' | 'mimo' | 'meta';
+  | 'anthropic'
+  | 'openai'
+  | 'gemini'
+  | 'deepseek'
+  | 'moonshot'
+  | 'zhipu'
+  | 'qwen'
+  | 'siliconflow'
+  | 'openrouter'
+  | 'groq'
+  | 'xai'
+  | 'mistral'
+  | 'ollama'
+  | 'opencode'
+  | 'local'
+  | 'generic'
+  | 'hunyuan'
+  | 'minimax'
+  | 'longcat'
+  | 'stepfun'
+  | 'mimo'
+  | 'meta';
 
 export interface VendorInfo {
   label: string;
@@ -72,7 +108,11 @@ const HOST_RULES: [RegExp, ModelVendor][] = [
 
 const MODEL_RULES: [RegExp, ModelVendor][] = [
   [/(?:^|\/)hy[34](?:[-.]|$)|hunyuan/, 'hunyuan'],
-  [/minimax/, 'minimax'], [/longcat/, 'longcat'], [/mimo/, 'mimo'], [/step(?:fun|[-\d])/, 'stepfun'], [/llama|muse-spark/, 'meta'],
+  [/minimax/, 'minimax'],
+  [/longcat/, 'longcat'],
+  [/mimo/, 'mimo'],
+  [/step(?:fun|[-\d])/, 'stepfun'],
+  [/llama|muse-spark/, 'meta'],
   [/claude|sonnet|opus|haiku/, 'anthropic'],
   [/gpt|chatgpt|davinci|codex|^o[134]/, 'openai'],
   [/gemini|gemma|palm/, 'gemini'],
@@ -85,7 +125,8 @@ const MODEL_RULES: [RegExp, ModelVendor][] = [
 ];
 
 /** Loopback and LAN endpoints serve whatever the user runs there, never a vendor cloud. */
-const LOCAL_HOSTS = /^(localhost|127(\.\d+){3}|0\.0\.0\.0|\[?::1\]?|host\.docker\.internal|10(\.\d+){3}|192\.168(\.\d+){2}|172\.(1[6-9]|2\d|3[01])(\.\d+){2})$/;
+const LOCAL_HOSTS =
+  /^(localhost|127(\.\d+){3}|0\.0\.0\.0|\[?::1\]?|host\.docker\.internal|10(\.\d+){3}|192\.168(\.\d+){2}|172\.(1[6-9]|2\d|3[01])(\.\d+){2})$/;
 
 function endpointHost(baseUrl: string): string {
   const trimmed = baseUrl.trim();

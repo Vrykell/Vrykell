@@ -24,7 +24,15 @@ function fixture() {
   return { scroll, add };
 }
 
-beforeEach(() => vi.stubGlobal('ResizeObserver', class { observe() {} disconnect() {} }));
+beforeEach(() =>
+  vi.stubGlobal(
+    'ResizeObserver',
+    class {
+      observe() {}
+      disconnect() {}
+    },
+  ),
+);
 afterEach(() => vi.unstubAllGlobals());
 
 describe('viewport command header', () => {
@@ -49,12 +57,16 @@ describe('viewport command header', () => {
       });
       expect(view.result.current).toBe(previous);
       expect(overlay.style.getPropertyValue('--pinned-command-remaining')).toBe('790px');
-    } finally { view.unmount(); parent.remove(); }
+    } finally {
+      view.unmount();
+      parent.remove();
+    }
   });
   it('finds the visible command without reading every historical block geometry', () => {
     const { scroll, add } = fixture();
     const items = Array.from({ length: 1024 }, (_, index) =>
-      add(String(index), (index - 1023) * 100, (index - 1023) * 100 + 200, (index - 1023) * 100 + 30));
+      add(String(index), (index - 1023) * 100, (index - 1023) * 100 + 200, (index - 1023) * 100 + 30),
+    );
     expect(measurePinnedCommand(scroll)?.id).toBe('1023');
     expect(items.reduce((total, item) => total + item.rect.mock.calls.length, 0)).toBeLessThan(15);
   });

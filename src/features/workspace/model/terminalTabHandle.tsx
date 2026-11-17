@@ -19,11 +19,20 @@ export function terminalTabHandle(tab: Tab, title: string, defaultShellType?: Sh
     id: tab.id,
     label: title,
     tip: title,
-    icon: tab.kind === 'history'
-      ? <History size={iconSizes.compact} />
-      : <IconCountBadge count={terminals.length}>
-          <TerminalProfileIcon colored kind={first?.kind} shellType={first?.shellType ?? (isSessionTab(tab) ? defaultShellType : undefined)} connectionId={first?.ssh?.connectionId} size={iconSizes.control} />
-        </IconCountBadge>,
+    icon:
+      tab.kind === 'history' ? (
+        <History size={iconSizes.compact} />
+      ) : (
+        <IconCountBadge count={terminals.length}>
+          <TerminalProfileIcon
+            colored
+            kind={first?.kind}
+            shellType={first?.shellType ?? (isSessionTab(tab) ? defaultShellType : undefined)}
+            connectionId={first?.ssh?.connectionId}
+            size={iconSizes.control}
+          />
+        </IconCountBadge>
+      ),
     closeLabel: t('Close this tab'),
     ...(closeTestId ? { closeTestId } : {}),
     capabilities: tabCapabilities({ renameable: isSessionTab(tab), groupable: isSessionTab(tab) }),

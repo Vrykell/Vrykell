@@ -3,7 +3,10 @@ import { describeFileServiceFailure } from '../model/fileServiceState';
 
 describe('file service status', () => {
   it('distinguishes absent SFTP from an incompatible file transport', () => {
-    expect(describeFileServiceFailure('SFTP_UNAVAILABLE:subsystem request failed')).toMatchObject({ kind: 'unavailable', title: '此连接暂不能浏览文件' });
+    expect(describeFileServiceFailure('SFTP_UNAVAILABLE:subsystem request failed')).toMatchObject({
+      kind: 'unavailable',
+      title: '此连接暂不能浏览文件',
+    });
     const handshake = describeFileServiceFailure('SSH 握手失败：[Session(-5)] Unable to exchange encryption keys');
     expect(handshake.kind).toBe('unavailable');
     expect(handshake.message).toContain('文件客户端');

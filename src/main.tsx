@@ -14,10 +14,10 @@ preloadApplication();
 const rootElement = document.getElementById('root');
 if (!rootElement) throw new Error('找不到应用挂载节点');
 
-void loadBundledFonts().then(() => createRoot(rootElement).render(
-  <StrictMode>
-    <AppProviders>
-      {toolWindowToken ? <ToolWindowApp token={toolWindowToken} /> : <App />}
-    </AppProviders>
-  </StrictMode>,
-));
+void loadBundledFonts().then(() =>
+  createRoot(rootElement).render(
+    <StrictMode>
+      <AppProviders>{toolWindowToken ? <ToolWindowApp token={toolWindowToken} /> : <App />}</AppProviders>
+    </StrictMode>,
+  ),
+);

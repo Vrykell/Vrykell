@@ -5,7 +5,8 @@ import { prepareSshHost, prepareSshJumpHosts, SshHostKeyMismatchError, SshHostTr
 
 vi.mock('@tauri-apps/plugin-dialog', () => ({ ask: vi.fn() }));
 vi.mock('../services/api', () => ({
-  sshHostKeyInfo: vi.fn(), sshTrustHostKey: vi.fn(),
+  sshHostKeyInfo: vi.fn(),
+  sshTrustHostKey: vi.fn(),
   sshConnectionOptions: (options: unknown) => options,
 }));
 const info = { known: false, mismatch: false, fingerprint: 'SHA256:verified-key', keyType: 'ed25519' };
@@ -56,24 +57,37 @@ describe('SSH host trust', () => {
   it('keeps the presented key details of a changed fingerprint', async () => {
     vi.mocked(sshHostKeyInfo).mockResolvedValue({ known: false, mismatch: true, fingerprint: 'SHA256:presented-key', keyType: 'rsa' });
     await expect(prepareSshHost('server', 2222)).rejects.toMatchObject({
-      name: 'SshHostKeyMismatchError', host: 'server', port: 2222, keyType: 'rsa', fingerprint: 'SHA256:presented-key',
+      name: 'SshHostKeyMismatchError',
+      host: 'server',
+      port: 2222,
+      keyType: 'rsa',
+      fingerprint: 'SHA256:presented-key',
     });
     expect(ask).not.toHaveBeenCalled();
     expect(sshTrustHostKey).not.toHaveBeenCalled();
   });
   it('keeps a jump-hop mismatch attached to the failing hop', async () => {
     vi.mocked(sshHostKeyInfo).mockResolvedValue({ known: false, mismatch: true, fingerprint: 'SHA256:hop-key', keyType: 'rsa' });
-    const connections = [{ id: 'gateway', name: 'Gateway', host: 'gateway.test', port: 2222, user: 'jump-user', authMethod: 'password' as const }];
+    const connections = [
+      { id: 'gateway', name: 'Gateway', host: 'gateway.test', port: 2222, user: 'jump-user', authMethod: 'password' as const },
+    ];
     const pending = prepareSshJumpHosts({ jumpConnectionId: 'gateway' }, connections);
     await expect(pending).rejects.toMatchObject({
-      name: 'SshHostKeyMismatchError', host: 'gateway.test', port: 2222, keyType: 'rsa', fingerprint: 'SHA256:hop-key',
+      name: 'SshHostKeyMismatchError',
+      host: 'gateway.test',
+      port: 2222,
+      keyType: 'rsa',
+      fingerprint: 'SHA256:hop-key',
     });
     expect(sshHostKeyInfo).toHaveBeenCalledWith('gateway.test', 2222, expect.any(Object));
     expect(vi.mocked(sshHostKeyInfo).mock.calls[0][2]).not.toHaveProperty('password');
   });
   it('does not trust a host after the pane closes during confirmation', async () => {
     const abort = new AbortController();
-    vi.mocked(ask).mockImplementation(async () => { abort.abort(); return true; });
+    vi.mocked(ask).mockImplementation(async () => {
+      abort.abort();
+      return true;
+    });
     await expect(prepareSshHost('server', 22, abort.signal)).rejects.toThrow();
     expect(sshTrustHostKey).not.toHaveBeenCalled();
   });

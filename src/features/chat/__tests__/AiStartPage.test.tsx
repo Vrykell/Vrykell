@@ -13,7 +13,8 @@ vi.mock('@platform/diagnostics', () => ({ invoke: invokeMock, diagnostic: vi.fn(
 beforeEach(() => {
   invokeMock.mockReset();
   invokeMock.mockImplementation((command: string) => {
-    if (command === 'acp_harnesses') return Promise.resolve([{ name: 'Agent', command: 'agent', args: [], env: {}, cwd: '', enabled: true }]);
+    if (command === 'acp_harnesses')
+      return Promise.resolve([{ name: 'Agent', command: 'agent', args: [], env: {}, cwd: '', enabled: true }]);
     if (command === 'acp_workspace_root') return Promise.resolve('C:/work');
     if (command === 'which_cmd') return Promise.resolve(true);
     return Promise.resolve(undefined);

@@ -1,9 +1,15 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { open as openDialog } from '@tauri-apps/plugin-dialog';
 import {
-  listSkills, getSkill, removeSkill, installSkillMd, fetchRemoteSkills, importSkillsFromPath,
+  listSkills,
+  getSkill,
+  removeSkill,
+  installSkillMd,
+  fetchRemoteSkills,
+  importSkillsFromPath,
   setSkillState,
-  type SkillMeta, type SkillDetail,
+  type SkillMeta,
+  type SkillDetail,
 } from '@features/agent/services/skills';
 import { useToastStore } from '@ui/feedback/Toast';
 import { t } from '@i18n';
@@ -18,7 +24,10 @@ export function useSkillsSettings() {
   const [error, setError] = useState<string | null>(null);
   const [changing, setChanging] = useState<string[]>([]);
   const changes = useRef(new Set<string>());
-  const setDetail = useCallback((next: SkillDetail | null) => { detailRequest.current++; updateDetail(next); }, []);
+  const setDetail = useCallback((next: SkillDetail | null) => {
+    detailRequest.current++;
+    updateDetail(next);
+  }, []);
   const [importUrl, setImportUrl] = useState('');
   const [importing, setImporting] = useState(false);
   const [warnDismissed, setWarnDismissed] = useState(false);
@@ -29,27 +38,40 @@ export function useSkillsSettings() {
 
   const refresh = useCallback(() => {
     const request = ++listRequest.current;
-    setLoading(true); setError(null);
+    setLoading(true);
+    setError(null);
     void listSkills()
-      .then(next => { if (request === listRequest.current) setMetas(next); })
-      .catch(failure => { if (request === listRequest.current) setError(String(failure)); })
-      .finally(() => { if (request === listRequest.current) setLoading(false); });
+      .then((next) => {
+        if (request === listRequest.current) setMetas(next);
+      })
+      .catch((failure) => {
+        if (request === listRequest.current) setError(String(failure));
+      })
+      .finally(() => {
+        if (request === listRequest.current) setLoading(false);
+      });
   }, []);
 
   useEffect(() => {
     refresh();
-    return () => { detailRequest.current++; listRequest.current++; };
+    return () => {
+      detailRequest.current++;
+      listRequest.current++;
+    };
   }, [refresh]);
 
-  const openDetail = useCallback(async (name: string) => {
-    const request = ++detailRequest.current;
-    try {
-      const next = await getSkill(name);
-      if (request === detailRequest.current) updateDetail(next);
-    } catch (error) {
-      toast(String((error as Error)?.message ?? error), 'error');
-    }
-  }, [toast]);
+  const openDetail = useCallback(
+    async (name: string) => {
+      const request = ++detailRequest.current;
+      try {
+        const next = await getSkill(name);
+        if (request === detailRequest.current) updateDetail(next);
+      } catch (error) {
+        toast(String((error as Error)?.message ?? error), 'error');
+      }
+    },
+    [toast],
+  );
 
   const doImportUrl = useCallback(async () => {
     const url = importUrl.trim();
@@ -72,58 +94,75 @@ export function useSkillsSettings() {
     }
   }, [importUrl, refresh, toast]);
 
-  const doImportPath = useCallback(async (directory: boolean) => {
-    try {
-      const selected = await openDialog({ multiple: false, directory });
-      if (typeof selected !== 'string') return;
-      setImporting(true);
+  const doImportPath = useCallback(
+    async (directory: boolean) => {
       try {
-        const imported = await importSkillsFromPath(selected);
-        toast(t('Imported {{count}} skills.', { count: imported.length }), 'success');
-        refresh();
-      } finally {
-        setImporting(false);
+        const selected = await openDialog({ multiple: false, directory });
+        if (typeof selected !== 'string') return;
+        setImporting(true);
+        try {
+          const imported = await importSkillsFromPath(selected);
+          toast(t('Imported {{count}} skills.', { count: imported.length }), 'success');
+          refresh();
+        } finally {
+          setImporting(false);
+        }
+      } catch (error) {
+        toast(String((error as Error)?.message ?? error), 'error');
       }
-    } catch (error) {
-      toast(String((error as Error)?.message ?? error), 'error');
-    }
-  }, [refresh, toast]);
+    },
+    [refresh, toast],
+  );
 
-  const toggleTrust = useCallback(async (skill: SkillMeta) => {
-    try {
-      await setSkillState(skill.name, !skill.trusted, undefined);
-      refresh();
-    } catch (error) {
-      toast(String((error as Error)?.message ?? error), 'error');
-    }
-  }, [refresh, toast]);
+  const toggleTrust = useCallback(
+    async (skill: SkillMeta) => {
+      try {
+        await setSkillState(skill.name, !skill.trusted, undefined);
+        refresh();
+      } catch (error) {
+        toast(String((error as Error)?.message ?? error), 'error');
+      }
+    },
+    [refresh, toast],
+  );
 
-  const toggleEnabled = useCallback(async (skill: SkillMeta) => {
-    if (changes.current.has(skill.name)) return;
-    changes.current.add(skill.name); setChanging([...changes.current]);
-    try {
-      await setSkillState(skill.name, undefined, !skill.enabled);
-      refresh();
-    } catch (error) {
-      toast(String((error as Error)?.message ?? error), 'error');
-    } finally {
-      changes.current.delete(skill.name); setChanging([...changes.current]);
-    }
-  }, [refresh, toast]);
+  const toggleEnabled = useCallback(
+    async (skill: SkillMeta) => {
+      if (changes.current.has(skill.name)) return;
+      changes.current.add(skill.name);
+      setChanging([...changes.current]);
+      try {
+        await setSkillState(skill.name, undefined, !skill.enabled);
+        refresh();
+      } catch (error) {
+        toast(String((error as Error)?.message ?? error), 'error');
+      } finally {
+        changes.current.delete(skill.name);
+        setChanging([...changes.current]);
+      }
+    },
+    [refresh, toast],
+  );
 
-  const del = useCallback(async (name: string) => {
-    try {
-      await removeSkill(name);
-      toast(t('Deleted {{name}}.', { name }), 'success');
-      refresh();
-    } catch (error) {
-      toast(String((error as Error)?.message ?? error), 'error');
-    }
-  }, [refresh, toast]);
+  const del = useCallback(
+    async (name: string) => {
+      try {
+        await removeSkill(name);
+        toast(t('Deleted {{name}}.', { name }), 'success');
+        refresh();
+      } catch (error) {
+        toast(String((error as Error)?.message ?? error), 'error');
+      }
+    },
+    [refresh, toast],
+  );
 
   return {
     metas,
-    loading, error, setError, changing,
+    loading,
+    error,
+    setError,
+    changing,
     detail,
     importUrl,
     importing,

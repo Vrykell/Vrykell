@@ -22,9 +22,10 @@ registerSource({
         id: `session-${s.id}`,
         title: s.title,
         subtitle: count === null ? undefined : t('{{count}} command blocks', { count }),
-        detail: s.status === 'historical'
-          ? t('Closed · {{date}}', { date: s.closed_at ? new Date(s.closed_at).toLocaleDateString() : '' })
-          : t('Active'),
+        detail:
+          s.status === 'historical'
+            ? t('Closed · {{date}}', { date: s.closed_at ? new Date(s.closed_at).toLocaleDateString() : '' })
+            : t('Active'),
         data: {
           sessionId: s.id,
           title: s.title,

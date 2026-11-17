@@ -8,15 +8,7 @@ import * as path from 'node:path';
 
 const COLS = 100;
 const ROWS = 30;
-const OUTPUT = path.resolve(
-  __dirname,
-  '..',
-  'src',
-  'test',
-  'fixtures',
-  'terminal',
-  'claude-startup-100x30.log',
-);
+const OUTPUT = path.resolve(__dirname, '..', 'src', 'test', 'fixtures', 'terminal', 'claude-startup-100x30.log');
 
 async function main() {
   const shell = 'C:/Program Files/Git/usr/bin/bash.exe';

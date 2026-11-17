@@ -2,12 +2,7 @@
  * messageParts pure-function tests: serialization roundtrip, dirty-data fallback, history summary format.
  */
 import { describe, it, expect } from 'vitest';
-import {
-  serializeParts,
-  deserializeParts,
-  partsToHistoryText,
-  type MessagePart,
-} from '@features/agent/model/messageParts';
+import { serializeParts, deserializeParts, partsToHistoryText, type MessagePart } from '@features/agent/model/messageParts';
 import { t } from '@i18n';
 
 const sampleParts: MessagePart[] = [

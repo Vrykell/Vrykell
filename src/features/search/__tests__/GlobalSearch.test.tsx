@@ -13,8 +13,7 @@ registerSource({ id: 'history', label: '命令历史', icon: History, search: hi
 registerSource({ id: 'file', label: '文件', icon: FileText, search: fileSearch });
 
 function result(command: string): SearchResult {
-  return { id: command, type: 'history', title: command,
-    data: { command, cwd: '/workspace', exitCode: 0, timestamp: 1, runCount: 1 } };
+  return { id: command, type: 'history', title: command, data: { command, cwd: '/workspace', exitCode: 0, timestamp: 1, runCount: 1 } };
 }
 
 beforeEach(() => {
@@ -71,9 +70,9 @@ describe('workspace search palette', () => {
     await screen.findByText('2 个结果');
     const body = container.querySelector<HTMLElement>('.global-search-body')!;
     const cards = Array.from(container.querySelectorAll<HTMLElement>('[data-search-result]'));
-    body.getBoundingClientRect = () => ({ top: 0, bottom: 80 } as DOMRect);
-    cards[0]!.getBoundingClientRect = () => ({ top: 0, bottom: 20 } as DOMRect);
-    cards[1]!.getBoundingClientRect = () => ({ top: 100, bottom: 120 } as DOMRect);
+    body.getBoundingClientRect = () => ({ top: 0, bottom: 80 }) as DOMRect;
+    cards[0]!.getBoundingClientRect = () => ({ top: 0, bottom: 20 }) as DOMRect;
+    cards[1]!.getBoundingClientRect = () => ({ top: 100, bottom: 120 }) as DOMRect;
 
     fireEvent.pointerMove(cards[1]!);
     expect(cards[1]).toHaveAttribute('data-selected', 'true');

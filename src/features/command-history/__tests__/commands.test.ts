@@ -2,8 +2,17 @@ import { describe, expect, it } from 'vitest';
 import { commandEnvironment, type HistoryCommandEntry } from '@core/commandHistory';
 import { commandKey, emptyPreferences, isWithin, projectItems, restoreRunningStatus } from '../model/commands';
 
-const entry = (id: string, command: string, cwd = '/work/app', shell = 'bash'): HistoryCommandEntry =>
-  ({ id, target: 'local', shell, command, cwd, status: 'success', exitCode: 0, timestamp: 1, runCount: 3 });
+const entry = (id: string, command: string, cwd = '/work/app', shell = 'bash'): HistoryCommandEntry => ({
+  id,
+  target: 'local',
+  shell,
+  command,
+  cwd,
+  status: 'success',
+  exitCode: 0,
+  timestamp: 1,
+  runCount: 3,
+});
 
 describe('project commands', () => {
   it('sorts history by recency or frequency without mutating source data or favorite order', () => {
@@ -14,11 +23,22 @@ describe('project commands', () => {
       { ...entry('manual', 'npm run preview'), timestamp: 40, runCount: 0 },
     ];
     const preferences = emptyPreferences();
-    expect(projectItems(history, preferences, '', 'all').history.map(item => item.id)).toEqual(['manual', 'latest', 'frequent', 'older']);
-    expect(projectItems(history, preferences, '', 'all', undefined, 'frequent').history.map(item => item.id)).toEqual(['frequent', 'latest', 'older', 'manual']);
-    expect(history.map(item => item.id)).toEqual(['older', 'frequent', 'latest', 'manual']);
-    preferences.favorites = [{ ...history[0]!, name: 'First' }, { ...history[1]!, name: 'Second' }];
-    expect(projectItems(history, preferences, '', 'all', undefined, 'frequent').favorites.map(item => item.name)).toEqual(['First', 'Second']);
+    expect(projectItems(history, preferences, '', 'all').history.map((item) => item.id)).toEqual(['manual', 'latest', 'frequent', 'older']);
+    expect(projectItems(history, preferences, '', 'all', undefined, 'frequent').history.map((item) => item.id)).toEqual([
+      'frequent',
+      'latest',
+      'older',
+      'manual',
+    ]);
+    expect(history.map((item) => item.id)).toEqual(['older', 'frequent', 'latest', 'manual']);
+    preferences.favorites = [
+      { ...history[0]!, name: 'First' },
+      { ...history[1]!, name: 'Second' },
+    ];
+    expect(projectItems(history, preferences, '', 'all', undefined, 'frequent').favorites.map((item) => item.name)).toEqual([
+      'First',
+      'Second',
+    ]);
   });
   it('does not show an unconfirmed command as running after a restart', () => {
     const running = { ...entry('active', 'npm run dev'), status: 'running' as const };
@@ -26,21 +46,35 @@ describe('project commands', () => {
     expect(restoreRunningStatus([running], new Set(['active']))[0]?.status).toBe('running');
   });
   it('supports saved manual order and combines collection and status filters', () => {
-    const history = [entry('one', 'npm run build'), { ...entry('two', 'cargo test'), status: 'failed' as const }, entry('three', 'git status')];
-    const preferences = { ...emptyPreferences(), historyOrder: [commandKey(history[2]!), commandKey(history[0]!)],
-      groups: [{ id: 'checks', name: 'Checks', commandKeys: [commandKey(history[1]!)] }] };
-    expect(projectItems(history, preferences, '', 'all', undefined, 'manual').history.map(item => item.id)).toEqual(['three', 'one', 'two']);
-    expect(projectItems(history, preferences, '', 'failed', undefined, 'recent', true).history.map(item => item.id)).toEqual(['two']);
+    const history = [
+      entry('one', 'npm run build'),
+      { ...entry('two', 'cargo test'), status: 'failed' as const },
+      entry('three', 'git status'),
+    ];
+    const preferences = {
+      ...emptyPreferences(),
+      historyOrder: [commandKey(history[2]!), commandKey(history[0]!)],
+      groups: [{ id: 'checks', name: 'Checks', commandKeys: [commandKey(history[1]!)] }],
+    };
+    expect(projectItems(history, preferences, '', 'all', undefined, 'manual').history.map((item) => item.id)).toEqual([
+      'three',
+      'one',
+      'two',
+    ]);
+    expect(projectItems(history, preferences, '', 'failed', undefined, 'recent', true).history.map((item) => item.id)).toEqual(['two']);
     expect(projectItems(history, preferences, '', 'success', undefined, 'recent', true).history).toEqual([]);
   });
   it('separates local and SSH identities, users, ports and shells', () => {
     expect(commandEnvironment({ kind: 'local' })).toEqual({ target: 'local', shell: 'system' });
-    expect(commandEnvironment({ kind: 'ssh', ssh: { host: 'HOST', user: 'one' } }).target)
-      .toBe(commandEnvironment({ kind: 'ssh', ssh: { host: 'host', user: 'one', port: 22 } }).target);
-    expect(commandEnvironment({ kind: 'ssh', ssh: { host: 'host', user: 'one' } }).target)
-      .not.toBe(commandEnvironment({ kind: 'ssh', ssh: { host: 'host', user: 'two' } }).target);
-    expect(commandEnvironment({ kind: 'ssh', ssh: { host: 'host', port: 23 } }).target)
-      .not.toBe(commandEnvironment({ kind: 'ssh', ssh: { host: 'host' } }).target);
+    expect(commandEnvironment({ kind: 'ssh', ssh: { host: 'HOST', user: 'one' } }).target).toBe(
+      commandEnvironment({ kind: 'ssh', ssh: { host: 'host', user: 'one', port: 22 } }).target,
+    );
+    expect(commandEnvironment({ kind: 'ssh', ssh: { host: 'host', user: 'one' } }).target).not.toBe(
+      commandEnvironment({ kind: 'ssh', ssh: { host: 'host', user: 'two' } }).target,
+    );
+    expect(commandEnvironment({ kind: 'ssh', ssh: { host: 'host', port: 23 } }).target).not.toBe(
+      commandEnvironment({ kind: 'ssh', ssh: { host: 'host' } }).target,
+    );
   });
   it('matches directory boundaries and preserves remote case', () => {
     expect(isWithin('/work/app/sub', '/work/app')).toBe(true);
@@ -60,11 +94,11 @@ describe('project commands', () => {
     preferences.hidden.push(commandKey(history[2]!));
     preferences.favorites.push({ ...history[0]!, name: 'List files' });
     const result = projectItems(history, preferences, '', 'all');
-    expect(result.favorites.map(item => item.name)).toEqual(['List files']);
-    expect(result.history.map(item => item.command)).toEqual(['lsof']);
+    expect(result.favorites.map((item) => item.name)).toEqual(['List files']);
+    expect(result.history.map((item) => item.command)).toEqual(['lsof']);
     preferences.rules = [{ id: 'prefix', kind: 'prefix', value: 'npm run' }];
     preferences.hidden = [];
-    expect(projectItems(history, preferences, '', 'all').history.map(item => item.command)).toEqual(['ls -l', 'lsof']);
+    expect(projectItems(history, preferences, '', 'all').history.map((item) => item.command)).toEqual(['ls -l', 'lsof']);
   });
   it('searches saved names, commands and paths and filters status and cwd', () => {
     const history = [entry('1', 'npm run build'), { ...entry('2', 'cargo test', '/work/app/src-tauri'), status: 'failed' as const }];
@@ -82,12 +116,16 @@ describe('project commands', () => {
     const history = [entry('bash', 'npm run build'), entry('pwsh', 'Get-ChildItem', '/work/app', 'pwsh')];
     const preferences = emptyPreferences();
     preferences.favorites = [{ ...history[1]!, id: 'favorite', name: 'PowerShell listing' }];
-    expect(projectItems(history, preferences, '', 'all', undefined, 'recent', false, 'bash').history.map(item => item.id)).toEqual(['bash']);
+    expect(projectItems(history, preferences, '', 'all', undefined, 'recent', false, 'bash').history.map((item) => item.id)).toEqual([
+      'bash',
+    ]);
     expect(projectItems(history, preferences, '', 'all', undefined, 'recent', false, 'bash').favorites).toEqual([]);
     expect(projectItems(history, preferences, '', 'all', undefined, 'recent', false, 'pwsh').history).toEqual([]);
-    expect(projectItems(history, preferences, '', 'all', undefined, 'recent', false, 'pwsh').favorites.map(item => item.name)).toEqual(['PowerShell listing']);
+    expect(projectItems(history, preferences, '', 'all', undefined, 'recent', false, 'pwsh').favorites.map((item) => item.name)).toEqual([
+      'PowerShell listing',
+    ]);
     const unfiltered = projectItems(history, preferences, '', 'all');
-    expect(unfiltered.history.map(item => item.id)).toEqual(['bash']);
-    expect(unfiltered.favorites.map(item => item.name)).toEqual(['PowerShell listing']);
+    expect(unfiltered.history.map((item) => item.id)).toEqual(['bash']);
+    expect(unfiltered.favorites.map((item) => item.name)).toEqual(['PowerShell listing']);
   });
 });

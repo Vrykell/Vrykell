@@ -5,9 +5,11 @@ import type { SearchResult, BlockResultData } from '../types';
 
 function blockResult(overrides: Partial<BlockResultData> = {}): SearchResult {
   return {
-    id: 'result', type: 'block', title: 'git --help', subtitle: 'Git command help',
-    data: { blockId: 'b', tabId: 't', command: 'git --help', exitCode: 0,
-      status: 'completed', startLine: 0, startedAt: 1, ...overrides },
+    id: 'result',
+    type: 'block',
+    title: 'git --help',
+    subtitle: 'Git command help',
+    data: { blockId: 'b', tabId: 't', command: 'git --help', exitCode: 0, status: 'completed', startLine: 0, startedAt: 1, ...overrides },
   };
 }
 
@@ -17,16 +19,14 @@ describe('search result actions', () => {
     const execute = vi.fn();
     const { container } = render(<SearchResultCard result={result} selected query="Git" onSelect={vi.fn()} onExecute={execute} />);
 
-    expect(screen.getAllByText(/git/i).some(el => el.tagName === 'MARK')).toBe(true);
+    expect(screen.getAllByText(/git/i).some((el) => el.tagName === 'MARK')).toBe(true);
     fireEvent.click(container.querySelector('[data-search-result]')!);
     expect(execute).toHaveBeenCalledWith(result);
   });
 
   it('renders one secondary line and no leading icon', () => {
     const result = { ...blockResult(), detail: 'Terminal · 1 min ago' };
-    const { container } = render(
-      <SearchResultCard result={result} selected={false} query="" onSelect={vi.fn()} onExecute={vi.fn()} />,
-    );
+    const { container } = render(<SearchResultCard result={result} selected={false} query="" onSelect={vi.fn()} onExecute={vi.fn()} />);
 
     expect(screen.getByText('Git command help')).toBeVisible();
     expect(screen.queryByText('Terminal · 1 min ago')).not.toBeInTheDocument();

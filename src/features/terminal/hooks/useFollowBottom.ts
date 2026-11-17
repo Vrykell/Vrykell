@@ -30,11 +30,10 @@ function captureViewAnchor(scroll: HTMLElement): ViewAnchor | null {
   const y = Math.min(viewport.bottom - 8, Math.max(viewport.top + 20, (titleBottom ?? viewport.top) + 8));
   const target = document.elementFromPoint(x, y);
   if (!target || !scroll.contains(target)) return null;
-  const element = target.closest<HTMLElement>('[data-testid^="command-block-"], [data-testid^="running-block-"]')
-    ?? target as HTMLElement;
+  const element =
+    target.closest<HTMLElement>('[data-testid^="command-block-"], [data-testid^="running-block-"]') ?? (target as HTMLElement);
   const caret = document.caretRangeFromPoint?.(x, y);
-  const range = caret?.startContainer.nodeType === Node.TEXT_NODE
-    && scroll.contains(caret.startContainer) ? caret.cloneRange() : null;
+  const range = caret?.startContainer.nodeType === Node.TEXT_NODE && scroll.contains(caret.startContainer) ? caret.cloneRange() : null;
   const caretTop = textTop(range, scroll);
   return {
     range,
@@ -47,19 +46,24 @@ function captureViewAnchor(scroll: HTMLElement): ViewAnchor | null {
 const engagers = new Map<string, () => void>();
 export function registerFollowEngager(id: string, engage: () => void): () => void {
   engagers.set(id, engage);
-  return () => { if (engagers.get(id) === engage) engagers.delete(id); };
+  return () => {
+    if (engagers.get(id) === engage) engagers.delete(id);
+  };
 }
-export function engageFollow(id: string): void { engagers.get(id)?.(); }
+export function engageFollow(id: string): void {
+  engagers.get(id)?.();
+}
 
-interface SavedScroll { top: number; following?: boolean; }
+interface SavedScroll {
+  top: number;
+  following?: boolean;
+}
 const scrollMemory = new Map<string, SavedScroll>();
-export function saveScrollPos(key: string, top: number): void { scrollMemory.set(key, { top }); }
+export function saveScrollPos(key: string, top: number): void {
+  scrollMemory.set(key, { top });
+}
 
-export function useFollowBottom(
-  scrollRef: React.RefObject<HTMLDivElement | null>,
-  deps: unknown[],
-  persistKey?: string,
-): () => void {
+export function useFollowBottom(scrollRef: React.RefObject<HTMLDivElement | null>, deps: unknown[], persistKey?: string): () => void {
   const atBottomRef = useRef(true);
   // Retain the actual, clamped offset to recognize delayed programmatic scroll events.
   const snappedTopRef = useRef(-1);
@@ -84,10 +88,24 @@ export function useFollowBottom(
       if (height > 0) lastVisibleTop = el.scrollTop;
       if (persistKey) scrollMemory.set(persistKey, { top: lastVisibleTop, following: atBottomRef.current });
     };
-    const record = (reason: string) => terminalDebug('terminal-follow-state', { paneId: persistKey, reason, following: atBottomRef.current, top: el.scrollTop, height: el.clientHeight, contentHeight: el.scrollHeight });
+    const record = (reason: string) =>
+      terminalDebug('terminal-follow-state', {
+        paneId: persistKey,
+        reason,
+        following: atBottomRef.current,
+        top: el.scrollTop,
+        height: el.clientHeight,
+        contentHeight: el.scrollHeight,
+      });
     const scheduleSnap = () => {
       if (frame) return;
-      frame = requestAnimationFrame(() => { frame = 0; if (atBottomRef.current) { snap(); persist(); } });
+      frame = requestAnimationFrame(() => {
+        frame = 0;
+        if (atBottomRef.current) {
+          snap();
+          persist();
+        }
+      });
     };
     let anchor: ViewAnchor | null = null;
     let anchorTimer: ReturnType<typeof setTimeout> | undefined;
@@ -188,8 +206,7 @@ export function useFollowBottom(
         atBottomRef.current = false;
         snappedTopRef.current = -1;
       } else if (!wheelBandGuarded()) {
-        atBottomRef.current =
-          contentHeight - el.scrollTop - height < BOTTOM_THRESHOLD_PX;
+        atBottomRef.current = contentHeight - el.scrollTop - height < BOTTOM_THRESHOLD_PX;
       }
       scheduleAnchor();
       persist();
@@ -199,29 +216,39 @@ export function useFollowBottom(
     el.addEventListener('wheel', onWheel, { capture: true, passive: true });
     // Observe the whole output flow because live xterm height changes outside React.
     const content = el.firstElementChild;
-    const ro = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(() => {
-      if (el.clientHeight <= 0) return;
-      if (pendingRestoreTop !== null) {
-        el.scrollTop = pendingRestoreTop; pendingRestoreTop = null;
-        if (!atBottomRef.current) anchor = captureViewAnchor(el);
-      }
-      contentHeight = el.scrollHeight;
-      // Honor the visible bottom position before restoring an older reading anchor; a fresh
-      // upward gesture keeps its position even inside the bottom band.
-      if (!wheelBandGuarded()
-        && el.scrollHeight - el.scrollTop - el.clientHeight < BOTTOM_THRESHOLD_PX) {
-        atBottomRef.current = true;
-        anchor = null;
-      }
-      height = el.clientHeight;
-      const previousTop = el.scrollTop;
-      if (atBottomRef.current) { snap(); persist(); }
-      else restoreAnchor();
-      if (Math.abs(el.scrollTop - previousTop) >= 1) terminalDebug('terminal-flow-layout', {
-        paneId: persistKey, following: atBottomRef.current, previousTop, top: el.scrollTop,
-        contentHeight: el.scrollHeight, height: el.clientHeight,
-      });
-    });
+    const ro =
+      typeof ResizeObserver === 'undefined'
+        ? null
+        : new ResizeObserver(() => {
+            if (el.clientHeight <= 0) return;
+            if (pendingRestoreTop !== null) {
+              el.scrollTop = pendingRestoreTop;
+              pendingRestoreTop = null;
+              if (!atBottomRef.current) anchor = captureViewAnchor(el);
+            }
+            contentHeight = el.scrollHeight;
+            // Honor the visible bottom position before restoring an older reading anchor; a fresh
+            // upward gesture keeps its position even inside the bottom band.
+            if (!wheelBandGuarded() && el.scrollHeight - el.scrollTop - el.clientHeight < BOTTOM_THRESHOLD_PX) {
+              atBottomRef.current = true;
+              anchor = null;
+            }
+            height = el.clientHeight;
+            const previousTop = el.scrollTop;
+            if (atBottomRef.current) {
+              snap();
+              persist();
+            } else restoreAnchor();
+            if (Math.abs(el.scrollTop - previousTop) >= 1)
+              terminalDebug('terminal-flow-layout', {
+                paneId: persistKey,
+                following: atBottomRef.current,
+                previousTop,
+                top: el.scrollTop,
+                contentHeight: el.scrollHeight,
+                height: el.clientHeight,
+              });
+          });
     ro?.observe(el);
     if (content) ro?.observe(content);
     return () => {

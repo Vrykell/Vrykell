@@ -1,6 +1,16 @@
 import { diagnostic, invoke as rawInvoke } from '@platform/diagnostics';
 import { normPath } from '@platform/path';
-import type { GitDiff, GitFileAction, GitOperation, GitScope, GitSnapshot, GitTarget, GitWorktree, GitReference, GitReferenceAction } from '@core/git';
+import type {
+  GitDiff,
+  GitFileAction,
+  GitOperation,
+  GitScope,
+  GitSnapshot,
+  GitTarget,
+  GitWorktree,
+  GitReference,
+  GitReferenceAction,
+} from '@core/git';
 
 let sequence = 0;
 async function track<T>(operation: string, request: () => Promise<T>): Promise<T> {
@@ -19,8 +29,11 @@ async function track<T>(operation: string, request: () => Promise<T>): Promise<T
 
 export function getGitSnapshot(target: GitTarget): Promise<GitSnapshot | null> {
   const normalized = target.connectionId ? target : { ...target, cwd: normPath(target.cwd) };
-  return track('snapshot', () => rawInvoke<GitSnapshot | null>('git_snapshot', { target: normalized })
-    .then(snapshot => snapshot && !target.connectionId ? { ...snapshot, root: normPath(snapshot.root) } : snapshot));
+  return track('snapshot', () =>
+    rawInvoke<GitSnapshot | null>('git_snapshot', { target: normalized }).then((snapshot) =>
+      snapshot && !target.connectionId ? { ...snapshot, root: normPath(snapshot.root) } : snapshot,
+    ),
+  );
 }
 
 export function getGitDiff(target: GitTarget, path: string, scope: GitScope): Promise<GitDiff> {
@@ -42,8 +55,22 @@ export function getGitWorktrees(target: GitTarget): Promise<GitWorktree[]> {
 export function getGitReferences(target: GitTarget): Promise<GitReference[]> {
   return track('references', () => rawInvoke('git_references', { target }));
 }
-export function editGitReference(target: GitTarget, action: GitReferenceAction, name: string, options: { newName?: string; startPoint?: string; message?: string } = {}): Promise<void> {
-  return track(action, () => rawInvoke('git_edit_reference', { target, action, name, newName: options.newName ?? null, startPoint: options.startPoint ?? null, message: options.message ?? null }));
+export function editGitReference(
+  target: GitTarget,
+  action: GitReferenceAction,
+  name: string,
+  options: { newName?: string; startPoint?: string; message?: string } = {},
+): Promise<void> {
+  return track(action, () =>
+    rawInvoke('git_edit_reference', {
+      target,
+      action,
+      name,
+      newName: options.newName ?? null,
+      startPoint: options.startPoint ?? null,
+      message: options.message ?? null,
+    }),
+  );
 }
 
 export function switchGitBranch(target: GitTarget, branch: string): Promise<void> {
@@ -51,7 +78,9 @@ export function switchGitBranch(target: GitTarget, branch: string): Promise<void
 }
 
 export function operateGit(target: GitTarget, operation: GitOperation, options: { message?: string; remote?: string } = {}): Promise<void> {
-  return track(operation, () => rawInvoke('git_operate', { target, operation, message: options.message ?? null, remote: options.remote ?? null }));
+  return track(operation, () =>
+    rawInvoke('git_operate', { target, operation, message: options.message ?? null, remote: options.remote ?? null }),
+  );
 }
 
 export function getGitCommitContext(target: GitTarget): Promise<string> {

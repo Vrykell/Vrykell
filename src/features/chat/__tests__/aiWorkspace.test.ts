@@ -4,7 +4,10 @@ import { closeAiWorkspaceSession } from '../services/aiWorkspace';
 import { useChatStore } from '../stores/chat';
 import { useComposerDrafts } from '../stores/composerDrafts';
 const snapshot = useAiWorkspace.getState();
-afterEach(() => { useAiWorkspace.setState(snapshot, true); vi.restoreAllMocks(); });
+afterEach(() => {
+  useAiWorkspace.setState(snapshot, true);
+  vi.restoreAllMocks();
+});
 
 it('closes a navigation tab without deleting the saved conversation, draft or messages', () => {
   const deleteConversation = vi.spyOn(useChatStore.getState(), 'deleteConversation');

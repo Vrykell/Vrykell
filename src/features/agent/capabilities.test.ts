@@ -55,7 +55,10 @@ describe('detectCapabilities', () => {
 
   it('label text is complete', () => {
     expect((['vision', 'reasoning', 'tools', 'search'] as ModelCapability[]).map(capabilityLabel)).toEqual([
-      t('Vision'), t('Reasoning'), t('Tools'), t('Search'),
+      t('Vision'),
+      t('Reasoning'),
+      t('Tools'),
+      t('Search'),
     ]);
   });
 });

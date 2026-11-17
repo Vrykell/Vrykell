@@ -1,10 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import {
-  buildNewTabOptions,
-  loadRecentOpen,
-  saveRecentOpen,
-  touchRecentOpen,
-} from '@features/workspace/model/tabTypes';
+import { buildNewTabOptions, loadRecentOpen, saveRecentOpen, touchRecentOpen } from '@features/workspace/model/tabTypes';
 import type { ShellOption } from '@platform/shells';
 import type { SshConnection } from '@features/ssh/services/api';
 
@@ -26,17 +21,13 @@ describe('tabTypes new tab candidates', () => {
   it('buildNewTabOptions merges shell and ssh candidates', () => {
     const opts = buildNewTabOptions(shells, sshs, {});
     expect(opts).toHaveLength(4);
-    expect(opts.map((o) => o.key)).toEqual([
-      'shell:zsh', 'shell:bash', 'ssh:ssh-1', 'ssh:ssh-2',
-    ]);
+    expect(opts.map((o) => o.key)).toEqual(['shell:zsh', 'shell:bash', 'ssh:ssh-1', 'ssh:ssh-2']);
   });
 
   it('sorts by most recent open time descending and keeps unopened entries in stable insertion order after them', () => {
     const recent = { 'shell:bash': 200, 'ssh:ssh-2': 300 };
     const opts = buildNewTabOptions(shells, sshs, recent);
-    expect(opts.map((o) => o.key)).toEqual([
-      'ssh:ssh-2', 'shell:bash', 'shell:zsh', 'ssh:ssh-1',
-    ]);
+    expect(opts.map((o) => o.key)).toEqual(['ssh:ssh-2', 'shell:bash', 'shell:zsh', 'ssh:ssh-1']);
   });
 
   it('touchRecentOpen persists and reads back', () => {

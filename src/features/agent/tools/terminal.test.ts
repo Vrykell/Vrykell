@@ -8,7 +8,13 @@ vi.mock('@tauri-apps/api/core', () => ({ invoke: invokeMock }));
 
 const { termMock } = vi.hoisted(() => ({
   termMock: {
-    state: { sessions: {} as Record<string, string>, startupStates: {} as Record<string, string>, scenes: {} as Record<string, string>, dims: {} as Record<string, { cols: number; rows: number }>, focusedPaneId: 'p1' },
+    state: {
+      sessions: {} as Record<string, string>,
+      startupStates: {} as Record<string, string>,
+      scenes: {} as Record<string, string>,
+      dims: {} as Record<string, { cols: number; rows: number }>,
+      focusedPaneId: 'p1',
+    },
     screen: null as { text?: string } | null,
   },
 }));
@@ -56,7 +62,25 @@ describe('read_terminal tool', () => {
     expect(await read({})).toMatchObject({ executionState: 'unknown' });
     termMock.state.scenes = { p1: 'blockList' };
     expect(await read({})).toMatchObject({ executionState: 'ready' });
-    useBlockStore.setState({ byTab: { p1: [{ id: 'running', command: 'sleep 10', status: 'executing', outputText: '', outputHtml: '', outputRaw: '', startedAt: 1, endedAt: null, exitCode: null, wasLongRunning: false, linesTruncated: 0 }] } });
+    useBlockStore.setState({
+      byTab: {
+        p1: [
+          {
+            id: 'running',
+            command: 'sleep 10',
+            status: 'executing',
+            outputText: '',
+            outputHtml: '',
+            outputRaw: '',
+            startedAt: 1,
+            endedAt: null,
+            exitCode: null,
+            wasLongRunning: false,
+            linesTruncated: 0,
+          },
+        ],
+      },
+    });
     expect(await read({})).toMatchObject({ executionState: 'busy' });
   });
   it('no session: structured error', async () => {
@@ -79,7 +103,11 @@ describe('read_terminal tool', () => {
     termMock.screen = { text: 'stale main buffer' };
     useBlockStore.setState({ byTab: { p1: [{ id: 'b1', command: 'ls', outputText: 'a.txt\nb.txt', status: 'done' } as never] } });
     const r = (await execOf(buildTerminalTools(CTX).read_terminal)({})) as {
-      ok: boolean; scene: string; cols: number; rows: number; content: string;
+      ok: boolean;
+      scene: string;
+      cols: number;
+      rows: number;
+      content: string;
     };
     expect(r.ok).toBe(true);
     expect(r.scene).toBe('blockList');
@@ -105,7 +133,9 @@ describe('terminal_keys tool', () => {
       await vi.advanceTimersByTimeAsync(3000);
       expect(await result).toMatchObject({ ok: true, sent: 0, waited_ms: 3000 });
       expect(invokeMock).not.toHaveBeenCalled();
-    } finally { vi.useRealTimers(); }
+    } finally {
+      vi.useRealTimers();
+    }
   });
   it('accepts a longer screen-update wait and clamps anything beyond the bound', async () => {
     vi.useFakeTimers();
@@ -124,7 +154,9 @@ describe('terminal_keys tool', () => {
       await vi.advanceTimersByTimeAsync(1000);
       expect(await waitOnly).toMatchObject({ ok: true, waited_ms: 1000 });
       expect(invokeMock).not.toHaveBeenCalled();
-    } finally { vi.useRealTimers(); }
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it('settles a screen-update wait as soon as the turn is aborted', async () => {
@@ -137,7 +169,9 @@ describe('terminal_keys tool', () => {
       controller.abort();
       await expect(result).resolves.toMatchObject({ ok: false, cancelled: true });
       expect(invokeMock).not.toHaveBeenCalled();
-    } finally { vi.useRealTimers(); }
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it('sends keys: \\xNN normalization, wait_ms pass-through, returns the scene', async () => {
@@ -145,7 +179,10 @@ describe('terminal_keys tool', () => {
     termMock.state.scenes = { p1: 'altScreen' };
     invokeMock.mockResolvedValue(undefined);
     const r = (await execOf(buildTerminalTools(CTX).terminal_keys)({ keys: 'vi a\\x1b', wait_ms: 0 })) as {
-      ok: boolean; sent: number; scene: string; decoded: string;
+      ok: boolean;
+      sent: number;
+      scene: string;
+      decoded: string;
     };
     expect(invokeMock).toHaveBeenCalledWith('pty_write', { id: 's1', data: 'vi a\u001b' });
     expect(r).toEqual({ ok: true, sent: 5, scene: 'altScreen', decoded: 'vi a\u001b' });
@@ -175,7 +212,8 @@ describe('terminal_keys tool', () => {
     termMock.state.sessions = { p1: 's1' };
     invokeMock.mockClear();
     const r = (await execOf(buildTerminalTools(CTX).terminal_keys)({ keys: 'a\\uZZZZ', wait_ms: 0 })) as {
-      ok: boolean; error: string;
+      ok: boolean;
+      error: string;
     };
     expect(r.ok).toBe(false);
     expect(r.error).toContain('无效转义序列');

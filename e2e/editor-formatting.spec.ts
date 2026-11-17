@@ -7,9 +7,12 @@ test('previews markdown without execution actions and switches real encoding req
   await expect(page.getByPlaceholder(/输入命令/)).toBeVisible();
   await page.evaluate(async () => {
     document.documentElement.dataset.nativeMaterial = 'fallback';
-    localStorage.setItem('mock-editor-files', JSON.stringify({ '["","/notes/readme.md"]': '# A note\n\n```sh\necho harmless\n```\n\n**Preview text**' }));
+    localStorage.setItem(
+      'mock-editor-files',
+      JSON.stringify({ '["","/notes/readme.md"]': '# A note\n\n```sh\necho harmless\n```\n\n**Preview text**' }),
+    );
     const path = '/src/features/workspace/stores/workspace.ts';
-    const { useWorkspaceStore } = await import(path) as typeof import('../src/features/workspace/stores/workspace');
+    const { useWorkspaceStore } = (await import(path)) as typeof import('../src/features/workspace/stores/workspace');
     useWorkspaceStore.getState().openEditorFile({ path: '/notes/readme.md' });
   });
   const editor = page.getByTestId('file-editor');

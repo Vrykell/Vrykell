@@ -30,36 +30,102 @@ interface Props {
   'aria-label'?: string;
 }
 
-export default function AutoSaveInput({ value, onCommit, placeholder, style, multiline, rows, type, min, max, step, disabled, trim = true, validate, normalize, onClear, clearAfterSave, testId, id, 'aria-label': ariaLabel }: Props) {
+export default function AutoSaveInput({
+  value,
+  onCommit,
+  placeholder,
+  style,
+  multiline,
+  rows,
+  type,
+  min,
+  max,
+  step,
+  disabled,
+  trim = true,
+  validate,
+  normalize,
+  onClear,
+  clearAfterSave,
+  testId,
+  id,
+  'aria-label': ariaLabel,
+}: Props) {
   const composing = useRef(false);
   const { flex, flexShrink, width, minWidth, minHeight, marginTop, marginBottom, ...controlStyle } = style ?? {};
-  const validateDraft = validate ?? (type === 'number'
-    ? (next: string) => next.trim() && Number.isFinite(Number(next)) ? undefined : t('Enter a valid number')
-    : undefined);
-  const save = useAutoSave(value, onCommit, validateDraft, clearAfterSave ? '' : undefined, next => {
+  const validateDraft =
+    validate ??
+    (type === 'number'
+      ? (next: string) => (next.trim() && Number.isFinite(Number(next)) ? undefined : t('Enter a valid number'))
+      : undefined);
+  const save = useAutoSave(value, onCommit, validateDraft, clearAfterSave ? '' : undefined, (next) => {
     let result = trim ? next.trim() : next;
     if (type === 'number') result = String(Math.min(max ?? Infinity, Math.max(min ?? -Infinity, Number(result))));
     return normalize ? normalize(result) : result;
   });
   const feedback = useSettingsSave();
-  const props = { id, value: save.value, placeholder, disabled, 'aria-label': ariaLabel, 'data-testid': testId,
-    onChange: (event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => save.setValue(event.target.value, false, composing.current),
-    onBlur: () => { void save.flush(); },
-    onCompositionStart: () => { composing.current = true; save.setComposing(true); },
-    onCompositionEnd: (event: React.CompositionEvent<HTMLInputElement | HTMLTextAreaElement>) => { composing.current = false; save.setValue(event.currentTarget.value); save.setComposing(false); },
+  const props = {
+    id,
+    value: save.value,
+    placeholder,
+    disabled,
+    'aria-label': ariaLabel,
+    'data-testid': testId,
+    onChange: (event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) =>
+      save.setValue(event.target.value, false, composing.current),
+    onBlur: () => {
+      void save.flush();
+    },
+    onCompositionStart: () => {
+      composing.current = true;
+      save.setComposing(true);
+    },
+    onCompositionEnd: (event: React.CompositionEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+      composing.current = false;
+      save.setValue(event.currentTarget.value);
+      save.setComposing(false);
+    },
     onKeyDown: (event: React.KeyboardEvent<HTMLInputElement | HTMLTextAreaElement>) => {
-      if (!multiline && event.key === 'Enter' && !event.nativeEvent.isComposing && !composing.current) { event.preventDefault(); void save.flush(); }
+      if (!multiline && event.key === 'Enter' && !event.nativeEvent.isComposing && !composing.current) {
+        event.preventDefault();
+        void save.flush();
+      }
     },
     // The shared field class supplies the compact single-line floor; multiline editors keep their own minimum.
     style: { ...inputStyle, ...controlStyle, width: '100%', ...(minHeight !== undefined ? { minHeight } : {}) },
   };
-  return <div className="autosave-input" data-multiline={multiline ? 'true' : undefined} style={{ minWidth: minWidth ?? 0, flex, flexShrink, width, marginTop, marginBottom }}>
-    {multiline ? <ConfigTextArea {...props} rows={rows} /> : <TextInput {...props} type={type} min={min} max={max} step={step} variant="field" />}
-    <SaveStatus inline status={save.status} error={save.error} onRetry={() => { void save.flush(); }} />
-    {onClear && <button type="button" onClick={() => { void feedback.save(async () => {
-      await save.cancel();
-      await onClear();
-      save.reset('');
-    }); }} style={{ marginLeft: 8, padding: '2px 8px', fontSize: 'var(--fs-micro)' }}>{t('Clear')}</button>}
-  </div>;
+  return (
+    <div
+      className="autosave-input"
+      data-multiline={multiline ? 'true' : undefined}
+      style={{ minWidth: minWidth ?? 0, flex, flexShrink, width, marginTop, marginBottom }}>
+      {multiline ? (
+        <ConfigTextArea {...props} rows={rows} />
+      ) : (
+        <TextInput {...props} type={type} min={min} max={max} step={step} variant="field" />
+      )}
+      <SaveStatus
+        inline
+        status={save.status}
+        error={save.error}
+        onRetry={() => {
+          void save.flush();
+        }}
+      />
+      {onClear && (
+        <button
+          type="button"
+          onClick={() => {
+            void feedback.save(async () => {
+              await save.cancel();
+              await onClear();
+              save.reset('');
+            });
+          }}
+          style={{ marginLeft: 8, padding: '2px 8px', fontSize: 'var(--fs-micro)' }}>
+          {t('Clear')}
+        </button>
+      )}
+    </div>
+  );
 }

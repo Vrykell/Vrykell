@@ -17,10 +17,22 @@ test('AI controls belong to the conversation while terminal input stays in comma
 
 test('pasted image attachments can be sent without a text question', async ({ page }) => {
   await mockAnthropic(page, 'I can see the image.');
-  await setupTauriMock(page, { aiActive: 'm-vision', aiModels: [{ id: 'm-vision', name: 'Vision model', provider: 'openai-compatible', baseUrl: 'http://127.0.0.1:11434/v1', model: 'vision-test', capabilities: { vision: true, reasoning: false, tools: true, search: false } }] });
+  await setupTauriMock(page, {
+    aiActive: 'm-vision',
+    aiModels: [
+      {
+        id: 'm-vision',
+        name: 'Vision model',
+        provider: 'openai-compatible',
+        baseUrl: 'http://127.0.0.1:11434/v1',
+        model: 'vision-test',
+        capabilities: { vision: true, reasoning: false, tools: true, search: false },
+      },
+    ],
+  });
   await page.goto('/');
   await page.getByRole('button', { name: '询问 AI', exact: true }).click();
-  await page.locator('[data-chat-composer]:visible').evaluate(element => {
+  await page.locator('[data-chat-composer]:visible').evaluate((element) => {
     const transfer = new DataTransfer();
     transfer.items.add(new File(['image'], 'screenshot.png', { type: 'image/png' }));
     const event = new ClipboardEvent('paste', { bubbles: true, cancelable: true });

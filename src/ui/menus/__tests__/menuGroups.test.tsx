@@ -22,6 +22,6 @@ it('groups actions consistently and keeps destructive items last', () => {
     { label: 'Cut', group: 'clipboard' as const, order: -1, onClick: vi.fn() },
   ];
   render(<ContextMenuItems items={items} onClose={vi.fn()} />);
-  expect(screen.getAllByRole('button').map(item => item.textContent)).toEqual(['Open', 'Cut', 'Copy', 'Rename', 'Delete']);
+  expect(screen.getAllByRole('button').map((item) => item.textContent)).toEqual(['Open', 'Cut', 'Copy', 'Rename', 'Delete']);
   expect(screen.getAllByRole('separator')).toHaveLength(3);
 });

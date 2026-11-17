@@ -6,6 +6,15 @@ import { useWorkspaceContainerTabs } from './useWorkspaceContainerTabs';
 
 /** Mixed tabs use the same container provider as native workspaces. */
 export function useUnifiedWorkspaceTabs(resources: WorkspaceResource[], icon: (resource: WorkspaceResource) => ReactNode) {
-  return useWorkspaceContainerTabs('unified', resources.map(resource => ({ id: resource.id, label: `${resource.title}${resource.dirty ? ' •' : ''}`,
-    tip: resource.title, icon: icon(resource), closeLabel: t('Close this tab'), capabilities: tabCapabilities({ groupable: true, renameable: true }) })));
+  return useWorkspaceContainerTabs(
+    'unified',
+    resources.map((resource) => ({
+      id: resource.id,
+      label: `${resource.title}${resource.dirty ? ' •' : ''}`,
+      tip: resource.title,
+      icon: icon(resource),
+      closeLabel: t('Close this tab'),
+      capabilities: tabCapabilities({ groupable: true, renameable: true }),
+    })),
+  );
 }

@@ -10,9 +10,12 @@ import type { TerminalReference } from '../model/conversation';
 import { useAiWorkspace } from '../stores/aiWorkspace';
 
 vi.mock('@platform/api/conversation', () => ({
-  listConversations: vi.fn().mockResolvedValue([]), saveConversation: vi.fn().mockResolvedValue(undefined),
-  listConversationMessages: vi.fn().mockResolvedValue([]), appendConversationMessage: vi.fn().mockResolvedValue(undefined),
-  deleteConversation: vi.fn().mockResolvedValue(undefined), deleteConversationMessage: vi.fn().mockResolvedValue(undefined),
+  listConversations: vi.fn().mockResolvedValue([]),
+  saveConversation: vi.fn().mockResolvedValue(undefined),
+  listConversationMessages: vi.fn().mockResolvedValue([]),
+  appendConversationMessage: vi.fn().mockResolvedValue(undefined),
+  deleteConversation: vi.fn().mockResolvedValue(undefined),
+  deleteConversationMessage: vi.fn().mockResolvedValue(undefined),
 }));
 
 const chat = useChatStore.getState();
@@ -22,7 +25,16 @@ const drafts = useComposerDrafts.getState();
 const blocks = useBlockStore.getState();
 const aiWorkspace = useAiWorkspace.getState();
 const environment = { paneId: 'a#0', label: 'Build terminal', kind: 'local' as const, cwd: '/project' };
-const reference: TerminalReference = { id: 'block-1', paneId: 'a#0', label: 'Source terminal', command: 'npm run build', output: 'Failed to compile', cwd: '/project', exitCode: 1, createdAt: 1 };
+const reference: TerminalReference = {
+  id: 'block-1',
+  paneId: 'a#0',
+  label: 'Source terminal',
+  command: 'npm run build',
+  output: 'Failed to compile',
+  cwd: '/project',
+  exitCode: 1,
+  createdAt: 1,
+};
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -30,15 +42,20 @@ beforeEach(() => {
   useAiWorkspace.setState(aiWorkspace, true);
   useChatStore.setState({ conversationsLoaded: true });
   useComposerDrafts.setState(drafts, true);
-  useWorkspaceStore.setState({ tabs: [
-    { id: 'a', kind: 'session', title: 'Build', layout: leaf({ id: 'a#0', kind: 'local', cwd: '/project' }) },
-    { id: 'b', kind: 'session', title: 'Other', layout: leaf({ id: 'b#0', kind: 'local' }) },
-  ], activeId: 'a' });
+  useWorkspaceStore.setState({
+    tabs: [
+      { id: 'a', kind: 'session', title: 'Build', layout: leaf({ id: 'a#0', kind: 'local', cwd: '/project' }) },
+      { id: 'b', kind: 'session', title: 'Other', layout: leaf({ id: 'b#0', kind: 'local' }) },
+    ],
+    activeId: 'a',
+  });
   useTerminalStore.setState({ sessions: { 'a#0': 'pty-a', 'b#0': 'pty-b' }, focusedPaneId: 'a#0' });
 });
 afterEach(() => {
-  useChatStore.setState(chat, true); useWorkspaceStore.setState(workspace, true);
-  useTerminalStore.setState(terminal, true); useComposerDrafts.setState(drafts, true);
+  useChatStore.setState(chat, true);
+  useWorkspaceStore.setState(workspace, true);
+  useTerminalStore.setState(terminal, true);
+  useComposerDrafts.setState(drafts, true);
   useBlockStore.setState(blocks, true);
   useAiWorkspace.setState(aiWorkspace, true);
 });
@@ -50,24 +67,34 @@ describe('independent conversations', () => {
     vi.mocked(api.saveConversation).mockClear();
     vi.mocked(api.appendConversationMessage).mockClear();
     let finish!: () => void;
-    vi.mocked(api.deleteConversation).mockImplementationOnce(() => new Promise<void>(resolve => { finish = resolve; }));
+    vi.mocked(api.deleteConversation).mockImplementationOnce(
+      () =>
+        new Promise<void>((resolve) => {
+          finish = resolve;
+        }),
+    );
     const deleting = useChatStore.getState().deleteConversation(id, { activateNext: false });
     await vi.waitFor(() => expect(finish).toBeTypeOf('function'));
     const stream = vi.fn(async () => {});
     const sending = useChatStore.getState().send('Late question', { conversationId: id, streamFn: stream });
-    finish(); await Promise.all([deleting, sending]);
+    finish();
+    await Promise.all([deleting, sending]);
     expect(api.saveConversation).not.toHaveBeenCalled();
     expect(api.appendConversationMessage).not.toHaveBeenCalled();
     expect(stream).not.toHaveBeenCalled();
-    expect(useChatStore.getState().conversations.some(item => item.id === id)).toBe(false);
+    expect(useChatStore.getState().conversations.some((item) => item.id === id)).toBe(false);
   });
 
   it('restores draft batches once without activating them or overwriting existing work', () => {
     const id = useChatStore.getState().createConversation();
-    useChatStore.getState().restoreDraftConversations([{ id, title: 'Replacement' }, { id: 'restored', title: 'Draft' }, { id: 'restored', title: 'Duplicate' }]);
+    useChatStore.getState().restoreDraftConversations([
+      { id, title: 'Replacement' },
+      { id: 'restored', title: 'Draft' },
+      { id: 'restored', title: 'Duplicate' },
+    ]);
     expect(useChatStore.getState().conversations).toHaveLength(2);
-    expect(useChatStore.getState().conversations.find(item => item.id === id)?.title).not.toBe('Replacement');
-    expect(useChatStore.getState().conversations.find(item => item.id === 'restored')?.title).toBe('Draft');
+    expect(useChatStore.getState().conversations.find((item) => item.id === id)?.title).not.toBe('Replacement');
+    expect(useChatStore.getState().conversations.find((item) => item.id === 'restored')?.title).toBe('Draft');
     expect(useChatStore.getState().byTab.restored).toEqual([]);
     expect(useChatStore.getState().activeConversationId).toBe(id);
     const previous = useChatStore.getState();
@@ -89,19 +116,28 @@ describe('independent conversations', () => {
     const stream: StreamFn = async (_messages, chunk, context) => {
       const id = context!.tabId!;
       chunk(`Reply for ${id}`);
-      await new Promise<void>(resolve => { releases.set(id, resolve); });
+      await new Promise<void>((resolve) => {
+        releases.set(id, resolve);
+      });
     };
-    const running = ids.map(conversationId => useChatStore.getState().send('First', { conversationId, streamFn: stream }));
+    const running = ids.map((conversationId) => useChatStore.getState().send('First', { conversationId, streamFn: stream }));
     await vi.waitFor(() => expect(releases.size).toBe(3));
     expect(useChatStore.getState().sendingTabs).toEqual(ids);
-    const followup = vi.fn(async (_messages, chunk: (text: string) => void) => { chunk('Second reply'); });
+    const followup = vi.fn(async (_messages, chunk: (text: string) => void) => {
+      chunk('Second reply');
+    });
     await useChatStore.getState().send('Second', { conversationId: ids[0], streamFn: followup });
     await useChatStore.getState().send('Third', { conversationId: ids[0], streamFn: followup });
     releases.get(ids[0])!();
     await running[0];
     await vi.waitFor(() => expect(followup).toHaveBeenCalledTimes(2));
     expect(useChatStore.getState().sendingTabs).toEqual(ids.slice(1));
-    expect(useChatStore.getState().byTab[ids[0]].filter(message => message.role === 'user').map(message => message.content)).toEqual(['First', 'Second', 'Third']);
+    expect(
+      useChatStore
+        .getState()
+        .byTab[ids[0]].filter((message) => message.role === 'user')
+        .map((message) => message.content),
+    ).toEqual(['First', 'Second', 'Third']);
     for (const id of ids.slice(1)) expect(useChatStore.getState().byTab[id][1].pending).toBe(true);
     for (const id of ids.slice(1)) releases.get(id)!();
     await Promise.all(running);
@@ -114,39 +150,67 @@ describe('independent conversations', () => {
     const second = useChatStore.getState().createConversation();
     let fail!: (error: Error) => void;
     let finish!: () => void;
-    const failing = useChatStore.getState().send('First', { conversationId: first, streamFn: () => new Promise((_resolve, reject) => { fail = reject; }) });
-    const continuing = useChatStore.getState().send('Second', { conversationId: second, streamFn: () => new Promise(resolve => { finish = resolve; }) });
+    const failing = useChatStore.getState().send('First', {
+      conversationId: first,
+      streamFn: () =>
+        new Promise((_resolve, reject) => {
+          fail = reject;
+        }),
+    });
+    const continuing = useChatStore.getState().send('Second', {
+      conversationId: second,
+      streamFn: () =>
+        new Promise((resolve) => {
+          finish = resolve;
+        }),
+    });
     await vi.waitFor(() => expect(finish).toBeTypeOf('function'));
     const queued = vi.fn(async () => {});
     await useChatStore.getState().send('Queued for second', { conversationId: second, streamFn: queued });
-    fail(new Error('Connection unavailable')); await failing;
+    fail(new Error('Connection unavailable'));
+    await failing;
     expect(useChatStore.getState().sendingTabs).toEqual([second]);
     expect(useChatStore.getState().byTab[first][1].error).toBe(true);
     useChatStore.getState().abortStream(first);
     expect(useChatStore.getState().queuedSends).toHaveLength(1);
     expect(useChatStore.getState().byTab[second][1].pending).toBe(true);
-    finish(); await continuing;
+    finish();
+    await continuing;
     await vi.waitFor(() => expect(queued).toHaveBeenCalledTimes(1));
   });
 
   it('keeps an unanswered tool cancelled immediately and after its stopped stream settles', async () => {
     const id = useChatStore.getState().createConversation();
     let finish!: () => void;
-    const pending = useChatStore.getState().send('Ask a question', { conversationId: id, streamFn: async (_messages, _chunk, ctx) => {
-      ctx?.handlers?.onToolEvent?.({ toolCallId: 'question', toolName: 'ask_user', state: 'input-pending', input: { question: 'Which target?' }, startedAt: 1 });
-      await new Promise<void>(resolve => { finish = resolve; });
-    } });
+    const pending = useChatStore.getState().send('Ask a question', {
+      conversationId: id,
+      streamFn: async (_messages, _chunk, ctx) => {
+        ctx?.handlers?.onToolEvent?.({
+          toolCallId: 'question',
+          toolName: 'ask_user',
+          state: 'input-pending',
+          input: { question: 'Which target?' },
+          startedAt: 1,
+        });
+        await new Promise<void>((resolve) => {
+          finish = resolve;
+        });
+      },
+    });
     await vi.waitFor(() => expect(finish).toBeTypeOf('function'));
     useChatStore.getState().abortStream(id);
-    const state = () => useChatStore.getState().byTab[id]?.[1]?.parts?.find(part => part.kind === 'tool');
+    const state = () => useChatStore.getState().byTab[id]?.[1]?.parts?.find((part) => part.kind === 'tool');
     expect(state()).toMatchObject({ tool: { state: 'cancelled' } });
-    finish(); await pending;
+    finish();
+    await pending;
     expect(state()).toMatchObject({ tool: { state: 'cancelled' } });
   });
   it('reserves scheduled work without blocking a different manual conversation', async () => {
     const manual = useChatStore.getState().createConversation();
     let release!: () => void;
-    const recording = new Promise<void>(resolve => { release = resolve; });
+    const recording = new Promise<void>((resolve) => {
+      release = resolve;
+    });
     const started = sendToChat('Scheduled task', () => recording);
     const reserved = useChatStore.getState().sendingTabs[0];
     expect(reserved).toBeTruthy();
@@ -178,7 +242,17 @@ describe('independent conversations', () => {
     expect(api.appendConversationMessage).not.toHaveBeenCalled();
     await useChatStore.getState().send('First message', { conversationId: id, streamFn: async () => {} });
     expect(api.saveConversation).toHaveBeenCalled();
-    expect(api.appendConversationMessage).toHaveBeenCalledWith(expect.any(String), id, 'user', 'First message', expect.any(Number), '', '', 'a#0', expect.any(String));
+    expect(api.appendConversationMessage).toHaveBeenCalledWith(
+      expect.any(String),
+      id,
+      'user',
+      'First message',
+      expect.any(Number),
+      '',
+      '',
+      'a#0',
+      expect.any(String),
+    );
   });
 
   it('removes empty history after deleting the final exchange and can save new content later', async () => {
@@ -187,68 +261,121 @@ describe('independent conversations', () => {
     useChatStore.getState().deleteExchange(id, useChatStore.getState().byTab[id][0].id);
     await vi.waitFor(() => expect(api.deleteConversation).toHaveBeenCalledWith(id));
     expect(useChatStore.getState().byTab[id]).toEqual([]);
-    expect(useChatStore.getState().conversations.some(item => item.id === id)).toBe(true);
+    expect(useChatStore.getState().conversations.some((item) => item.id === id)).toBe(true);
     await useChatStore.getState().send('New content', { conversationId: id, streamFn: async () => {} });
-    expect(api.saveConversation).toHaveBeenLastCalledWith(id, expect.any(String), expect.any(Number), expect.any(Number), expect.any(String));
+    expect(api.saveConversation).toHaveBeenLastCalledWith(
+      id,
+      expect.any(String),
+      expect.any(Number),
+      expect.any(Number),
+      expect.any(String),
+    );
   });
 
   it('queues messages in order and retains their owner when navigation changes', async () => {
     const id = useChatStore.getState().createConversation();
     let finish!: () => void;
-    const running = useChatStore.getState().send('First', { conversationId: id, streamFn: () => new Promise(resolve => { finish = resolve; }) });
+    const running = useChatStore.getState().send('First', {
+      conversationId: id,
+      streamFn: () =>
+        new Promise((resolve) => {
+          finish = resolve;
+        }),
+    });
     await vi.waitFor(() => expect(finish).toBeTypeOf('function'));
     const stream = vi.fn(async () => {});
     await useChatStore.getState().send('Second', { conversationId: id, streamFn: stream });
     await useChatStore.getState().send('Third', { conversationId: id, streamFn: stream });
     useChatStore.getState().createConversation();
-    expect(useChatStore.getState().queuedSends.map(item => item.text)).toEqual(['Second', 'Third']);
-    finish(); await running;
+    expect(useChatStore.getState().queuedSends.map((item) => item.text)).toEqual(['Second', 'Third']);
+    finish();
+    await running;
     await vi.waitFor(() => expect(stream).toHaveBeenCalledTimes(2));
-    expect(useChatStore.getState().byTab[id].filter(message => message.role === 'user').map(message => message.content)).toEqual(['First', 'Second', 'Third']);
+    expect(
+      useChatStore
+        .getState()
+        .byTab[id].filter((message) => message.role === 'user')
+        .map((message) => message.content),
+    ).toEqual(['First', 'Second', 'Third']);
   });
 
   it('starts a queued send after stopping the current turn', async () => {
     const id = useChatStore.getState().createConversation();
     let finishFirst!: () => void;
-    const first = useChatStore.getState().send('First', { conversationId: id, streamFn: () => new Promise(resolve => { finishFirst = resolve; }) });
+    const first = useChatStore.getState().send('First', {
+      conversationId: id,
+      streamFn: () =>
+        new Promise((resolve) => {
+          finishFirst = resolve;
+        }),
+    });
     await vi.waitFor(() => expect(finishFirst).toBeTypeOf('function'));
     const queued = vi.fn(async () => {});
     await useChatStore.getState().send('Queued next', { conversationId: id, streamFn: queued });
-    expect(useChatStore.getState().queuedSends.map(item => item.text)).toEqual(['Queued next']);
+    expect(useChatStore.getState().queuedSends.map((item) => item.text)).toEqual(['Queued next']);
     useChatStore.getState().abortStream(id);
     await vi.waitFor(() => expect(queued).toHaveBeenCalledTimes(1));
-    expect(useChatStore.getState().byTab[id].filter(message => message.role === 'user').map(message => message.content)).toEqual(['First', 'Queued next']);
-    finishFirst(); await first;
+    expect(
+      useChatStore
+        .getState()
+        .byTab[id].filter((message) => message.role === 'user')
+        .map((message) => message.content),
+    ).toEqual(['First', 'Queued next']);
+    finishFirst();
+    await first;
   });
 
   it('stops a noncooperative stream immediately and fences its late callbacks and finalizer', async () => {
     const id = useChatStore.getState().createConversation();
-    let finishOld!: () => void; let oldChunk!: (text: string) => void;
-    const old = useChatStore.getState().send('First', { conversationId: id, streamFn: async (_messages, chunk) => {
-      oldChunk = chunk; chunk('Partial'); await new Promise<void>(resolve => { finishOld = resolve; });
-    } });
+    let finishOld!: () => void;
+    let oldChunk!: (text: string) => void;
+    const old = useChatStore.getState().send('First', {
+      conversationId: id,
+      streamFn: async (_messages, chunk) => {
+        oldChunk = chunk;
+        chunk('Partial');
+        await new Promise<void>((resolve) => {
+          finishOld = resolve;
+        });
+      },
+    });
     await vi.waitFor(() => expect(finishOld).toBeTypeOf('function'));
     useChatStore.getState().abortStream(id);
     expect(useChatStore.getState().sendingTabs).toEqual([]);
     expect(useChatStore.getState().byTab[id][1]).toMatchObject({ content: 'Partial', stopped: true, pending: false });
     let finishNew!: () => void;
-    const next = useChatStore.getState().send('Next', { conversationId: id, streamFn: () => new Promise(resolve => { finishNew = resolve; }) });
+    const next = useChatStore.getState().send('Next', {
+      conversationId: id,
+      streamFn: () =>
+        new Promise((resolve) => {
+          finishNew = resolve;
+        }),
+    });
     await vi.waitFor(() => expect(finishNew).toBeTypeOf('function'));
-    oldChunk('Late'); finishOld(); await old;
+    oldChunk('Late');
+    finishOld();
+    await old;
     expect(useChatStore.getState().sendingTabs).toContain(id);
     expect(useChatStore.getState().byTab[id][1].content).toBe('Partial');
-    finishNew(); await next;
+    finishNew();
+    await next;
   });
 
   it('does not resurrect a stopped request when persistence finishes later', async () => {
     const id = useChatStore.getState().createConversation();
     let finishSave!: () => void;
-    vi.mocked(api.saveConversation).mockImplementationOnce(() => new Promise(resolve => { finishSave = resolve; }));
+    vi.mocked(api.saveConversation).mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          finishSave = resolve;
+        }),
+    );
     const stream = vi.fn(async () => {});
     const sending = useChatStore.getState().send('First', { conversationId: id, streamFn: stream });
     await vi.waitFor(() => expect(finishSave).toBeTypeOf('function'));
     useChatStore.getState().dropTab(id);
-    finishSave(); await sending;
+    finishSave();
+    await sending;
     expect(stream).not.toHaveBeenCalled();
     expect(useChatStore.getState().sendingTabs).toEqual([]);
     expect(useChatStore.getState().byTab[id]).toBeUndefined();
@@ -256,12 +383,29 @@ describe('independent conversations', () => {
   it('keeps the full current command result in both the reference and submitted history', async () => {
     const command = `printf ${'argument '.repeat(400)}END_COMMAND`;
     const output = `BEGIN_OUTPUT:${'line 😀\n'.repeat(900)}:FINAL_ERROR`;
-    useBlockStore.setState({ byTab: { 'a#0': [{ id: 'full', command, outputText: output, outputHtml: '', outputRaw: output,
-      status: 'done', exitCode: 1, startedAt: 1, endedAt: 2, wasLongRunning: false, linesTruncated: 0 }] } });
+    useBlockStore.setState({
+      byTab: {
+        'a#0': [
+          {
+            id: 'full',
+            command,
+            outputText: output,
+            outputHtml: '',
+            outputRaw: output,
+            status: 'done',
+            exitCode: 1,
+            startedAt: 1,
+            endedAt: 2,
+            wasLongRunning: false,
+            linesTruncated: 0,
+          },
+        ],
+      },
+    });
     const id = askAboutTerminal('a#0');
     const references = useComposerDrafts.getState().byTab[id]?.references ?? [];
     expect(references[0]).toMatchObject({ command, output });
-    const stream: StreamFn = async messages => {
+    const stream: StreamFn = async (messages) => {
       expect(messages[0].content).toContain(command);
       expect(messages[0].content).toContain(output);
     };
@@ -289,7 +433,7 @@ describe('independent conversations', () => {
     await useChatStore.getState().send('Fix the build', { conversationId: id, streamFn: stream });
     expect(useChatStore.getState().activeConversationId).toBe(id);
     expect(useChatStore.getState().byTab[id]?.[1].content).toBe('The build issue is fixed.');
-    expect(useWorkspaceStore.getState().tabs.find(tab => tab.id === 'a')?.title).toBe('Build');
+    expect(useWorkspaceStore.getState().tabs.find((tab) => tab.id === 'a')?.title).toBe('Build');
     expect(api.appendConversationMessage).toHaveBeenCalledTimes(2);
   });
 
@@ -301,7 +445,7 @@ describe('independent conversations', () => {
     expect(useAiWorkspace.getState().selected).toBe(`chat:${main}`);
     expect(useAiWorkspace.getState().sideSelected).toBe(`chat:${id}`);
     expect(useChatStore.getState().activeConversationId).toBe(main);
-    expect(useChatStore.getState().conversations.find(item => item.id === id)?.environment).toBeNull();
+    expect(useChatStore.getState().conversations.find((item) => item.id === id)?.environment).toBeNull();
     expect(useComposerDrafts.getState().byTab[id]?.references?.[0].output).toBe('Failed to compile');
     expect(useChatStore.getState().byTab[id]).toEqual([]);
     const stream: StreamFn = async (messages, _onChunk, context) => {
@@ -345,30 +489,65 @@ describe('independent conversations', () => {
     ];
     useChatStore.setState({ byTab: { [id]: messages } });
     setDefaultStream(async (history, onChunk) => {
-      expect(history.map(message => message.content)).toEqual(['First question']); onChunk('Replacement');
+      expect(history.map((message) => message.content)).toEqual(['First question']);
+      onChunk('Replacement');
     });
     await useChatStore.getState().regenerate(id, 'q1');
-    expect(useChatStore.getState().byTab[id].map(message => message.content)).toEqual(['First question', 'Replacement', 'Second question', 'Second reply']);
+    expect(useChatStore.getState().byTab[id].map((message) => message.content)).toEqual([
+      'First question',
+      'Replacement',
+      'Second question',
+      'Second reply',
+    ]);
     expect(api.deleteConversationMessage).not.toHaveBeenCalled();
-    expect(api.appendConversationMessage).toHaveBeenLastCalledWith('a1', id, 'assistant', 'Replacement', 1, '', '', null, expect.any(String));
+    expect(api.appendConversationMessage).toHaveBeenLastCalledWith(
+      'a1',
+      id,
+      'assistant',
+      'Replacement',
+      1,
+      '',
+      '',
+      null,
+      expect.any(String),
+    );
   });
 
   it('removes a persisted regeneration placeholder when stopped before any content', async () => {
     const id = useChatStore.getState().createConversation();
-    useChatStore.setState({ byTab: { [id]: [
-      { id: 'q', role: 'user', content: 'Question', createdAt: 1 },
-      { id: 'a', role: 'assistant', content: 'Old reply', createdAt: 2 },
-    ] } });
-    setDefaultStream(async () => { useChatStore.getState().abortStream(id); });
+    useChatStore.setState({
+      byTab: {
+        [id]: [
+          { id: 'q', role: 'user', content: 'Question', createdAt: 1 },
+          { id: 'a', role: 'assistant', content: 'Old reply', createdAt: 2 },
+        ],
+      },
+    });
+    setDefaultStream(async () => {
+      useChatStore.getState().abortStream(id);
+    });
     await useChatStore.getState().regenerate(id, 'q');
-    expect(useChatStore.getState().byTab[id].map(message => message.id)).toEqual(['q']);
+    expect(useChatStore.getState().byTab[id].map((message) => message.id)).toEqual(['q']);
     expect(api.deleteConversationMessage).toHaveBeenCalledWith('a');
   });
 
   it('restores independent history without requiring a terminal tab', async () => {
     useChatStore.setState({ conversationsLoaded: false });
-    vi.mocked(api.listConversations).mockResolvedValueOnce([{ id: 'saved', title: 'Build issue', created_at: 1, updated_at: 2, environment: JSON.stringify(environment) }]);
-    vi.mocked(api.listConversationMessages).mockResolvedValueOnce([{ id: 'question', role: 'user', content: 'Help', created_at: 1, parts: '', attachments: '', pane_id: 'a#0', context: JSON.stringify({ references: [reference] }) }]);
+    vi.mocked(api.listConversations).mockResolvedValueOnce([
+      { id: 'saved', title: 'Build issue', created_at: 1, updated_at: 2, environment: JSON.stringify(environment) },
+    ]);
+    vi.mocked(api.listConversationMessages).mockResolvedValueOnce([
+      {
+        id: 'question',
+        role: 'user',
+        content: 'Help',
+        created_at: 1,
+        parts: '',
+        attachments: '',
+        pane_id: 'a#0',
+        context: JSON.stringify({ references: [reference] }),
+      },
+    ]);
     useWorkspaceStore.setState({ tabs: [], activeId: '' });
     await useChatStore.getState().loadConversations();
     expect(useChatStore.getState().activeConversationId).toBe('saved');
@@ -386,17 +565,32 @@ describe('independent conversations', () => {
 
   it('restores a failed reply as an error instead of an empty successful answer', async () => {
     const id = useChatStore.getState().createConversation();
-    await useChatStore.getState().send('Help', { conversationId: id, streamFn: async () => { throw new Error('Provider unavailable'); } });
+    await useChatStore.getState().send('Help', {
+      conversationId: id,
+      streamFn: async () => {
+        throw new Error('Provider unavailable');
+      },
+    });
     expect(useChatStore.getState().byTab[id][1].error).toBe(true);
-    const saved = [...vi.mocked(api.appendConversationMessage).mock.calls].reverse().find(call => call[2] === 'assistant');
+    const saved = [...vi.mocked(api.appendConversationMessage).mock.calls].reverse().find((call) => call[2] === 'assistant');
     expect(saved).toBeDefined();
     const context = JSON.parse(saved![8]);
     expect(context.error).toBe(true);
     expect(context.errorText).toContain('Provider unavailable');
     useChatStore.setState({ conversationsLoaded: false, conversations: [], byTab: {}, activeConversationId: '' });
     vi.mocked(api.listConversations).mockResolvedValueOnce([{ id, title: 'Help', created_at: 1, updated_at: 2, environment: 'null' }]);
-    vi.mocked(api.listConversationMessages).mockResolvedValueOnce([{ id: saved![0], role: 'assistant', content: saved![3],
-      created_at: saved![4], parts: saved![5], attachments: saved![6], pane_id: saved![7], context: saved![8] }]);
+    vi.mocked(api.listConversationMessages).mockResolvedValueOnce([
+      {
+        id: saved![0],
+        role: 'assistant',
+        content: saved![3],
+        created_at: saved![4],
+        parts: saved![5],
+        attachments: saved![6],
+        pane_id: saved![7],
+        context: saved![8],
+      },
+    ]);
     await useChatStore.getState().loadConversations();
     expect(useChatStore.getState().byTab[id][0]).toMatchObject({ error: true, errorText: 'Provider unavailable' });
   });
@@ -406,13 +600,18 @@ describe('independent conversations', () => {
     await useChatStore.getState().send('Saved question', { conversationId: id, streamFn: async () => {} });
     await vi.waitFor(() => expect(api.saveConversation).toHaveBeenCalledTimes(1));
     let finishDelete: (() => void) | undefined;
-    vi.mocked(api.deleteConversation).mockImplementationOnce(() => new Promise<void>(resolve => { finishDelete = resolve; }));
+    vi.mocked(api.deleteConversation).mockImplementationOnce(
+      () =>
+        new Promise<void>((resolve) => {
+          finishDelete = resolve;
+        }),
+    );
     const deletion = useChatStore.getState().deleteConversation(id);
     await vi.waitFor(() => expect(api.deleteConversation).toHaveBeenCalledTimes(1));
     await useChatStore.getState().retryPersistence();
     finishDelete?.();
     await deletion;
     expect(api.saveConversation).toHaveBeenCalledTimes(1);
-    expect(useChatStore.getState().conversations.some(item => item.id === id)).toBe(false);
+    expect(useChatStore.getState().conversations.some((item) => item.id === id)).toBe(false);
   });
 });

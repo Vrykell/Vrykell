@@ -3,47 +3,75 @@ import { setupTauriMock } from './tauri-mock';
 import { gotoSetting } from './settings';
 
 type Mode = 'available' | 'current' | 'offline' | 'signature';
-interface Fixture { mode: Mode; checks: number; downloads: number; installs: number; restarts: number; closes: number; finish?: () => void; }
+interface Fixture {
+  mode: Mode;
+  checks: number;
+  downloads: number;
+  installs: number;
+  restarts: number;
+  closes: number;
+  finish?: () => void;
+}
 async function openAbout(page: Page, theme: 'dark' | 'light' = 'dark', mode: Mode = 'available') {
   await setupTauriMock(page, { integration: false });
-  await page.addInitScript(({ theme, mode }) => {
-    localStorage.setItem('vrykell-theme-mode', theme);
-    const root = window as unknown as { isTauri: boolean; __UPDATE_FIXTURE__: Fixture; __TAURI_INTERNALS__: { invoke: (command: string, args?: Record<string, unknown>) => Promise<unknown> } };
-    root.isTauri = true;
-    const fixture = root.__UPDATE_FIXTURE__ = { mode, checks: 0, downloads: 0, installs: 0, restarts: 0, closes: 0 };
-    const original = root.__TAURI_INTERNALS__.invoke;
-    root.__TAURI_INTERNALS__.invoke = async (command, args) => {
-      if (command === 'plugin:app|version') return '0.1.0';
-      if (command === 'plugin:updater|check') {
-        fixture.checks += 1;
-        if (fixture.mode === 'offline') throw new Error('The stable release feed is unavailable');
-        return fixture.mode === 'current' ? null : { rid: 501, currentVersion: '0.1.0', version: '0.2.0', body: 'Release notes\n<script>fixture</script>', rawJson: {} };
-      }
-      if (command === 'plugin:updater|download') {
-        fixture.downloads += 1;
-        const channel = args?.onEvent as { onmessage: (event: unknown) => void };
-        channel.onmessage({ event: 'Started', data: { contentLength: 100 } });
-        channel.onmessage({ event: 'Progress', data: { chunkLength: 25 } });
-        return new Promise<number>((resolve, reject) => {
-          fixture.finish = () => {
-            channel.onmessage({ event: 'Progress', data: { chunkLength: 75 } });
-            channel.onmessage({ event: 'Finished' });
-            if (fixture.mode === 'signature') reject(new Error('Update signature verification failed'));
-            else resolve(777);
-          };
-        });
-      }
-      if (command === 'plugin:updater|install') { fixture.installs += 1; return; }
-      if (command === 'plugin:process|restart') { fixture.restarts += 1; return; }
-      if (command === 'pty_close_all') { fixture.closes += 1; return 0; }
-      return original(command, args);
-    };
-  }, { theme, mode });
+  await page.addInitScript(
+    ({ theme, mode }) => {
+      localStorage.setItem('vrykell-theme-mode', theme);
+      const root = window as unknown as {
+        isTauri: boolean;
+        __UPDATE_FIXTURE__: Fixture;
+        __TAURI_INTERNALS__: { invoke: (command: string, args?: Record<string, unknown>) => Promise<unknown> };
+      };
+      root.isTauri = true;
+      const fixture = (root.__UPDATE_FIXTURE__ = { mode, checks: 0, downloads: 0, installs: 0, restarts: 0, closes: 0 });
+      const original = root.__TAURI_INTERNALS__.invoke;
+      root.__TAURI_INTERNALS__.invoke = async (command, args) => {
+        if (command === 'plugin:app|version') return '0.1.0';
+        if (command === 'plugin:updater|check') {
+          fixture.checks += 1;
+          if (fixture.mode === 'offline') throw new Error('The stable release feed is unavailable');
+          return fixture.mode === 'current'
+            ? null
+            : { rid: 501, currentVersion: '0.1.0', version: '0.2.0', body: 'Release notes\n<script>fixture</script>', rawJson: {} };
+        }
+        if (command === 'plugin:updater|download') {
+          fixture.downloads += 1;
+          const channel = args?.onEvent as { onmessage: (event: unknown) => void };
+          channel.onmessage({ event: 'Started', data: { contentLength: 100 } });
+          channel.onmessage({ event: 'Progress', data: { chunkLength: 25 } });
+          return new Promise<number>((resolve, reject) => {
+            fixture.finish = () => {
+              channel.onmessage({ event: 'Progress', data: { chunkLength: 75 } });
+              channel.onmessage({ event: 'Finished' });
+              if (fixture.mode === 'signature') reject(new Error('Update signature verification failed'));
+              else resolve(777);
+            };
+          });
+        }
+        if (command === 'plugin:updater|install') {
+          fixture.installs += 1;
+          return;
+        }
+        if (command === 'plugin:process|restart') {
+          fixture.restarts += 1;
+          return;
+        }
+        if (command === 'pty_close_all') {
+          fixture.closes += 1;
+          return 0;
+        }
+        return original(command, args);
+      };
+    },
+    { theme, mode },
+  );
   await page.goto('/');
   await gotoSetting(page, '关于');
   await expect(page.getByTestId('application-version')).toHaveText('0.1.0');
 }
-async function state(page: Page) { return page.evaluate(() => (window as unknown as { __UPDATE_FIXTURE__: Fixture }).__UPDATE_FIXTURE__); }
+async function state(page: Page) {
+  return page.evaluate(() => (window as unknown as { __UPDATE_FIXTURE__: Fixture }).__UPDATE_FIXTURE__);
+}
 async function finishDownload(page: Page, attempts = 1) {
   for (let attempt = 1; attempt <= attempts; attempt += 1) {
     await expect.poll(async () => (await state(page)).downloads).toBe(attempt);
@@ -51,7 +79,10 @@ async function finishDownload(page: Page, attempts = 1) {
   }
 }
 
-for (const [theme, width] of [['dark', 1240], ['light', 720]] as const) {
+for (const [theme, width] of [
+  ['dark', 1240],
+  ['light', 720],
+] as const) {
   test(`about page checks, downloads and explicitly installs stable updates in ${theme}`, async ({ page }, info) => {
     await openAbout(page, theme);
     const initialCloses = (await state(page)).closes;
@@ -92,7 +123,9 @@ test('failed update checks remain retryable without claiming the application is 
   await page.clock.install();
   await page.clock.fastForward(60000);
   await expect(page.locator('#app-notifications').getByRole('alert')).toBeVisible();
-  await page.evaluate(() => { (window as unknown as { __UPDATE_FIXTURE__: Fixture }).__UPDATE_FIXTURE__.mode = 'current'; });
+  await page.evaluate(() => {
+    (window as unknown as { __UPDATE_FIXTURE__: Fixture }).__UPDATE_FIXTURE__.mode = 'current';
+  });
   await page.locator('#app-notifications').getByRole('button', { name: '重试', exact: true }).click();
   await expect(page.getByText('当前已是最新正式版。', { exact: true })).toBeVisible();
 });
@@ -114,10 +147,10 @@ test('cancelling the unsaved-document guard keeps drafts and terminal connection
   await page.evaluate(async () => {
     const actionsPath = '/src/features/editor/services/documentActions.ts';
     const documentsPath = '/src/features/editor/stores/documents.ts';
-    const { newEditorFile } = await import(actionsPath) as typeof import('../src/features/editor/services/documentActions');
-    const { useEditorDocuments } = await import(documentsPath) as typeof import('../src/features/editor/stores/documents');
+    const { newEditorFile } = (await import(actionsPath)) as typeof import('../src/features/editor/services/documentActions');
+    const { useEditorDocuments } = (await import(documentsPath)) as typeof import('../src/features/editor/stores/documents');
     newEditorFile();
-    const draft = Object.values(useEditorDocuments.getState().documents).find(document => !!document.file.draftId)!;
+    const draft = Object.values(useEditorDocuments.getState().documents).find((document) => !!document.file.draftId)!;
     useEditorDocuments.getState().edit(draft.file, 'Keep this draft during updates');
   });
   await gotoSetting(page, '关于');
@@ -131,9 +164,11 @@ test('cancelling the unsaved-document guard keeps drafts and terminal connection
   await guard.getByRole('button', { name: '取消', exact: true }).click();
   await expect(guard).toHaveCount(0);
   expect(await state(page)).toMatchObject({ installs: 0, restarts: 0, closes: initialCloses });
-  expect(await page.evaluate(async () => {
-    const path = '/src/features/editor/stores/documents.ts';
-    const { useEditorDocuments } = await import(path) as typeof import('../src/features/editor/stores/documents');
-    return Object.values(useEditorDocuments.getState().documents).some(document => document.value === 'Keep this draft during updates');
-  })).toBe(true);
+  expect(
+    await page.evaluate(async () => {
+      const path = '/src/features/editor/stores/documents.ts';
+      const { useEditorDocuments } = (await import(path)) as typeof import('../src/features/editor/stores/documents');
+      return Object.values(useEditorDocuments.getState().documents).some((document) => document.value === 'Keep this draft during updates');
+    }),
+  ).toBe(true);
 });

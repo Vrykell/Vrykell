@@ -18,13 +18,18 @@ function hasBlockTerm(page: Page) {
 
 /** Select a run of cells in the running block's xterm, as a mouse drag would. */
 function selectInBlockTerm(page: Page, column: number, row: number, length: number) {
-  return page.evaluate(({ column, row, length }) => {
-    const map = (window as unknown as {
-      __vrykellTerms?: Map<string, { select: (column: number, row: number, length: number) => void }>;
-    }).__vrykellTerms!;
-    const key = [...map.keys()].find((candidate) => candidate.startsWith('block:'))!;
-    map.get(key)!.select(column, row, length);
-  }, { column, row, length });
+  return page.evaluate(
+    ({ column, row, length }) => {
+      const map = (
+        window as unknown as {
+          __vrykellTerms?: Map<string, { select: (column: number, row: number, length: number) => void }>;
+        }
+      ).__vrykellTerms!;
+      const key = [...map.keys()].find((candidate) => candidate.startsWith('block:'))!;
+      map.get(key)!.select(column, row, length);
+    },
+    { column, row, length },
+  );
 }
 
 test.beforeEach(async ({ page }) => {
@@ -104,9 +109,11 @@ test('with a selection Ctrl+C copies instead of sending an interrupt to the term
 
   // Without a selection it is still a terminal interrupt
   await page.evaluate(() => {
-    const map = (window as unknown as {
-      __vrykellTerms?: Map<string, { clearSelection: () => void }>;
-    }).__vrykellTerms!;
+    const map = (
+      window as unknown as {
+        __vrykellTerms?: Map<string, { clearSelection: () => void }>;
+      }
+    ).__vrykellTerms!;
     const key = [...map.keys()].find((candidate) => candidate.startsWith('block:'))!;
     map.get(key)!.clearSelection();
   });

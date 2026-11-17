@@ -11,12 +11,25 @@ vi.mock('../services/commitMessage', () => ({ generateCommitMessage: vi.fn() }))
 vi.mock('@features/workspace', () => ({ useSessionStore: { getState: () => ({}) } }));
 const target = { cwd: '/repo' };
 const key = gitTargetKey(target);
-const snapshot: GitSnapshot = { root: '/repo', branch: 'main', remotes: ['origin'], entries: [{ path: 'file.ts', previousPath: null, indexStatus: 'M', worktreeStatus: 'M' }] };
-beforeEach(() => { vi.resetAllMocks(); useGitOperations.setState({ drafts: {}, errors: {}, busy: {} }); });
+const snapshot: GitSnapshot = {
+  root: '/repo',
+  branch: 'main',
+  remotes: ['origin'],
+  entries: [{ path: 'file.ts', previousPath: null, indexStatus: 'M', worktreeStatus: 'M' }],
+};
+beforeEach(() => {
+  vi.resetAllMocks();
+  useGitOperations.setState({ drafts: {}, errors: {}, busy: {} });
+});
 
 it('retains manual typing made while a message is being generated', async () => {
   let resolve: (value: string) => void = () => {};
-  vi.mocked(generateCommitMessage).mockImplementation(() => new Promise(done => { resolve = done; }));
+  vi.mocked(generateCommitMessage).mockImplementation(
+    () =>
+      new Promise((done) => {
+        resolve = done;
+      }),
+  );
   render(<GitCommit target={target} snapshot={snapshot} refresh={() => {}} />);
   fireEvent.click(screen.getByRole('button', { name: '生成提交信息' }));
   fireEvent.change(screen.getByRole('textbox', { name: '提交信息' }), { target: { value: 'fix: typed during generation' } });
@@ -43,7 +56,7 @@ it('commits then pushes through the action menu and clears only the committed dr
   fireEvent.click(screen.getByRole('button', { name: '提交操作' }));
   fireEvent.click(screen.getByRole('button', { name: '提交并推送' }));
   await waitFor(() => expect(operateGit).toHaveBeenCalledTimes(2));
-  expect(vi.mocked(operateGit).mock.calls.map(call => call[1])).toEqual(['commit', 'push']);
+  expect(vi.mocked(operateGit).mock.calls.map((call) => call[1])).toEqual(['commit', 'push']);
   expect(screen.getByRole('textbox', { name: '提交信息' })).toHaveValue('');
 });
 
@@ -65,7 +78,12 @@ it('publishes a clean branch without an upstream and avoids a staging hint on cl
 
 it('keeps synchronization busy until the operation finishes and restores the button after failure', async () => {
   let reject: (reason: Error) => void = () => {};
-  vi.mocked(operateGit).mockImplementation(() => new Promise((_, fail) => { reject = fail; }));
+  vi.mocked(operateGit).mockImplementation(
+    () =>
+      new Promise((_, fail) => {
+        reject = fail;
+      }),
+  );
   render(<GitCommit target={target} snapshot={{ ...snapshot, entries: [], upstream: 'origin/main', ahead: 1 }} refresh={() => {}} />);
   fireEvent.click(screen.getByRole('button', { name: '同步更改 ↑1' }));
   const syncing = screen.getByRole('button', { name: '正在同步… ↑1' });
@@ -87,9 +105,15 @@ it('keeps feedback for a complete turn when synchronization finishes immediately
     fireEvent.click(screen.getByRole('button', { name: '同步更改 ↑1' }));
     await act(async () => {});
     rerender(<GitCommit target={target} snapshot={{ ...clean, ahead: 0 }} refresh={() => {}} />);
-    await act(async () => { await vi.advanceTimersByTimeAsync(799); });
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(799);
+    });
     expect(screen.getByRole('button', { name: '正在同步…' })).toHaveAttribute('aria-busy', 'true');
-    await act(async () => { await vi.advanceTimersByTimeAsync(1); });
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(1);
+    });
     expect(screen.getByRole('button', { name: '已是最新' })).toHaveAttribute('aria-busy', 'false');
-  } finally { vi.useRealTimers(); }
+  } finally {
+    vi.useRealTimers();
+  }
 });

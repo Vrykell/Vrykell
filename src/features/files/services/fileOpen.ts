@@ -48,9 +48,7 @@ function stringOr(value: unknown, fallback: string): string {
 }
 
 function recordOr(value: unknown): Record<string, string> {
-  return value && typeof value === 'object' && !Array.isArray(value)
-    ? (value as Record<string, string>)
-    : {};
+  return value && typeof value === 'object' && !Array.isArray(value) ? (value as Record<string, string>) : {};
 }
 
 export function loadConfig(): FileOpenConfig {
@@ -119,9 +117,7 @@ export function remoteOpenCommand(cfg: FileOpenConfig, path: string): string {
 
 // ── Open entry points ──
 
-export type OpenResult =
-  | { via: 'terminal'; editor: string; fellBack: boolean }
-  | { via: 'system'; degraded: boolean };
+export type OpenResult = { via: 'terminal'; editor: string; fellBack: boolean } | { via: 'system'; degraded: boolean };
 
 /** Shape returned by the file_open command (tag=via, camelCase) */
 interface FileOpenResultRust {
@@ -135,11 +131,7 @@ interface FileOpenResultRust {
 /**
  * Opens a file. With the terminal route, the command is written through the write callback (the caller adds the newline / writes to the PTY).
  */
-export async function openFile(
-  path: string,
-  write: (commandLine: string) => void,
-  shell?: ShellType,
-): Promise<OpenResult> {
+export async function openFile(path: string, write: (commandLine: string) => void, shell?: ShellType): Promise<OpenResult> {
   const cfg = loadConfig();
   const res = await invoke<FileOpenResultRust>('file_open', { path, cfg: shell ? { ...cfg, shell } : cfg });
 

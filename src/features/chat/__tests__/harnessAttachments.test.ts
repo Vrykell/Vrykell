@@ -7,7 +7,12 @@ const readAttachmentDataUrl = vi.hoisted(() => vi.fn());
 vi.mock('@features/agent/model/attachments', () => ({ readAttachmentDataUrl }));
 
 const attachment = (overrides: Partial<AttachmentMeta>): AttachmentMeta => ({
-  id: 'attachment', kind: 'file', name: 'file.txt', mime: 'text/plain', size: 10, ...overrides,
+  id: 'attachment',
+  kind: 'file',
+  name: 'file.txt',
+  mime: 'text/plain',
+  size: 10,
+  ...overrides,
 });
 
 describe('harness attachments', () => {

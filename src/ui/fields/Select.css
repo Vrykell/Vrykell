@@ -15,21 +15,66 @@
   cursor: pointer;
   transition: background var(--dur-fast) var(--ease);
 }
-.ui-select:hover:not(:disabled) { background: var(--button-hover); }
-.ui-select[aria-expanded="true"] { background: var(--button-hover); }
-.ui-select:focus-visible { outline: none; background: var(--button-hover); }
-.ui-select-value { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ui-select:hover:not(:disabled) {
+  background: var(--button-hover);
+}
+.ui-select[aria-expanded='true'] {
+  background: var(--button-hover);
+}
+.ui-select:focus-visible {
+  outline: none;
+  background: var(--button-hover);
+}
+.ui-select-value {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 /* Optional swatch for colour options; the value keeps the remaining width. */
-.ui-select-swatch { width: 14px; height: 14px; border-radius: 4px; border: 0; flex-shrink: 0; }
-.ui-select-icon { display: inline-flex; align-items: center; flex-shrink: 0; }
-.ui-select-badge { display: inline-flex; align-items: center; flex-shrink: 0; }
+.ui-select-swatch {
+  width: 14px;
+  height: 14px;
+  border-radius: 4px;
+  border: 0;
+  flex-shrink: 0;
+}
+.ui-select-icon {
+  display: inline-flex;
+  align-items: center;
+  flex-shrink: 0;
+}
+.ui-select-badge {
+  display: inline-flex;
+  align-items: center;
+  flex-shrink: 0;
+}
 /* Dropdown rows share the trigger's rounded-square swatch. */
-.ui-select-chevron { flex-shrink: 0; color: var(--text-muted); transition: transform var(--dur-fast) var(--ease); }
-.ui-select[aria-expanded="true"] .ui-select-chevron { transform: rotate(180deg); }
-.ui-select-menu { position: fixed; z-index: 10000; display: flex; flex-direction: column; padding: 4px; }
-.workspace-floating.ui-select-menu { background: var(--elevated); }
+.ui-select-chevron {
+  flex-shrink: 0;
+  color: var(--text-muted);
+  transition: transform var(--dur-fast) var(--ease);
+}
+.ui-select[aria-expanded='true'] .ui-select-chevron {
+  transform: rotate(180deg);
+}
+.ui-select-menu {
+  position: fixed;
+  z-index: 10000;
+  display: flex;
+  flex-direction: column;
+  padding: 4px;
+}
+.workspace-floating.ui-select-menu {
+  background: var(--elevated);
+}
 /* Only the rows scroll; the trailing action stays pinned below them. */
-.ui-select-options { min-height: 0; overflow-y: auto; overscroll-behavior: contain; }
+.ui-select-options {
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
 .ui-select-option {
   display: flex;
   align-items: center;
@@ -40,15 +85,33 @@
   cursor: pointer;
   transition: background var(--dur-fast) var(--ease);
 }
-.ui-select-option-label { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.ui-select-option-label {
+  flex: 1;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
 /* The selected option is marked with a check icon, not a filled background. */
-.ui-select-option[aria-selected="true"] { font-weight: inherit; }
-.ui-select-check { flex-shrink: 0; color: var(--accent); }
-.ui-select-option[data-active="true"] { background: var(--hover); }
-.ui-select-menu[data-keyboard-navigation="false"] .ui-select-option:hover:not([aria-disabled="true"]) { background: var(--hover); }
-.ui-select-option[aria-disabled="true"] { color: var(--text-muted); cursor: default; opacity: 0.45; }
+.ui-select-option[aria-selected='true'] {
+  font-weight: inherit;
+}
+.ui-select-check {
+  flex-shrink: 0;
+  color: var(--accent);
+}
+.ui-select-option[data-active='true'] {
+  background: var(--hover);
+}
+.ui-select-menu[data-keyboard-navigation='false'] .ui-select-option:hover:not([aria-disabled='true']) {
+  background: var(--hover);
+}
+.ui-select-option[aria-disabled='true'] {
+  color: var(--text-muted);
+  cursor: default;
+  opacity: 0.45;
+}
 /* Trailing action: a quiet row separated from the options, sharing their active highlight. */
 .ui-select-action {
+  position: relative;
   display: flex;
   align-items: center;
   gap: 8px;
@@ -56,7 +119,6 @@
   margin-top: 4px;
   padding: 6px 10px;
   border: 0;
-  border-top: 1px solid var(--border);
   border-radius: 0 0 var(--radius-inner) var(--radius-inner);
   background: transparent;
   color: var(--text-secondary);
@@ -65,6 +127,21 @@
   cursor: pointer;
   transition: color var(--dur-fast) var(--ease);
 }
-.ui-select-action > svg { flex-shrink: 0; color: var(--text-muted); }
+/* The separator above the trailing action stops short of the menu edge. */
+.ui-select-action::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 8px;
+  right: 8px;
+  border-top: 1px solid var(--border);
+  pointer-events: none;
+}
+.ui-select-action > svg {
+  flex-shrink: 0;
+  color: var(--text-muted);
+}
 /* Quiet feedback only: the action never paints a highlight background. */
-.ui-select-action:is(:hover, [data-active="true"]) { color: var(--text-primary); }
+.ui-select-action:is(:hover, [data-active='true']) {
+  color: var(--text-primary);
+}

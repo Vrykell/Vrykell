@@ -78,8 +78,12 @@ export function useTerminalFocus(active: boolean, tabId: string, recheck = false
       if (hasTextSelection()) return;
       term.focus();
     };
-    const onPointerDown = (event: MouseEvent) => { if (event.button === 0) pointerPressed.current = true; };
-    const onPointerUp = () => { pointerPressed.current = false; };
+    const onPointerDown = (event: MouseEvent) => {
+      if (event.button === 0) pointerPressed.current = true;
+    };
+    const onPointerUp = () => {
+      pointerPressed.current = false;
+    };
 
     window.addEventListener('focusout', onFocusOut);
     window.addEventListener('click', onClick);

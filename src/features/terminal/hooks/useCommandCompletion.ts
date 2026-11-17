@@ -20,22 +20,17 @@ interface UseCommandCompletionOptions {
 }
 
 /** Keep full suggestions stable while editing their prefix; accept, cycle and restore separately. */
-export function useCommandCompletion({
-  text,
-  aiMode,
-  isFocused,
-  visible,
-  cwd,
-  inputRef,
-  setText,
-}: UseCommandCompletionOptions) {
+export function useCommandCompletion({ text, aiMode, isFocused, visible, cwd, inputRef, setText }: UseCommandCompletionOptions) {
   const completeOn = useAgentSettings((state) => state.global.completeEnabled);
   const completeDebounceMs = useAgentSettings((state) => state.global.completeDebounceMs);
   const [suggestions, setSuggestions] = useState<{ commands: string[]; cwd?: string }>({ commands: [] });
   const enabled = completeOn && !aiMode && isFocused && visible && text.trim().length > 0 && !text.includes('\n');
-  const ghostCandidates = enabled && suggestions.cwd === cwd
-    ? suggestions.commands.filter(command => command.length > text.length && command.startsWith(text)).map(command => command.slice(text.length))
-    : [];
+  const ghostCandidates =
+    enabled && suggestions.cwd === cwd
+      ? suggestions.commands
+          .filter((command) => command.length > text.length && command.startsWith(text))
+          .map((command) => command.slice(text.length))
+      : [];
   const ghost = ghostCandidates[0] ?? '';
   const completionRef = useRef<CompletionCycle | null>(null);
   const sequenceRef = useRef(0);
@@ -61,7 +56,7 @@ export function useCommandCompletion({
 
     const locals = localCompleteCandidates(text);
     if (locals.length > 0) {
-      setSuggestions({ commands: locals.map(suffix => text + suffix), cwd });
+      setSuggestions({ commands: locals.map((suffix) => text + suffix), cwd });
       return;
     }
 
@@ -81,30 +76,33 @@ export function useCommandCompletion({
     };
   }, [completeDebounceMs, cwd, enabled, text]);
 
-  const acceptCompletion = useCallback((shiftKey: boolean) => {
-    if (ghostCandidates.length === 0 && !completionRef.current) return false;
-    const cycle = completionRef.current;
-    if (cycle) {
-      const direction = shiftKey ? -1 : 1;
-      cycle.index = (cycle.index + direction + cycle.candidates.length) % cycle.candidates.length;
-      suppressEffectRef.current = true;
-      setText(cycle.base + cycle.candidates[cycle.index]!);
-    } else {
-      completionRef.current = { base: text, candidates: ghostCandidates, index: 0 };
-      suppressEffectRef.current = true;
-      setText(text + ghostCandidates[0]!);
-      setSuggestions({ commands: [] });
-    }
+  const acceptCompletion = useCallback(
+    (shiftKey: boolean) => {
+      if (ghostCandidates.length === 0 && !completionRef.current) return false;
+      const cycle = completionRef.current;
+      if (cycle) {
+        const direction = shiftKey ? -1 : 1;
+        cycle.index = (cycle.index + direction + cycle.candidates.length) % cycle.candidates.length;
+        suppressEffectRef.current = true;
+        setText(cycle.base + cycle.candidates[cycle.index]!);
+      } else {
+        completionRef.current = { base: text, candidates: ghostCandidates, index: 0 };
+        suppressEffectRef.current = true;
+        setText(text + ghostCandidates[0]!);
+        setSuggestions({ commands: [] });
+      }
 
-    const element = inputRef.current;
-    if (element) {
-      element.style.height = 'auto';
-      requestAnimationFrame(() => {
-        element.style.height = Math.min(element.scrollHeight, 120) + 'px';
-      });
-    }
-    return true;
-  }, [ghostCandidates, inputRef, setText, text]);
+      const element = inputRef.current;
+      if (element) {
+        element.style.height = 'auto';
+        requestAnimationFrame(() => {
+          element.style.height = Math.min(element.scrollHeight, 120) + 'px';
+        });
+      }
+      return true;
+    },
+    [ghostCandidates, inputRef, setText, text],
+  );
 
   const restoreCompletion = useCallback(() => {
     const cycle = completionRef.current;

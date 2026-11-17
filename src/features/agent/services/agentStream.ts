@@ -14,9 +14,23 @@ import { useSshStore } from '@features/ssh';
 import { invoke } from '@platform/diagnostics';
 import { t } from '@i18n';
 import type { StreamFn } from '@features/chat';
-import { createChatModel, createNativeWebSearchTool, deepThinkProviderOptions, providerId, supportsThinkingPassback, type ProviderKind } from '@features/agent/services/provider';
+import {
+  createChatModel,
+  createNativeWebSearchTool,
+  deepThinkProviderOptions,
+  providerId,
+  supportsThinkingPassback,
+  type ProviderKind,
+} from '@features/agent/services/provider';
 import { useAgentSettings } from '@features/agent/stores/agentSettings';
-import { estimateTokens, messageTokens, sizeModelMessages, planContext, IMAGE_TOKEN_ESTIMATE, type SizedMessage } from '@features/agent/model/context';
+import {
+  estimateTokens,
+  messageTokens,
+  sizeModelMessages,
+  planContext,
+  IMAGE_TOKEN_ESTIMATE,
+  type SizedMessage,
+} from '@features/agent/model/context';
 import { attachmentsForModel, supportsVision } from '@features/agent/model/attachments';
 import { buildTools } from '@features/agent/tools';
 import { buildTavilySearchTool } from '@features/agent/tools/webSearch';
@@ -46,7 +60,11 @@ interface AiConfigInfoRust {
   /** Providers (endpoint ids) that hold their own API key. */
   provider_keys?: string[];
   models: {
-    id: string; name: string; provider: ProviderKind; baseUrl: string; model: string;
+    id: string;
+    name: string;
+    provider: ProviderKind;
+    baseUrl: string;
+    model: string;
     capabilities?: { vision: boolean; reasoning: boolean; tools: boolean; search: boolean };
   }[];
   active_model: string;
@@ -81,10 +99,19 @@ export const agentStream: StreamFn = async (messages, onChunk, ctx) => {
   const capturedEnvironment = ctx?.environment ?? (executionPane ? environmentForPane(executionPane) : null);
   const remote = ctx?.environment?.kind === 'ssh' || executionPaneSpec(executionPane)?.kind === 'ssh';
   const remoteSpec = executionPaneSpec(executionPane)?.ssh;
-  const hostNotes = remote ? useSshStore.getState().connections.find(connection => connection.id === remoteSpec?.connectionId)?.aiNotes ?? ctx?.environment?.aiNotes ?? remoteSpec?.aiNotes : undefined;
+  const hostNotes = remote
+    ? (useSshStore.getState().connections.find((connection) => connection.id === remoteSpec?.connectionId)?.aiNotes ??
+      ctx?.environment?.aiNotes ??
+      remoteSpec?.aiNotes)
+    : undefined;
   const info = await invoke<AiConfigInfoRust>('get_ai_config');
   if (!hasKeyFor(info)) {
-    terminalDebug('chat-provider-key-check', { provider: info.provider, activeModel: info.active_model, configured: false, configuredEndpoints: info.provider_keys?.length ?? 0 });
+    terminalDebug('chat-provider-key-check', {
+      provider: info.provider,
+      activeModel: info.active_model,
+      configured: false,
+      configuredEndpoints: info.provider_keys?.length ?? 0,
+    });
     throw new Error(t('No API key is configured. Select a configured provider in model settings.'));
   }
   const model = createChatModel({
@@ -105,23 +132,23 @@ export const agentStream: StreamFn = async (messages, onChunk, ctx) => {
   // placeholder text prompt. Vision capability prefers the probed result (detected on creation),
   // falling back to a name heuristic for older data.
   const vision =
-    (info.models ?? []).find((m) => m.id === info.active_model)?.capabilities?.vision ??
-    supportsVision(info.provider, info.model);
-  const latestQuestion = [...messages].reverse().find(message => message.role === 'user');
-  if (!vision && latestQuestion?.attachments?.some(attachment => attachment.mime.startsWith('image/'))) {
+    (info.models ?? []).find((m) => m.id === info.active_model)?.capabilities?.vision ?? supportsVision(info.provider, info.model);
+  const latestQuestion = [...messages].reverse().find((message) => message.role === 'user');
+  if (!vision && latestQuestion?.attachments?.some((attachment) => attachment.mime.startsWith('image/'))) {
     throw new Error(t('The selected model does not support image input. Choose a model with image input enabled.'));
   }
   const sized: SizedMessage[] = [];
   for (const m of messages) {
-    if (m.role === 'assistant' && m.parts?.some(part => part.kind === 'tool')) {
+    if (m.role === 'assistant' && m.parts?.some((part) => part.kind === 'tool')) {
       if (agentMode) {
         for (const msg of partsToModelMessages(m.content, m.parts)) {
-          const safe = msg.role === 'assistant' && typeof msg.content === 'string' ? { ...msg, content: visibleAssistantText(msg.content) } : msg;
+          const safe =
+            msg.role === 'assistant' && typeof msg.content === 'string' ? { ...msg, content: visibleAssistantText(msg.content) } : msg;
           sized.push({ msg: safe, tokens: messageTokens(safe) });
         }
       } else {
         // Sanitize assistant prose only; tool results stay intact as evidence for the next turn.
-        const parts = m.parts.map(part => part.kind === 'text' ? { ...part, text: visibleAssistantText(part.text) } : part);
+        const parts = m.parts.map((part) => (part.kind === 'text' ? { ...part, text: visibleAssistantText(part.text) } : part));
         const text = partsToDiscussionText(visibleAssistantText(m.content), parts);
         sized.push({ msg: { role: 'assistant', content: text }, tokens: countTokens(text) + 16 });
       }
@@ -144,7 +171,8 @@ export const agentStream: StreamFn = async (messages, onChunk, ctx) => {
         sized.push({ msg: { role: m.role as 'user' | 'assistant', content: safeContent }, tokens: countTokens(safeContent) + 16 });
       }
     } else {
-      const content = m.role === 'assistant' ? visibleAssistantText(m.content) || '[Unstructured tool markup omitted; no tool was executed.]' : m.content;
+      const content =
+        m.role === 'assistant' ? visibleAssistantText(m.content) || '[Unstructured tool markup omitted; no tool was executed.]' : m.content;
       sized.push({ msg: { role: m.role as 'user' | 'assistant', content }, tokens: countTokens(content) + 16 });
     }
   }
@@ -165,23 +193,29 @@ export const agentStream: StreamFn = async (messages, onChunk, ctx) => {
   let memoryContext = '';
   const scope = memoryScope(capturedEnvironment, ctx?.tabId);
   try {
-    const query = [...messages].reverse().find(message => message.role === 'user')?.content ?? '';
+    const query = [...messages].reverse().find((message) => message.role === 'user')?.content ?? '';
     if (levelOf('memory') !== 'deny') {
-      memoryContext = await retrieveMemory(query, scope,
-        settings.contextMaxTokens > 0 ? Math.min(800, Math.floor(settings.contextMaxTokens * 0.1)) : 800, ctx?.signal, countTokens);
+      memoryContext = await retrieveMemory(
+        query,
+        scope,
+        settings.contextMaxTokens > 0 ? Math.min(800, Math.floor(settings.contextMaxTokens * 0.1)) : 800,
+        ctx?.signal,
+        countTokens,
+      );
     }
   } catch {
     terminalDebug('agent-memory-retrieval', { available: false });
   }
   const disabledTools = agentMode
-    ? TOOL_NAMES.filter(name => levelOf(name) === 'deny').map(name => policyToolLabel(name, info.provider))
+    ? TOOL_NAMES.filter((name) => levelOf(name) === 'deny').map((name) => policyToolLabel(name, info.provider))
     : [];
   const toolPolicyNote = disabledTools.length
     ? `Tools disabled by the current policy (never call them): ${disabledTools.join(', ')}. Only call the tools provided in this request; if a needed capability is disabled, explain the limitation and ask the user.`
     : '';
   const basePrompt = [
     buildSystemPrompt(settings.systemPrompt, undefined, agentMode),
-    executionPane === null ? 'No terminal is connected to this conversation. run_command, read_terminal and terminal_keys are unavailable; do not call them. Answer questions using provided references, and do not claim to execute terminal commands.'
+    executionPane === null
+      ? 'No terminal is connected to this conversation. run_command, read_terminal and terminal_keys are unavailable; do not call them. Answer questions using provided references, and do not claim to execute terminal commands.'
       : `Execution terminal: ${ctx?.environment?.label ?? executionPane}. Directory at request start: ${ctx?.environment?.cwd ?? 'unknown'}. This target stays fixed for this request.`,
     remote ? 'The execution terminal is remote. Use terminal tools for remote files; local file tools are unavailable.' : '',
     agentMode ? TOOL_RECOVERY_GUIDANCE : '',
@@ -195,10 +229,7 @@ export const agentStream: StreamFn = async (messages, onChunk, ctx) => {
 
   // Tool-call ledger: rebuilding a complete ToolRun from tool-result/tool-error events needs
   // toolName/input/startedAt (the result part does not always carry the input back).
-  const calls = new Map<
-    string,
-    { toolName: string; input: Record<string, unknown>; startedAt: number }
-  >();
+  const calls = new Map<string, { toolName: string; input: Record<string, unknown>; startedAt: number }>();
 
   // Tool table: local tools plus web search.
   // Web search priority: provider-native (server-side execution) → hosted search API forwarding
@@ -266,10 +297,24 @@ export const agentStream: StreamFn = async (messages, onChunk, ctx) => {
   const toolTurn = new ToolTurn();
   for (const [name, entry] of Object.entries(tools)) {
     const execute = entry.execute;
-    if (execute) tools[name] = { ...entry, execute: (input, options) => toolTurn.run(
-      async () => { const output = await execute(input, options); toolTurn.observe(name, output); return output; },
-      () => ({ ok: false, ...(options.abortSignal?.aborted || ctx?.signal?.aborted ? { cancelled: true } : { denied: true }),
-        error: t(TOOL_TURN_CLOSED) }), options.abortSignal ?? ctx?.signal) };
+    if (execute)
+      tools[name] = {
+        ...entry,
+        execute: (input, options) =>
+          toolTurn.run(
+            async () => {
+              const output = await execute(input, options);
+              toolTurn.observe(name, output);
+              return output;
+            },
+            () => ({
+              ok: false,
+              ...(options.abortSignal?.aborted || ctx?.signal?.aborted ? { cancelled: true } : { denied: true }),
+              error: t(TOOL_TURN_CLOSED),
+            }),
+            options.abortSignal ?? ctx?.signal,
+          ),
+      };
   }
   let schemaTokens = 0;
   for (const [name, entry] of Object.entries(tools)) {
@@ -279,13 +324,19 @@ export const agentStream: StreamFn = async (messages, onChunk, ctx) => {
   }
   const reservedTokens = countTokens(basePrompt) + schemaTokens + 64;
   const plan = await planContext({
-    sized: sizeModelMessages(sized.map(item => item.msg)), strategy: settings.contextStrategy, maxTokens: settings.contextMaxTokens,
-    summaryTokens: settings.contextSummaryTokens, reservedTokens,
-    model, tabId: ctx?.tabId, signal: ctx?.signal,
+    sized: sizeModelMessages(sized.map((item) => item.msg)),
+    strategy: settings.contextStrategy,
+    maxTokens: settings.contextMaxTokens,
+    summaryTokens: settings.contextSummaryTokens,
+    reservedTokens,
+    model,
+    tabId: ctx?.tabId,
+    signal: ctx?.signal,
   });
   const systemPrompt = [basePrompt, plan.system].filter(Boolean).join('\n\n');
   if (ctx?.signal?.aborted) throw new DOMException('Aborted', 'AbortError');
-  const initialUsage = plan.messages.reduce((sum, message) => sum + messageTokens(message), 0) + countTokens(systemPrompt) + schemaTokens + 64;
+  const initialUsage =
+    plan.messages.reduce((sum, message) => sum + messageTokens(message), 0) + countTokens(systemPrompt) + schemaTokens + 64;
   ctx?.handlers?.onContextUsed?.(initialUsage, settings.contextMaxTokens);
   if (settings.contextStrategy !== 'off' && settings.contextMaxTokens > 0 && initialUsage > settings.contextMaxTokens) {
     throw new Error(t('The current request exceeds the context budget. Increase the budget or request smaller tool results.'));
@@ -311,23 +362,30 @@ export const agentStream: StreamFn = async (messages, onChunk, ctx) => {
     messages: modelMessages,
     instructions: systemPrompt || undefined,
     tools: hasTools ? tools : undefined,
-    prepareStep: hasTools ? async options => {
-      if (ctx?.signal?.aborted) throw new DOMException('Aborted', 'AbortError');
-      const current = sizeModelMessages(options.messages);
-      const next = await planContext({ sized: current, strategy: settings.contextStrategy,
-        maxTokens: settings.contextMaxTokens, summaryTokens: settings.contextSummaryTokens,
-        reservedTokens: countTokens([systemPrompt, stepSummary].filter(Boolean).join('\n\n')) + schemaTokens + 64,
-        previousSummary: stepSummary, model, signal: ctx?.signal });
-      if (next.system) stepSummary = next.system;
-      const instructions = [systemPrompt, stepSummary].filter(Boolean).join('\n\n');
-      const used = next.messages.reduce((sum, msg) => sum + messageTokens(msg), 0)
-        + countTokens(instructions) + schemaTokens + 64;
-      ctx?.handlers?.onContextUsed?.(used, settings.contextMaxTokens);
-      if (settings.contextStrategy !== 'off' && settings.contextMaxTokens > 0 && used > settings.contextMaxTokens) {
-        throw new Error(t('The current request exceeds the context budget. Increase the budget or request smaller tool results.'));
-      }
-      return { ...prepareToolRecoveryStep(options, Object.keys(tools)), messages: next.messages, instructions };
-    } : undefined,
+    prepareStep: hasTools
+      ? async (options) => {
+          if (ctx?.signal?.aborted) throw new DOMException('Aborted', 'AbortError');
+          const current = sizeModelMessages(options.messages);
+          const next = await planContext({
+            sized: current,
+            strategy: settings.contextStrategy,
+            maxTokens: settings.contextMaxTokens,
+            summaryTokens: settings.contextSummaryTokens,
+            reservedTokens: countTokens([systemPrompt, stepSummary].filter(Boolean).join('\n\n')) + schemaTokens + 64,
+            previousSummary: stepSummary,
+            model,
+            signal: ctx?.signal,
+          });
+          if (next.system) stepSummary = next.system;
+          const instructions = [systemPrompt, stepSummary].filter(Boolean).join('\n\n');
+          const used = next.messages.reduce((sum, msg) => sum + messageTokens(msg), 0) + countTokens(instructions) + schemaTokens + 64;
+          ctx?.handlers?.onContextUsed?.(used, settings.contextMaxTokens);
+          if (settings.contextStrategy !== 'off' && settings.contextMaxTokens > 0 && used > settings.contextMaxTokens) {
+            throw new Error(t('The current request exceeds the context budget. Increase the budget or request smaller tool results.'));
+          }
+          return { ...prepareToolRecoveryStep(options, Object.keys(tools)), messages: next.messages, instructions };
+        }
+      : undefined,
     stopWhen: hasTools ? stepCountIs(Math.max(1, Math.round(settings.maxSteps))) : undefined,
     abortSignal: ctx?.signal,
     // Deep thinking: pass providerOptions through (OpenAI-compatible → reasoning_effort).
@@ -337,7 +395,11 @@ export const agentStream: StreamFn = async (messages, onChunk, ctx) => {
       settings.maxOutputTokens > 0
         ? settings.maxOutputTokens
         : thinkingEnabled
-          ? (settings.thinkingLevel === 'low' ? 8000 : settings.thinkingLevel === 'medium' ? 16000 : 32000)
+          ? settings.thinkingLevel === 'low'
+            ? 8000
+            : settings.thinkingLevel === 'medium'
+              ? 16000
+              : 32000
           : undefined,
     temperature: settings.temperature != null ? settings.temperature : undefined,
     onError: ({ error }) => {
@@ -354,8 +416,7 @@ export const agentStream: StreamFn = async (messages, onChunk, ctx) => {
     switch (part.type) {
       case 'text-delta': {
         // v7 calls it part.text; also accept the older textDelta name defensively.
-        const t =
-          (part as { text?: string }).text ?? (part as { textDelta?: string }).textDelta ?? '';
+        const t = (part as { text?: string }).text ?? (part as { textDelta?: string }).textDelta ?? '';
         if (t) onChunk(t);
         break;
       }
@@ -372,7 +433,10 @@ export const agentStream: StreamFn = async (messages, onChunk, ctx) => {
       case 'tool-call': {
         // Chat mode registers no tools. A model that still emits a call must not create a
         // phantom running card; the turn ends with an explanatory note instead.
-        if (!hasTools) { chatModeToolCall = true; break; }
+        if (!hasTools) {
+          chatModeToolCall = true;
+          break;
+        }
         const p = part as {
           toolCallId: string;
           toolName: string;
@@ -468,7 +532,9 @@ export const agentStream: StreamFn = async (messages, onChunk, ctx) => {
   } else if (unavailableTools.size > 0) {
     const names = [...unavailableTools].join(', ');
     terminalDebug('unavailable-tool-call', { provider: info.provider, model: info.model, tools: names });
-    onChunk(`\n\n> ${t('The model tried to call an unavailable tool ({{tool}}). Only tools provided in this request can be used.', { tool: names })}`);
+    onChunk(
+      `\n\n> ${t('The model tried to call an unavailable tool ({{tool}}). Only tools provided in this request can be used.', { tool: names })}`,
+    );
   }
   // Reaching the tool-call limit leaves streamText without a finish reason; state the cause.
   if (streamError == null && stepLimit > 0 && stepCount >= stepLimit && lastFinishReason === 'tool-calls') {
@@ -478,22 +544,24 @@ export const agentStream: StreamFn = async (messages, onChunk, ctx) => {
   }
   // Optional metrics must never hold a completed or cancelled turn open.
   if (streamError == null && !ctx?.signal?.aborted) {
-    void Promise.resolve(result.usage).then(usage => {
-      if (ctx?.signal?.aborted) return;
-      useUsageStore.getState().recordTurn({
-        provider: info.provider,
-        model: info.model,
-        inputTokens: usage.inputTokens,
-        outputTokens: usage.outputTokens,
-        cachedInputTokens: usage.inputTokenDetails?.cacheReadTokens,
-        reasoningTokens: usage.outputTokenDetails?.reasoningTokens,
-        steps: stepCount,
-        toolCalls,
+    void Promise.resolve(result.usage)
+      .then((usage) => {
+        if (ctx?.signal?.aborted) return;
+        useUsageStore.getState().recordTurn({
+          provider: info.provider,
+          model: info.model,
+          inputTokens: usage.inputTokens,
+          outputTokens: usage.outputTokens,
+          cachedInputTokens: usage.inputTokenDetails?.cacheReadTokens,
+          reasoningTokens: usage.outputTokenDetails?.reasoningTokens,
+          steps: stepCount,
+          toolCalls,
+        });
+      })
+      .catch((e: unknown) => {
+        // Usage is optional: never let it fail the turn.
+        console.warn('[agentStream] Could not report token usage:', e);
       });
-    }).catch((e: unknown) => {
-      // Usage is optional: never let it fail the turn.
-      console.warn('[agentStream] Could not report token usage:', e);
-    });
   }
   if (streamError != null) {
     console.error('[agentStream] 流式请求失败:', streamError);

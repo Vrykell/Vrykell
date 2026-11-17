@@ -44,23 +44,17 @@ export interface SkillTrustInfo {
   enabled: boolean;
 }
 
-
 export const listSkills = () => invoke<SkillMeta[]>('list_skills');
 export const getSkill = (name: string) => invoke<SkillDetail>('get_skill', { name });
 export const setSkillState = (name: string, trusted?: boolean, enabled?: boolean) =>
   invoke<void>('set_skill_state', { name, trusted: trusted ?? null, enabled: enabled ?? null });
-export const readSkillFile = (name: string, relativePath: string) =>
-  invoke<string>('read_skill_file', { name, relativePath });
+export const readSkillFile = (name: string, relativePath: string) => invoke<string>('read_skill_file', { name, relativePath });
 export const removeSkill = (name: string) => invoke<void>('remove_skill', { name });
 export const installSkillMd = (name: string, description: string, prompt: string, lease?: string | null) =>
   invoke<SkillMeta>('install_skill_md', { name, description, prompt, ...(lease === undefined ? {} : { lease }) });
-export const importSkillsFromPath = (path: string) =>
-  invoke<SkillMeta[]>('import_skills_from_path', { path });
-export const fetchRemoteSkills = (url: string) =>
-  invoke<RemoteSkill[]>('fetch_skill_registry', { url });
-export const findSkillReference = (text: string) =>
-  invoke<SkillTrustInfo | null>('find_skill_reference', { text });
-
+export const importSkillsFromPath = (path: string) => invoke<SkillMeta[]>('import_skills_from_path', { path });
+export const fetchRemoteSkills = (url: string) => invoke<RemoteSkill[]>('fetch_skill_registry', { url });
+export const findSkillReference = (text: string) => invoke<SkillTrustInfo | null>('find_skill_reference', { text });
 
 /** If the text or path references an untrusted skill, return its name; otherwise null. */
 export async function untrustedSkillFor(text: string): Promise<string | null> {
@@ -81,7 +75,7 @@ export function availableSkillMetas(metas: SkillMeta[]): SkillMeta[] {
 /** "Available skills" list injected into the system prompt (names + descriptions only). */
 export function buildSkillsContext(metas: SkillMeta[]): string {
   if (metas.length === 0) return '';
-  const lines = metas.map(k => `- ${k.name}: ${k.description || 'No description'}`);
+  const lines = metas.map((k) => `- ${k.name}: ${k.description || 'No description'}`);
   return [
     'Available skills: load matching instructions with use_skill. Read or run resources through read_file and run_command within the granted permissions.',
     ...lines,

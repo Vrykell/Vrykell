@@ -12,10 +12,14 @@ import { setupTauriMock, acpAnswered, acpCalls, emitAcpSession, acpUpdate } from
 const SESSION = 'sess_e2e';
 
 /** One permission request, shaped like the protocol's. */
-function permissionRequest(toolCallId: string, title: string, options = [
-  { optionId: 'allow-once', name: 'Allow once', kind: 'allow_once' },
-  { optionId: 'reject-once', name: 'Reject', kind: 'reject_once' },
-]) {
+function permissionRequest(
+  toolCallId: string,
+  title: string,
+  options = [
+    { optionId: 'allow-once', name: 'Allow once', kind: 'allow_once' },
+    { optionId: 'reject-once', name: 'Reject', kind: 'reject_once' },
+  ],
+) {
   return {
     sessionId: SESSION,
     kind: 'permission',
@@ -38,9 +42,12 @@ test.describe('harness session', () => {
     for (const width of [760, 1240]) {
       await page.setViewportSize({ width, height: 800 });
       const actions = page.getByTestId('harness-row-0').locator('.settings-row-actions');
-      const boxes = await actions.getByRole('button').evaluateAll(elements => elements.map(element => {
-        const box = element.getBoundingClientRect(); return { left: box.left, right: box.right };
-      }));
+      const boxes = await actions.getByRole('button').evaluateAll((elements) =>
+        elements.map((element) => {
+          const box = element.getBoundingClientRect();
+          return { left: box.left, right: box.right };
+        }),
+      );
       expect(boxes).toHaveLength(4);
       for (let index = 1; index < boxes.length; index++) expect(boxes[index]!.left - boxes[index - 1]!.right).toBeLessThanOrEqual(3);
       await page.getByTestId('harness-row-0').screenshot({ path: testInfo.outputPath(`server-actions-${width}.png`) });
@@ -50,10 +57,13 @@ test.describe('harness session', () => {
 
     // A quota failure is not a missing login: the message stays visible and no hint is invented.
     await emitAcpSession(page, {
-      sessionId: SESSION, kind: 'error',
+      sessionId: SESSION,
+      kind: 'error',
       payload: {
         message: 'agent error (-32603): API Error: 402 Insufficient Balance',
-        code: -32603, authRequired: false, details: 'exit code: 1\n\nInsufficient Balance',
+        code: -32603,
+        authRequired: false,
+        details: 'exit code: 1\n\nInsufficient Balance',
       },
     });
     await expect(page.locator('[data-error-notification="true"]')).toContainText('Insufficient Balance');
@@ -61,7 +71,8 @@ test.describe('harness session', () => {
 
     // The protocol's own authentication code gets the instructions the agent advertised.
     await emitAcpSession(page, {
-      sessionId: SESSION, kind: 'error',
+      sessionId: SESSION,
+      kind: 'error',
       payload: { message: 'agent error (-32000): Authentication required', code: -32000, authRequired: true },
     });
     await expect(page.getByTestId('harness-auth-hint')).toContainText('Run `fake login`');
@@ -91,18 +102,28 @@ test.describe('harness session', () => {
     await expect.poll(() => acpCalls(page)).toContain('acp_set_mode:plan');
 
     // The agent's streamed output lands in the transcript.
-    await emitAcpSession(page, acpUpdate(SESSION, {
-      sessionUpdate: 'agent_message_chunk', content: { type: 'text', text: 'Working on it.' },
-    }));
+    await emitAcpSession(
+      page,
+      acpUpdate(SESSION, {
+        sessionUpdate: 'agent_message_chunk',
+        content: { type: 'text', text: 'Working on it.' },
+      }),
+    );
     // Diagnostics: what the page read and which commands ran.
 
-
-await expect(page.getByTestId('harness-page')).toContainText('Working on it.');
+    await expect(page.getByTestId('harness-page')).toContainText('Working on it.');
 
     // Its tool call shows as a row with the human-readable title the harness provided.
-    await emitAcpSession(page, acpUpdate(SESSION, {
-      sessionUpdate: 'tool_call', toolCallId: 'call_1', title: 'Run the tests', kind: 'execute', status: 'pending',
-    }));
+    await emitAcpSession(
+      page,
+      acpUpdate(SESSION, {
+        sessionUpdate: 'tool_call',
+        toolCallId: 'call_1',
+        title: 'Run the tests',
+        kind: 'execute',
+        status: 'pending',
+      }),
+    );
     await expect(page.getByTestId('harness-page')).toContainText('Run the tests');
 
     // A permission request becomes a card, with the options the harness itself named ...
@@ -120,34 +141,43 @@ await expect(page.getByTestId('harness-page')).toContainText('Working on it.');
     await expect(card).toHaveCount(0);
 
     // A second request can be refused with the protocol cancel when the harness offers no reject.
-    await emitAcpSession(page, permissionRequest('call_2', 'Delete the build output',
-      [{ optionId: 'allow-once', name: 'Allow once', kind: 'allow_once' }]));
+    await emitAcpSession(
+      page,
+      permissionRequest('call_2', 'Delete the build output', [{ optionId: 'allow-once', name: 'Allow once', kind: 'allow_once' }]),
+    );
     await expect(page.getByTestId('harness-permission')).toContainText('Delete the build output');
     await page.getByTestId('harness-option-deny').click();
-    await expect.poll(() => acpAnswered(page)).toEqual([
-      { toolCallId: 'call_1', optionId: 'allow-once' },
-      { toolCallId: 'call_2', optionId: null },
-    ]);
+    await expect
+      .poll(() => acpAnswered(page))
+      .toEqual([
+        { toolCallId: 'call_1', optionId: 'allow-once' },
+        { toolCallId: 'call_2', optionId: null },
+      ]);
 
     // When the harness names its own reject option, that option answers the card and no duplicate
     // cancel action is added beside it.
     await emitAcpSession(page, permissionRequest('call_3', 'Remove the cache'));
     expect(await page.getByTestId('harness-option-deny').count()).toBe(0);
     await page.getByTestId('harness-option-reject-once').click();
-    await expect.poll(() => acpAnswered(page)).toEqual([
-      { toolCallId: 'call_1', optionId: 'allow-once' },
-      { toolCallId: 'call_2', optionId: null },
-      { toolCallId: 'call_3', optionId: 'reject-once' },
-    ]);
+    await expect
+      .poll(() => acpAnswered(page))
+      .toEqual([
+        { toolCallId: 'call_1', optionId: 'allow-once' },
+        { toolCallId: 'call_2', optionId: null },
+        { toolCallId: 'call_3', optionId: 'reject-once' },
+      ]);
 
     // The plan and the context window the agent publishes belong to the session view.
-    await emitAcpSession(page, acpUpdate(SESSION, {
-      sessionUpdate: 'plan',
-      entries: [
-        { content: 'Read the failing test', status: 'completed' },
-        { content: 'Fix the parser', status: 'in_progress' },
-      ],
-    }));
+    await emitAcpSession(
+      page,
+      acpUpdate(SESSION, {
+        sessionUpdate: 'plan',
+        entries: [
+          { content: 'Read the failing test', status: 'completed' },
+          { content: 'Fix the parser', status: 'in_progress' },
+        ],
+      }),
+    );
     await emitAcpSession(page, acpUpdate(SESSION, { sessionUpdate: 'usage_update', used: 12_000, size: 200_000 }));
     await expect(page.getByTestId('harness-plan')).toContainText('Fix the parser');
     await page.getByRole('button', { name: '会话设置', exact: true }).click();
@@ -159,10 +189,13 @@ await expect(page.getByTestId('harness-page')).toContainText('Working on it.');
     await expect(page.getByTestId('harness-selector-mode')).toContainText('Default');
 
     // Slash commands the agent advertises are one keystroke away.
-    await emitAcpSession(page, acpUpdate(SESSION, {
-      sessionUpdate: 'available_commands_update',
-      availableCommands: [{ name: 'web', description: 'Search the web', input: { hint: 'query to search for' } }],
-    }));
+    await emitAcpSession(
+      page,
+      acpUpdate(SESSION, {
+        sessionUpdate: 'available_commands_update',
+        availableCommands: [{ name: 'web', description: 'Search the web', input: { hint: 'query to search for' } }],
+      }),
+    );
     await page.getByTestId('harness-composer').fill('/');
     await expect(page.getByTestId('harness-commands')).toContainText('/web');
     await page.getByTestId('harness-composer').press('Enter');

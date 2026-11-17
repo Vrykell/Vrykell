@@ -8,12 +8,22 @@ beforeEach(() => {
   localStorage.clear();
   Object.defineProperty(window, 'innerWidth', { configurable: true, value: 1400 });
   useWorkspaceNavigation.setState({ collapsed: false, sidebarOverlay: false, area: 'code' });
-  useDockStore.setState({ leftZone: [], rightZone: ['files', 'git', 'command-history', 'chat'], leftPanels: [], rightPanels: [], panelWidths: {}, collapsedPanels: [] });
+  useDockStore.setState({
+    leftZone: [],
+    rightZone: ['files', 'git', 'command-history', 'chat'],
+    leftPanels: [],
+    rightPanels: [],
+    panelWidths: {},
+    collapsedPanels: [],
+  });
 });
-afterEach(() => { useDockStore.setState(snapshot, true); Object.defineProperty(window, 'innerWidth', { configurable: true, value: originalWidth }); });
+afterEach(() => {
+  useDockStore.setState(snapshot, true);
+  Object.defineProperty(window, 'innerWidth', { configurable: true, value: originalWidth });
+});
 
 describe('right auxiliary dock', () => {
-  it.each(['files', 'git', 'command-history', 'chat'])('opens %s on the right and replaces the previous panel', id => {
+  it.each(['files', 'git', 'command-history', 'chat'])('opens %s on the right and replaces the previous panel', (id) => {
     useDockStore.getState().openPanel('files');
     useDockStore.getState().openPanel(id);
     expect(useDockStore.getState().rightPanels).toEqual([id]);
@@ -22,7 +32,10 @@ describe('right auxiliary dock', () => {
     expect(useDockStore.getState().rightPanels).toEqual([]);
   });
   it('ignores retired and unknown panels', () => {
-    for (const id of ['tabs', 'ssh', 'missing']) { useDockStore.getState().openPanel(id); useDockStore.getState().togglePanel('left', id); }
+    for (const id of ['tabs', 'ssh', 'missing']) {
+      useDockStore.getState().openPanel(id);
+      useDockStore.getState().togglePanel('left', id);
+    }
     expect(useDockStore.getState().rightPanels).toEqual([]);
   });
   it('preserves visibility and persists ordering during a toolbar reorder', () => {
@@ -92,9 +105,22 @@ describe('right auxiliary dock', () => {
 });
 
 describe('layout normalization', () => {
-  const seed = { layoutVersion: 6, leftZone: ['tabs', 'ssh', 'files', 'git'], rightZone: ['chat'], leftPanels: ['files'], rightPanels: [], panelWidths: { files: 240, chat: 350 } };
+  const seed = {
+    layoutVersion: 6,
+    leftZone: ['tabs', 'ssh', 'files', 'git'],
+    rightZone: ['chat'],
+    leftPanels: ['files'],
+    rightPanels: [],
+    panelWidths: { files: 240, chat: 350 },
+  };
   it('keeps one left panel and rebuilds the right action row', () => {
-    expect(normalizeDockLayout(seed)).toEqual({ leftZone: ['files'], rightZone: ['chat', 'git', 'command-history'], leftPanels: ['files'], rightPanels: [], panelWidths: { files: 200, chat: 320 } });
+    expect(normalizeDockLayout(seed)).toEqual({
+      leftZone: ['files'],
+      rightZone: ['chat', 'git', 'command-history'],
+      leftPanels: ['files'],
+      rightPanels: [],
+      panelWidths: { files: 200, chat: 320 },
+    });
   });
   it('prefers the formerly visible right panel when two panels were open', () => {
     expect(normalizeDockLayout({ ...seed, rightPanels: ['chat'] })?.rightPanels).toEqual(['chat']);
@@ -106,12 +132,14 @@ describe('layout normalization', () => {
     expect(normalizeDockLayout({ ...seed, leftPanels: ['tabs', 'ssh'] })?.rightPanels).toEqual([]);
   });
   it('repairs duplicate and unknown entries without discarding the saved order', () => {
-    expect(normalizeDockLayout({ ...seed, rightZone: ['git', 'git', 'removed', 'settings'], leftZone: ['git', 'chat', 'files'] })?.rightZone).toEqual(['chat', 'files', 'command-history']);
+    expect(
+      normalizeDockLayout({ ...seed, rightZone: ['git', 'git', 'removed', 'settings'], leftZone: ['git', 'chat', 'files'] })?.rightZone,
+    ).toEqual(['chat', 'files', 'command-history']);
   });
   it('sanitizes non-finite and obsolete widths', () => {
     expect(normalizeDockLayout({ ...seed, panelWidths: { files: 1, chat: Infinity, removed: 200 } })?.panelWidths).toEqual({ files: 160 });
   });
-  it.each([null, [], {}, { ...seed, leftZone: null }, { ...seed, panelWidths: [] }])('rejects malformed layout %j', value => {
+  it.each([null, [], {}, { ...seed, leftZone: null }, { ...seed, panelWidths: [] }])('rejects malformed layout %j', (value) => {
     expect(normalizeDockLayout(value)).toBeNull();
   });
 });
@@ -120,13 +148,16 @@ describe('independent auxiliary sides', () => {
   it('opens a remembered left panel as an overlay when the content leaves no sidebar budget', () => {
     Object.defineProperty(window, 'innerWidth', { value: 500 });
     const dock = useDockStore.getState();
-    dock.moveButton('files', 'left'); dock.openPanel('files');
+    dock.moveButton('files', 'left');
+    dock.openPanel('files');
     expect(useWorkspaceNavigation.getState()).toMatchObject({ collapsed: false, sidebarOverlay: true });
     expect(useDockStore.getState().leftPanels).toEqual(['files']);
   });
   it('keeps one different panel on each side and closes either without affecting the other', () => {
     const dock = useDockStore.getState();
-    dock.moveButton('files', 'left'); dock.openPanel('files'); dock.openPanel('chat');
+    dock.moveButton('files', 'left');
+    dock.openPanel('files');
+    dock.openPanel('chat');
     expect(useDockStore.getState()).toMatchObject({ leftPanels: ['files'], rightPanels: ['chat'] });
     dock.openPanel('git');
     expect(useDockStore.getState()).toMatchObject({ leftPanels: ['files'], rightPanels: ['git'] });
@@ -135,7 +166,9 @@ describe('independent auxiliary sides', () => {
   });
   it('keeps a single left panel and returns the displaced one to the right row', () => {
     const dock = useDockStore.getState();
-    dock.moveButton('files', 'left'); dock.openPanel('files'); dock.openPanel('chat');
+    dock.moveButton('files', 'left');
+    dock.openPanel('files');
+    dock.openPanel('chat');
     dock.moveButton('chat', 'left');
     expect(useDockStore.getState()).toMatchObject({ leftZone: ['chat'], leftPanels: ['chat'], rightPanels: [] });
     // The displaced panel never disappears: it waits in the right button row and can be opened again.
@@ -144,11 +177,13 @@ describe('independent auxiliary sides', () => {
     expect(useDockStore.getState()).toMatchObject({ leftZone: ['chat'], leftPanels: ['chat'], rightPanels: ['files'] });
     dock.moveButton('chat', 'right', 0);
     expect(useDockStore.getState()).toMatchObject({ leftZone: [], leftPanels: [], rightPanels: ['chat'] });
-    expect(useDockStore.getState().rightZone.filter(id => id === 'chat')).toHaveLength(1);
+    expect(useDockStore.getState().rightZone.filter((id) => id === 'chat')).toHaveLength(1);
   });
   it('restores a collapsed left panel without replacing the right panel or its saved width', () => {
     const dock = useDockStore.getState();
-    dock.moveButton('chat', 'left'); dock.openPanel('chat'); dock.openPanel('files');
+    dock.moveButton('chat', 'left');
+    dock.openPanel('chat');
+    dock.openPanel('files');
     useWorkspaceNavigation.getState().setCollapsed(true);
     dock.reconcilePanelSpace();
     expect(useDockStore.getState()).toMatchObject({ leftPanels: ['chat'], rightPanels: ['files'] });
@@ -157,8 +192,15 @@ describe('independent auxiliary sides', () => {
     expect(useDockStore.getState()).toMatchObject({ leftPanels: ['chat'], rightPanels: ['files'] });
   });
   it('normalizes and reloads both sides', async () => {
-    const seed = { layoutVersion: 6, widthPreset: 'compact', leftZone: ['files', 'files'], rightZone: ['files', 'chat'],
-      leftPanels: ['files', 'chat'], rightPanels: ['files', 'chat'], panelWidths: { chat: 370 } };
+    const seed = {
+      layoutVersion: 6,
+      widthPreset: 'compact',
+      leftZone: ['files', 'files'],
+      rightZone: ['files', 'chat'],
+      leftPanels: ['files', 'chat'],
+      rightPanels: ['files', 'chat'],
+      panelWidths: { chat: 370 },
+    };
     const expected = normalizeDockLayout(seed)!;
     expect(expected).toMatchObject({ leftZone: ['files'], leftPanels: ['files'], rightPanels: ['chat'], panelWidths: { chat: 370 } });
     expect(expected.rightZone).not.toContain('files');

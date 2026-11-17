@@ -23,26 +23,47 @@ export default function ProviderEndpointCard({ row }: { row: ProviderRow<ModelPr
   const [confirmation, setConfirmation] = useState<{ resolve: (allowed: boolean) => void } | null>(null);
   const [revision, setRevision] = useState(0);
   const pending = useRef<((allowed: boolean) => void) | null>(null);
-  useEffect(() => () => { pending.current?.(false); pending.current = null; }, [row.id]);
+  useEffect(
+    () => () => {
+      pending.current?.(false);
+      pending.current = null;
+    },
+    [row.id],
+  );
 
   // The address belongs to the provider: every model row of this endpoint moves with it.
   const commit = async (value: string) => {
     let destination: URL;
-    try { destination = new URL(value); } catch { throw new Error(t('Enter a valid HTTP or HTTPS API address.')); }
-    if (!['http:', 'https:'].includes(destination.protocol) || destination.username || destination.password) throw new Error(t('Enter a valid HTTP or HTTPS API address.'));
+    try {
+      destination = new URL(value);
+    } catch {
+      throw new Error(t('Enter a valid HTTP or HTTPS API address.'));
+    }
+    if (!['http:', 'https:'].includes(destination.protocol) || destination.username || destination.password)
+      throw new Error(t('Enter a valid HTTP or HTTPS API address.'));
     const nextId = providerId(row.kind, value);
     if (nextId === row.id) return;
     const hasKey = useAiConfigStore.getState().providerKeys.includes(row.id);
     let sameOrigin = false;
-    try { sameOrigin = new URL(row.baseUrl).origin === destination.origin; } catch {}
+    try {
+      sameOrigin = new URL(row.baseUrl).origin === destination.origin;
+    } catch {}
     if (hasKey && !sameOrigin) {
-      const allowed = await new Promise<boolean>(resolve => { pending.current = resolve; setConfirmation({ resolve }); });
+      const allowed = await new Promise<boolean>((resolve) => {
+        pending.current = resolve;
+        setConfirmation({ resolve });
+      });
       pending.current = null;
       setConfirmation(null);
-      if (!allowed) { setRevision(previous => previous + 1); return; }
+      if (!allowed) {
+        setRevision((previous) => previous + 1);
+        return;
+      }
     }
     if (hasKey) await setProviderKey(nextId, '', row.id);
-    await commitModels(current => current.map(model => providerId(model.provider, model.baseUrl) === row.id ? { ...model, baseUrl: value } : model));
+    await commitModels((current) =>
+      current.map((model) => (providerId(model.provider, model.baseUrl) === row.id ? { ...model, baseUrl: value } : model)),
+    );
     selectProvider(nextId);
   };
 
@@ -51,8 +72,7 @@ export default function ProviderEndpointCard({ row }: { row: ProviderRow<ModelPr
       <Field
         layout="stacked"
         title={t('{{name}} API address', { name })}
-        description={t('Requests go to this endpoint; every model of the provider shares it.')}
-      >
+        description={t('Requests go to this endpoint; every model of the provider shares it.')}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
           <AutoSaveInput
             key={revision}
@@ -63,20 +83,32 @@ export default function ProviderEndpointCard({ row }: { row: ProviderRow<ModelPr
             testId="provider-endpoint-input"
             style={{ flex: 1, fontFamily: 'var(--font-mono)' }}
           />
-          <CopyButton testId="provider-endpoint-copy" text={row.baseUrl}
-            label={t('Copy API address')} iconSize={16} style={{ width: 32, height: 32 }} />
+          <CopyButton
+            testId="provider-endpoint-copy"
+            text={row.baseUrl}
+            label={t('Copy API address')}
+            iconSize={16}
+            style={{ width: 32, height: 32 }}
+          />
         </div>
         <div
           data-testid="provider-endpoint-preview"
-          style={{ marginTop: 6, color: 'var(--text-muted)', fontSize: 'var(--fs-caption)', overflowWrap: 'anywhere' }}
-        >
+          style={{ marginTop: 6, color: 'var(--text-muted)', fontSize: 'var(--fs-caption)', overflowWrap: 'anywhere' }}>
           {t('{{name}} preview: {{url}}', {
             name,
             url: effectiveEndpoint(row.kind, row.baseUrl, row.models[0]?.model ?? ''),
           })}
         </div>
       </Field>
-      <ConfirmDialog open={!!confirmation} title={t('Use the existing API key?')} message={t('The API address points to a different origin. Reuse this provider’s existing key for the new address?')} confirmLabel={t('Use existing key')} cancelLabel={t('Cancel')} onConfirm={() => confirmation?.resolve(true)} onCancel={() => confirmation?.resolve(false)} />
+      <ConfirmDialog
+        open={!!confirmation}
+        title={t('Use the existing API key?')}
+        message={t('The API address points to a different origin. Reuse this provider’s existing key for the new address?')}
+        confirmLabel={t('Use existing key')}
+        cancelLabel={t('Cancel')}
+        onConfirm={() => confirmation?.resolve(true)}
+        onCancel={() => confirmation?.resolve(false)}
+      />
     </SettingsGroup>
   );
 }

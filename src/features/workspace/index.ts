@@ -1,12 +1,6 @@
 /** Public entry point for the workspace domain. */
 export { useUiStore } from '@features/workspace/stores/ui';
-export {
-  useDockStore,
-  PANEL_DEFS,
-  NAVIGATION_DEFS,
-  MIN_PANEL_WIDTH,
-  type DockSide,
-} from '@features/workspace/stores/dock';
+export { useDockStore, PANEL_DEFS, NAVIGATION_DEFS, MIN_PANEL_WIDTH, type DockSide } from '@features/workspace/stores/dock';
 export { useDockDragStore } from '@features/workspace/stores/dockDrag';
 export { useNavigationDrag } from '@features/workspace/stores/navigationDrag';
 export { useNavigationButtonDrag } from '@features/workspace/hooks/useNavigationButtonDrag';
@@ -32,11 +26,7 @@ export {
   type WorkspaceSession,
 } from '@features/workspace/model/session/restoreWorkspace';
 export { initForwardedLaunch } from '@features/workspace/services/forwardedLaunch';
-export {
-  selectActiveSessionTab,
-  selectSessionTabs,
-  type SessionWorkspaceSnapshot,
-} from '@features/workspace/model/session/selectors';
+export { selectActiveSessionTab, selectSessionTabs, type SessionWorkspaceSnapshot } from '@features/workspace/model/session/selectors';
 export {
   MIN_PANE_SIZE,
   countLeaves,
@@ -48,13 +38,7 @@ export {
   type TerminalSpec,
   type WindowLayout,
 } from '@features/workspace/model/windowLayout';
-export {
-  buildNewTabOptions,
-  loadRecentOpen,
-  saveRecentOpen,
-  touchRecentOpen,
-  type NewTabOption,
-} from '@features/workspace/model/tabTypes';
+export { buildNewTabOptions, loadRecentOpen, saveRecentOpen, touchRecentOpen, type NewTabOption } from '@features/workspace/model/tabTypes';
 export { useActiveWorkspace } from '@features/workspace/hooks/useActiveWorkspace';
 export { usePanelTerminal, type PanelTerminalOption, type PanelTerminalState } from '@features/workspace/hooks/usePanelTerminal';
 export { useCanRemoveWorkspacePane } from './hooks/useCanRemoveWorkspacePane';

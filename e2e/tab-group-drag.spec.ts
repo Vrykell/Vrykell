@@ -30,19 +30,19 @@ test('groups and loose tabs share one drag order and a dragged group folds only 
   const groupCard = groupHeader.locator('xpath=..').locator('xpath=..');
   await expect(groupCard).toHaveAttribute('data-group-card', 'true');
   await expect(groupCard.locator('[data-group-id] [data-group-id]')).toHaveCount(0);
-  expect(await groupCard.evaluate(element => getComputedStyle(element).borderTopWidth)).toBe('0px');
-  expect(await groupCard.evaluate(element => getComputedStyle(element).borderBottomWidth)).toBe('0px');
+  expect(await groupCard.evaluate((element) => getComputedStyle(element).borderTopWidth)).toBe('0px');
+  expect(await groupCard.evaluate((element) => getComputedStyle(element).borderBottomWidth)).toBe('0px');
   // The colored edge is an overlay so it never shortens the tabs inside the group.
-  expect(await groupCard.evaluate(element => getComputedStyle(element, '::after').height)).toBe('2px');
-  expect(await groupCard.evaluate(element => getComputedStyle(element).borderRadius)).toBe('0px');
-  expect(await groupHeader.evaluate(element => getComputedStyle(element).backgroundColor)).toBe('rgba(0, 0, 0, 0)');
-  expect(await groupHeader.evaluate(element => getComputedStyle(element, '::before').content)).toBe('none');
+  expect(await groupCard.evaluate((element) => getComputedStyle(element, '::after').height)).toBe('2px');
+  expect(await groupCard.evaluate((element) => getComputedStyle(element).borderRadius)).toBe('0px');
+  expect(await groupHeader.evaluate((element) => getComputedStyle(element).backgroundColor)).toBe('rgba(0, 0, 0, 0)');
+  expect(await groupHeader.evaluate((element) => getComputedStyle(element, '::before').content)).toBe('none');
   await page.screenshot({ path: info.outputPath('group-rest-dark.png'), animations: 'disabled' });
-  const restBackground = await groupHeader.evaluate(element => getComputedStyle(element).backgroundColor);
+  const restBackground = await groupHeader.evaluate((element) => getComputedStyle(element).backgroundColor);
   await groupCard.hover();
-  expect(await groupHeader.evaluate(element => getComputedStyle(element).backgroundColor)).toBe(restBackground);
-  expect(await groupHeader.evaluate(element => getComputedStyle(element).borderTopLeftRadius)).toBe('8px');
-  expect(await groupHeader.evaluate(element => getComputedStyle(element, '::before').content)).toBe('none');
+  expect(await groupHeader.evaluate((element) => getComputedStyle(element).backgroundColor)).toBe(restBackground);
+  expect(await groupHeader.evaluate((element) => getComputedStyle(element).borderTopLeftRadius)).toBe('8px');
+  expect(await groupHeader.evaluate((element) => getComputedStyle(element, '::before').content)).toBe('none');
   await page.screenshot({ path: info.outputPath('group-hover-dark.png'), animations: 'disabled' });
   const groupedId = (await page.locator('[data-group-id] [data-tab-row-id]').first().getAttribute('data-tab-row-id'))!;
   const looseRow = page.locator(`[data-tab-row-id]:not([data-tab-row-id="${groupedId}"])`).last();
@@ -58,7 +58,11 @@ test('groups and loose tabs share one drag order and a dragged group folds only 
   expect(previewBox.x).toBeGreaterThanOrEqual(0);
   expect(previewBox.x + previewBox.width).toBeLessThanOrEqual(1240);
   expect(Math.abs(previewBox.y - groupBox.y)).toBeLessThanOrEqual(0.5);
-  expect(await page.locator('[data-reorder-preview="item"] .terminal-tab-group').evaluate(element => getComputedStyle(element).backgroundColor)).toBe('rgba(0, 0, 0, 0)');
+  expect(
+    await page
+      .locator('[data-reorder-preview="item"] .terminal-tab-group')
+      .evaluate((element) => getComputedStyle(element).backgroundColor),
+  ).toBe('rgba(0, 0, 0, 0)');
   await page.screenshot({ path: info.outputPath('group-drag-dark.png'), animations: 'disabled' });
   await page.mouse.up();
   await expect(page.getByTestId(`tab-row-${groupedId}`)).toBeVisible();
@@ -81,8 +85,9 @@ test('a loose tab entering a group at its first member joins the group instead o
   const groupId = (await groupHeader.getAttribute('data-group-header-id'))!;
   const groupedRow = page.locator('[data-group-id] [data-tab-row-id]').first();
   const memberId = (await groupedRow.getAttribute('data-tab-row-id'))!;
-  const looseId = await page.locator('[data-tab-row-id]').evaluateAll(rows => rows
-    .find(row => !row.closest('[data-group-id]'))?.getAttribute('data-tab-row-id'));
+  const looseId = await page
+    .locator('[data-tab-row-id]')
+    .evaluateAll((rows) => rows.find((row) => !row.closest('[data-group-id]'))?.getAttribute('data-tab-row-id'));
   expect(looseId).toBeTruthy();
   const looseRow = page.getByTestId(`tab-row-${looseId}`);
   const source = (await looseRow.boundingBox())!;
@@ -98,8 +103,9 @@ test('a loose tab entering a group at its first member joins the group instead o
   await page.mouse.up();
 
   await expect(page.getByTestId(`tab-row-${looseId}`)).toHaveAttribute('data-tab-group', groupId);
-  const memberIds = await page.locator(`[data-group-id="${groupId}"] [data-tab-row-id]`).evaluateAll(rows =>
-    rows.map(row => row.getAttribute('data-tab-row-id')));
+  const memberIds = await page
+    .locator(`[data-group-id="${groupId}"] [data-tab-row-id]`)
+    .evaluateAll((rows) => rows.map((row) => row.getAttribute('data-tab-row-id')));
   expect(memberIds[0]).toBe(looseId);
 });
 
@@ -116,8 +122,9 @@ test('dragging a loose tab across a leading group never absorbs it', async ({ pa
   const groupId = (await groupHeader.getAttribute('data-group-header-id'))!;
   const group = page.locator('.terminal-tab-group').first();
   const memberId = (await group.locator('[data-tab-row-id]').first().getAttribute('data-tab-row-id'))!;
-  const looseId = (await page.locator('[data-tab-row-id]').evaluateAll(rows => rows
-    .find(row => !row.closest('[data-group-id]'))?.getAttribute('data-tab-row-id')))!;
+  const looseId = (await page
+    .locator('[data-tab-row-id]')
+    .evaluateAll((rows) => rows.find((row) => !row.closest('[data-group-id]'))?.getAttribute('data-tab-row-id')))!;
   const source = (await page.getByTestId(`tab-row-${looseId}`).boundingBox())!;
   const y = source.y + source.height / 2;
   const moveTo = async (pick: (boxes: { label: { x: number; width: number }; member: { x: number; width: number } }) => number) => {
@@ -130,16 +137,16 @@ test('dragging a loose tab across a leading group never absorbs it', async ({ pa
 
   await beginDrag(page, page.getByTestId(`tab-row-${looseId}`), y);
   // Between the label and the first member: the placeholder opens at the group's start.
-  await moveTo(boxes => boxes.label.x + boxes.label.width + 6);
+  await moveTo((boxes) => boxes.label.x + boxes.label.width + 6);
   await expect(group.locator(`[data-reorder-placeholder="${memberId}"]`)).toHaveCount(1);
   // Left of the label: the placeholder leaves the group and sits before it.
-  await moveTo(boxes => boxes.label.x - 10);
+  await moveTo((boxes) => boxes.label.x - 10);
   await expect(group.locator('[data-reorder-placeholder]')).toHaveCount(0);
   const beforeGroup = page.locator(`[data-reorder-placeholder="${groupId}"]`);
   await expect(beforeGroup).toHaveCount(1);
   expect((await beforeGroup.boundingBox())!.x).toBeLessThan((await group.boundingBox())!.x);
   // Past the group's right edge: the placeholder moves to the empty tail instead of staying inside.
-  await moveTo(boxes => boxes.member.x + boxes.member.width + 40);
+  await moveTo((boxes) => boxes.member.x + boxes.member.width + 40);
   await expect(page.locator('[data-reorder-zone="ungrouped"] [data-reorder-placeholder]')).toHaveCount(1);
   await page.mouse.up();
   await expect(page.getByTestId(`tab-row-${looseId}`)).toHaveAttribute('data-tab-group', '');
@@ -159,8 +166,9 @@ test('a collapsed group joins the dragged tab only after the pointer dwells on i
   const group = page.locator('.terminal-tab-group').first();
   await groupHeader.click();
   await expect(groupHeader).toHaveAttribute('aria-expanded', 'false');
-  const looseId = (await page.locator('[data-tab-row-id]').evaluateAll(rows => rows
-    .find(row => !row.closest('[data-group-id]'))?.getAttribute('data-tab-row-id')))!;
+  const looseId = (await page
+    .locator('[data-tab-row-id]')
+    .evaluateAll((rows) => rows.find((row) => !row.closest('[data-group-id]'))?.getAttribute('data-tab-row-id')))!;
   const source = (await page.getByTestId(`tab-row-${looseId}`).boundingBox())!;
   const y = source.y + source.height / 2;
 

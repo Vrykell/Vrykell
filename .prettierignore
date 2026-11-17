@@ -1,0 +1,14 @@
+node_modules/
+dist/
+coverage/
+test-results/
+playwright-report/
+src-tauri/target/
+src-tauri/windows-context-menu/generated/
+public/
+docs/
+.github/
+package-lock.json
+src-tauri/Cargo.lock
+*.md
+**/*.md

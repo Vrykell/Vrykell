@@ -26,7 +26,13 @@ const connection: SshConnection = {
 describe('ssh store', () => {
   it('does not restore a deleted profile from a listing already in flight', async () => {
     let finish!: (connections: SshConnection[]) => void;
-    vi.mocked(listSshConnections).mockImplementationOnce(() => new Promise(resolve => { finish = resolve; }))
+    vi.mocked(listSshConnections)
+      .mockImplementationOnce(
+        () =>
+          new Promise((resolve) => {
+            finish = resolve;
+          }),
+      )
       .mockResolvedValue([]);
     const loading = useSshStore.getState().load();
     const deleting = useSshStore.getState().remove(connection.id);
@@ -40,7 +46,13 @@ describe('ssh store', () => {
   it('publishes saved changes made while an old listing is in flight', async () => {
     const updated = { ...connection, host: 'updated.example.com' };
     let finish!: (connections: SshConnection[]) => void;
-    vi.mocked(listSshConnections).mockImplementationOnce(() => new Promise(resolve => { finish = resolve; }))
+    vi.mocked(listSshConnections)
+      .mockImplementationOnce(
+        () =>
+          new Promise((resolve) => {
+            finish = resolve;
+          }),
+      )
       .mockResolvedValue([updated]);
     const loading = useSshStore.getState().load();
     const saving = useSshStore.getState().save(updated);
@@ -54,11 +66,11 @@ describe('ssh store', () => {
     const other = { ...connection, id: 'other', name: 'Other' };
     useSshStore.setState({ connections: [connection, other] });
     useSshStore.getState().reorder(0, 1);
-    expect(useSshStore.getState().connections.map(item => item.id)).toEqual(['other', 'ssh-1']);
+    expect(useSshStore.getState().connections.map((item) => item.id)).toEqual(['other', 'ssh-1']);
     expect(JSON.parse(localStorage.getItem('vrykell-ssh-order')!)).toEqual(['other', 'ssh-1']);
     vi.mocked(listSshConnections).mockResolvedValueOnce([connection, other]);
     await useSshStore.getState().load();
-    expect(useSshStore.getState().connections.map(item => item.id)).toEqual(['other', 'ssh-1']);
+    expect(useSshStore.getState().connections.map((item) => item.id)).toEqual(['other', 'ssh-1']);
   });
   beforeEach(() => {
     vi.clearAllMocks();
@@ -121,9 +133,10 @@ describe('ssh store', () => {
   it('ensureSshLoaded triggers loading only once', async () => {
     let resolveLoad: (connections: SshConnection[]) => void = () => {};
     vi.mocked(listSshConnections).mockImplementation(
-      () => new Promise((resolve) => {
-        resolveLoad = resolve;
-      }),
+      () =>
+        new Promise((resolve) => {
+          resolveLoad = resolve;
+        }),
     );
 
     ensureSshLoaded();

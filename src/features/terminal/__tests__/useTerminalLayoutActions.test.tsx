@@ -47,10 +47,9 @@ describe('useTerminalLayoutActions', () => {
     useSessionStore.setState({ tabs: [tab], activeId: tab.id });
     useTerminalStore.setState({ focusedPaneId: second.id });
 
-    const { result, rerender } = renderHook(
-      ({ currentLayout }) => useTerminalLayoutActions({ windowId: tab.id, layout: currentLayout }),
-      { initialProps: { currentLayout: layout } },
-    );
+    const { result, rerender } = renderHook(({ currentLayout }) => useTerminalLayoutActions({ windowId: tab.id, layout: currentLayout }), {
+      initialProps: { currentLayout: layout },
+    });
     const target = moveTargets(layout, second.id)[0]!;
     expect(target.leafId).toBe(first.id);
 

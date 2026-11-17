@@ -36,9 +36,7 @@ export function toExchanges(messages: ChatMessage[]): ChatExchange[] {
   return out;
 }
 
-export type FlowItem =
-  | { type: 'block'; block: TermBlock; ts: number }
-  | { type: 'ai'; exchange: ChatExchange; ts: number };
+export type FlowItem = { type: 'block'; block: TermBlock; ts: number } | { type: 'ai'; exchange: ChatExchange; ts: number };
 
 /** Merges command blocks and AI exchanges by timestamp (stable: blocks win ties; blocks
  *  without startedAt count as earliest).

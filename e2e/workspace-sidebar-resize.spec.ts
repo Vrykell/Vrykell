@@ -4,22 +4,26 @@ import { setupTauriMock } from './tauri-mock';
 async function dragStart(page: Page) {
   const bounds = (await page.getByTestId('workspace-sidebar-resize').boundingBox())!;
   const y = bounds.y + bounds.height / 2;
-  await page.mouse.move(bounds.x + bounds.width / 2, y); await page.mouse.down();
+  await page.mouse.move(bounds.x + bounds.width / 2, y);
+  await page.mouse.down();
   return y;
 }
 
 test('sidebar width is bounded, reversible while held, persisted and fully collapsed on release', async ({ page }, info) => {
-  await setupTauriMock(page, {}); await page.goto('/');
+  await setupTauriMock(page, {});
+  await page.goto('/');
   const sidebar = page.getByTestId('workspace-sidebar');
   const input = page.locator('[data-terminal-input]').first();
   await input.fill('keep command draft');
   let y = await dragStart(page);
-  await page.mouse.move(800, y); await page.mouse.up();
+  await page.mouse.move(800, y);
+  await page.mouse.up();
   await expect.poll(async () => (await sidebar.boundingBox())!.width).toBe(400);
   y = await dragStart(page);
   await page.mouse.move(159, y);
   await expect(sidebar).toBeHidden();
-  await page.mouse.move(280, y); await page.mouse.up();
+  await page.mouse.move(280, y);
+  await page.mouse.up();
   await expect.poll(async () => (await sidebar.boundingBox())!.width).toBe(280);
   await expect(input).toHaveValue('keep command draft');
   const search = (await page.getByTestId('global-search-trigger').boundingBox())!;
@@ -28,10 +32,12 @@ test('sidebar width is bounded, reversible while held, persisted and fully colla
   await page.reload();
   await expect.poll(async () => (await sidebar.boundingBox())!.width).toBe(280);
   y = await dragStart(page);
-  await page.mouse.move(159, y); await page.mouse.up();
+  await page.mouse.move(159, y);
+  await page.mouse.up();
   await expect(sidebar).toBeHidden();
-  expect(await sidebar.evaluate(element => element.getBoundingClientRect().width)).toBe(0);
-  await page.reload(); await expect(sidebar).toBeHidden();
+  expect(await sidebar.evaluate((element) => element.getBoundingClientRect().width)).toBe(0);
+  await page.reload();
+  await expect(sidebar).toBeHidden();
   await page.getByTestId('workspace-sidebar-expand').click();
   await expect.poll(async () => (await sidebar.boundingBox())!.width).toBe(280);
   const handle = page.getByRole('separator', { name: '调整工作区侧栏宽度' });
@@ -44,10 +50,12 @@ test('sidebar width is bounded, reversible while held, persisted and fully colla
 });
 
 test('narrow windows retain manual expansion without consuming the terminal minimum', async ({ page }, info) => {
-  await setupTauriMock(page, {}); await page.goto('/');
+  await setupTauriMock(page, {});
+  await page.goto('/');
   const sidebar = page.getByTestId('workspace-sidebar');
   const y = await dragStart(page);
-  await page.mouse.move(800, y); await page.mouse.up();
+  await page.mouse.move(800, y);
+  await page.mouse.up();
   await page.setViewportSize({ width: 720, height: 800 });
   await expect(sidebar).toBeHidden();
   await page.getByTestId('workspace-sidebar-expand').click();
@@ -60,12 +68,13 @@ test('narrow windows retain manual expansion without consuming the terminal mini
 });
 
 test('a full terminal grid can open navigation as a temporary overlay without resizing its panes', async ({ page }, info) => {
-  await setupTauriMock(page, {}); await page.goto('/');
+  await setupTauriMock(page, {});
+  await page.goto('/');
   const input = page.locator('[data-terminal-input]').first();
   await input.fill('retain the terminal draft');
   await page.evaluate(async () => {
     const path = '/src/features/workspace/stores/workspace.ts';
-    const { useWorkspaceStore } = await import(path) as typeof import('../src/features/workspace/stores/workspace');
+    const { useWorkspaceStore } = (await import(path)) as typeof import('../src/features/workspace/stores/workspace');
     useWorkspaceStore.getState().splitFocusedDirect('row');
     useWorkspaceStore.getState().splitFocusedDirect('row');
   });

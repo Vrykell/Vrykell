@@ -16,27 +16,43 @@ test('page scrollbars stay below an open dialog and become usable again after cl
   const dialog = page.getByRole('dialog', { name: '命令面板' });
   await expect(dialog).toBeVisible();
   await expect(dialog).toHaveCSS('opacity', '1');
-  await expect.poll(() => dialog.evaluate(element => getComputedStyle(element.parentElement!).opacity)).toBe('1');
+  await expect.poll(() => dialog.evaluate((element) => getComputedStyle(element.parentElement!).opacity)).toBe('1');
   const point = await dialog.evaluate((element, railId) => {
     const popup = element.getBoundingClientRect();
     const bar = document.querySelector(`[role="scrollbar"][aria-controls="${railId}"]`)!.getBoundingClientRect();
-    return { x: bar.x + bar.width / 2, y: popup.y + popup.height / 2,
-      inside: bar.x >= popup.x && bar.right <= popup.right && popup.y >= bar.y && popup.bottom <= bar.bottom };
+    return {
+      x: bar.x + bar.width / 2,
+      y: popup.y + popup.height / 2,
+      inside: bar.x >= popup.x && bar.right <= popup.right && popup.y >= bar.y && popup.bottom <= bar.bottom,
+    };
   }, id);
   expect(point.inside).toBe(true);
-  await expect.poll(() => page.evaluate(point => document.elementFromPoint(point.x, point.y)?.closest('[role="dialog"]')?.getAttribute('aria-label'), point)).toBe('命令面板');
+  await expect
+    .poll(() =>
+      page.evaluate((point) => document.elementFromPoint(point.x, point.y)?.closest('[role="dialog"]')?.getAttribute('aria-label'), point),
+    )
+    .toBe('命令面板');
   await page.mouse.move(point.x, point.y);
   await page.screenshot({ path: test.info().outputPath('dialog-over-settings-scrollbar.png') });
   await dialog.locator('..').click({ position: { x: 5, y: 5 } });
   await expect(dialog).toBeHidden();
-  await expect.poll(() => page.evaluate(point => document.elementFromPoint(point.x, point.y)?.closest('[role="scrollbar"]')?.getAttribute('aria-controls'), point)).toBe(id);
+  await expect
+    .poll(() =>
+      page.evaluate(
+        (point) => document.elementFromPoint(point.x, point.y)?.closest('[role="scrollbar"]')?.getAttribute('aria-controls'),
+        point,
+      ),
+    )
+    .toBe(id);
   await page.mouse.move(point.x, point.y);
   await page.mouse.wheel(0, 240);
-  await expect.poll(() => navigation.evaluate(element => element.scrollTop)).toBeGreaterThan(0);
+  await expect.poll(() => navigation.evaluate((element) => element.scrollTop)).toBeGreaterThan(0);
 });
 
 test('a code block track cannot leave the chat transcript over the composer', async ({ page }) => {
-  const code = Array.from({ length: 40 }, (_, row) => `const value_${row} = ${row}; // a line wide enough to overflow horizontally`).join('\n');
+  const code = Array.from({ length: 40 }, (_, row) => `const value_${row} = ${row}; // a line wide enough to overflow horizontally`).join(
+    '\n',
+  );
   await mockAnthropic(page, `Here is the block:\n\n\`\`\`ts\n${code}\n\`\`\`\n\nAfter the block.`);
   await setupTauriMock(page, {});
   await page.goto('/');
@@ -48,22 +64,27 @@ test('a code block track cannot leave the chat transcript over the composer', as
   await expect(surface).toBeVisible();
   // The reply's block is taller than the transcript, so the transcript clips its bottom edge.
   await page.setViewportSize({ width: 1240, height: 560 });
-  const alignBlockBottom = (offset: number) => transcript.evaluate((scroll, delta) => {
-    const pre = scroll.querySelector<HTMLElement>('.md pre')!;
-    scroll.scrollTop += pre.getBoundingClientRect().bottom - (scroll.getBoundingClientRect().bottom + delta);
-  }, offset);
+  const alignBlockBottom = (offset: number) =>
+    transcript.evaluate((scroll, delta) => {
+      const pre = scroll.querySelector<HTMLElement>('.md pre')!;
+      scroll.scrollTop += pre.getBoundingClientRect().bottom - (scroll.getBoundingClientRect().bottom + delta);
+    }, offset);
 
   // With the block's bottom edge 20px below the transcript, the whole track band is clipped: the
   // point it would occupy belongs to the composer, and no track may answer for it.
   await alignBlockBottom(20);
   // The overlay scrollbar reacts to the scroll event on a later task, so wait for its state to
   // settle before measuring the hit test; a persistent track still fails the assertions below.
-  await expect.poll(() => page.evaluate(() => {
-    const scroll = document.querySelector<HTMLElement>('.chat-transcript')!;
-    const surface = scroll.querySelector<HTMLElement>('.md pre')!;
-    const bar = document.querySelector<HTMLElement>(`[role="scrollbar"][aria-controls="${surface.id}"][aria-orientation="horizontal"]`);
-    return bar ? getComputedStyle(bar).display : 'missing';
-  })).toBe('none');
+  await expect
+    .poll(() =>
+      page.evaluate(() => {
+        const scroll = document.querySelector<HTMLElement>('.chat-transcript')!;
+        const surface = scroll.querySelector<HTMLElement>('.md pre')!;
+        const bar = document.querySelector<HTMLElement>(`[role="scrollbar"][aria-controls="${surface.id}"][aria-orientation="horizontal"]`);
+        return bar ? getComputedStyle(bar).display : 'missing';
+      }),
+    )
+    .toBe('none');
   const escape = await page.evaluate(() => {
     const scroll = document.querySelector<HTMLElement>('.chat-transcript')!;
     const surface = scroll.querySelector<HTMLElement>('.md pre')!;
@@ -87,14 +108,16 @@ test('a code block track cannot leave the chat transcript over the composer', as
   await alignBlockBottom(-2);
   const bar = page.locator(`[role="scrollbar"][aria-controls="${await surface.getAttribute('id')}"][aria-orientation="horizontal"]`);
   await expect(bar).toBeVisible();
-  expect(await bar.evaluate(element => {
-    const bounds = document.querySelector('.chat-transcript')!.getBoundingClientRect();
-    const rect = element.getBoundingClientRect();
-    return rect.top >= bounds.top - 1 && rect.bottom <= bounds.bottom + 1;
-  })).toBe(true);
+  expect(
+    await bar.evaluate((element) => {
+      const bounds = document.querySelector('.chat-transcript')!.getBoundingClientRect();
+      const rect = element.getBoundingClientRect();
+      return rect.top >= bounds.top - 1 && rect.bottom <= bounds.bottom + 1;
+    }),
+  ).toBe(true);
   const track = (await bar.boundingBox())!;
   await page.mouse.click(track.x + track.width - 6, track.y + track.height / 2);
-  await expect.poll(() => surface.evaluate(element => element.scrollLeft)).toBeGreaterThan(0);
+  await expect.poll(() => surface.evaluate((element) => element.scrollLeft)).toBeGreaterThan(0);
   await page.mouse.click(track.x + 6, track.y + track.height / 2);
-  await expect.poll(() => surface.evaluate(element => element.scrollLeft)).toBe(0);
+  await expect.poll(() => surface.evaluate((element) => element.scrollLeft)).toBe(0);
 });

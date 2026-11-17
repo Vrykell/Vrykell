@@ -10,7 +10,10 @@ export const useSettingsNavigationStore = create<{
   openField: (page: PageId, title: string, control?: string) => void;
   setSelected: (page: PageId) => void;
 }>((set) => ({
-  selected: 'ai-model', targetField: null, request: 0,
-  setSelected: selected => set({ selected, targetField: null, targetControl: undefined }),
-  openField: (selected, targetField, targetControl) => set(state => ({ selected, targetField, targetControl, request: state.request + 1 })),
+  selected: 'ai-model',
+  targetField: null,
+  request: 0,
+  setSelected: (selected) => set({ selected, targetField: null, targetControl: undefined }),
+  openField: (selected, targetField, targetControl) =>
+    set((state) => ({ selected, targetField, targetControl, request: state.request + 1 })),
 }));

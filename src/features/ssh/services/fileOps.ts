@@ -1,7 +1,18 @@
 import { useFileUndoSettings } from '@config/fileUndo';
 import {
-  sshFsList, sshSearchFiles, sshRename, sshCreateFile, sshCreateDir, sshMove, sshCopy,
-  sshStageDelete, sshRestoreStaged, sshPurgeStaged, sshUpload, sshDownload, sshStat,
+  sshFsList,
+  sshSearchFiles,
+  sshRename,
+  sshCreateFile,
+  sshCreateDir,
+  sshMove,
+  sshCopy,
+  sshStageDelete,
+  sshRestoreStaged,
+  sshPurgeStaged,
+  sshUpload,
+  sshDownload,
+  sshStat,
 } from '@features/ssh/services/api';
 import { normalizeRemotePath, parentOfRemote, joinRemote } from '@features/ssh/utils/remotePath';
 import type { FileOpOutcome, FileOps } from '@features/files/model/fileOps';
@@ -13,7 +24,7 @@ export function createSshFileOps(connectionId: string): FileOps {
     const completed: FileOpOutcome['completed'] = [];
     const errors: string[] = [];
     for (const path of paths) {
-      if (parentOfRemote(path) === destDir) continue;   // Same level: no operation
+      if (parentOfRemote(path) === destDir) continue; // Same level: no operation
       try {
         completed.push({ from: path, to: await sshMove(connectionId, path, destDir) });
       } catch (error) {
@@ -28,8 +39,8 @@ export function createSshFileOps(connectionId: string): FileOps {
     backgroundRefresh: 'one-directory',
     search: (root, query, signal, onProgress) => sshSearchFiles(connectionId, root, query, signal, onProgress),
     stat: (path) => sshStat(connectionId, path),
-    list: (dir) => sshFsList(connectionId, dir ?? undefined)
-      .then((response) => ({
+    list: (dir) =>
+      sshFsList(connectionId, dir ?? undefined).then((response) => ({
         base: response.base ? normalizeRemotePath(response.base) : null,
         entries: response.entries,
       })),
@@ -42,7 +53,8 @@ export function createSshFileOps(connectionId: string): FileOps {
     rename: (path, newName) => sshRename(connectionId, path, newName),
     move,
     copy: (paths, destDir) => sshCopy(connectionId, paths, destDir),
-    stageDelete: (paths) => useFileUndoSettings.getState().remote ? sshStageDelete(connectionId, paths) : sshStageDelete(connectionId, paths, false),
+    stageDelete: (paths) =>
+      useFileUndoSettings.getState().remote ? sshStageDelete(connectionId, paths) : sshStageDelete(connectionId, paths, false),
     restoreStaged: (pairs) => sshRestoreStaged(connectionId, pairs),
     purgeStaged: (paths) => sshPurgeStaged(connectionId, paths),
     upload: (dir, localPath) => sshUpload(connectionId, dir, localPath),

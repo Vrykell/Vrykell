@@ -9,10 +9,7 @@
 import { deserializeParts } from '@features/agent/model/messageParts';
 import { deserializeAttachments } from '@features/agent/model/attachments';
 import { parseEnvironment, parseReferences } from '../model/conversation';
-import {
-  acpTranscriptDelete, acpTranscriptGet, acpTranscriptList, acpTranscriptSave,
-  type AcpTranscriptSummary,
-} from '@platform/api/acp';
+import { acpTranscriptDelete, acpTranscriptGet, acpTranscriptList, acpTranscriptSave, type AcpTranscriptSummary } from '@platform/api/acp';
 import type { ChatMessage } from '@features/chat';
 
 export interface RetainedHarnessTranscript {
@@ -42,7 +39,7 @@ function truncateCodePoints(value: string, limit: number): string {
 
 /** The title a history row shows: the first question, falling back to the agent name. */
 export function harnessTranscriptTitle(messages: readonly ChatMessage[], harness: string): string {
-  const first = messages.find(message => message.role === 'user' && message.content.trim());
+  const first = messages.find((message) => message.role === 'user' && message.content.trim());
   const text = first?.content.trim().replace(/\s+/g, ' ');
   return truncateCodePoints(text || harness, 120);
 }

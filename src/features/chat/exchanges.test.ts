@@ -4,7 +4,11 @@ import type { ChatMessage } from '@features/chat/stores/chat';
 import type { TermBlock } from '@features/terminal/services/pipeline/termBlock';
 
 const msg = (id: string, role: 'user' | 'assistant', createdAt: number, extra: Partial<ChatMessage> = {}): ChatMessage => ({
-  id, role, content: `${role}-${id}`, createdAt, ...extra,
+  id,
+  role,
+  content: `${role}-${id}`,
+  createdAt,
+  ...extra,
 });
 
 const block = (id: string, startedAt: number): TermBlock => ({
@@ -31,10 +35,7 @@ describe('toExchanges', () => {
   });
 
   it('turns consecutive question/answer pairs into separate exchanges', () => {
-    const ex = toExchanges([
-      msg('q1', 'user', 1), msg('a1', 'assistant', 2),
-      msg('q2', 'user', 3), msg('a2', 'assistant', 4),
-    ]);
+    const ex = toExchanges([msg('q1', 'user', 1), msg('a1', 'assistant', 2), msg('q2', 'user', 3), msg('a2', 'assistant', 4)]);
     expect(ex.map((e) => e.id)).toEqual(['q1', 'q2']);
   });
 

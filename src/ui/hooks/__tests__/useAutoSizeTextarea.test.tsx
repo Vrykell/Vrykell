@@ -23,13 +23,23 @@ describe('textarea size recovery', () => {
       measuredHeights.push(this.style.height);
       return width < 200 ? 180 : this.value.includes('\n') ? 48 : 24;
     });
-    vi.stubGlobal('ResizeObserver', class {
-      constructor(callback: () => void) { notify = callback; }
-      observe() {}
-      disconnect = disconnect;
-    });
+    vi.stubGlobal(
+      'ResizeObserver',
+      class {
+        constructor(callback: () => void) {
+          notify = callback;
+        }
+        observe() {}
+        disconnect = disconnect;
+      },
+    );
   });
-  afterEach(() => { cleanup(); vi.restoreAllMocks(); vi.unstubAllGlobals(); disconnect.mockClear(); });
+  afterEach(() => {
+    cleanup();
+    vi.restoreAllMocks();
+    vi.unstubAllGlobals();
+    disconnect.mockClear();
+  });
 
   it('shrinks empty placeholder and draft fields again when width is restored', () => {
     const { container, rerender, unmount } = render(<Composer />);
@@ -47,7 +57,7 @@ describe('textarea size recovery', () => {
       expect(input.style.overflowY).toBe('hidden');
       expect(input.value).toBe(value);
     }
-    expect(measuredHeights.every(height => height === 'auto')).toBe(true);
+    expect(measuredHeights.every((height) => height === 'auto')).toBe(true);
     unmount();
     expect(disconnect).toHaveBeenCalledOnce();
   });
@@ -72,7 +82,9 @@ describe('textarea size recovery', () => {
     act(() => notify());
     expect(input.style.height).toBe('120px');
     width = 400;
-    await act(async () => { document.documentElement.style.setProperty('--test-font', '15px'); });
+    await act(async () => {
+      document.documentElement.style.setProperty('--test-font', '15px');
+    });
     expect(input.style.height).toBe('24px');
     document.documentElement.style.removeProperty('--test-font');
   });

@@ -6,7 +6,12 @@ import { useTypographyStore } from '@config/typography';
 describe('theme font settings', () => {
   it('keeps every font preview in the group that owns its controls', () => {
     render(<FontSettings />);
-    for (const [group, preview] of [['界面字体', '界面字体预览'], ['终端字体', '终端字体预览'], ['对话字体', 'AI Chat 字号预览'], ['编辑器字体设置', '编辑器字体预览']]) {
+    for (const [group, preview] of [
+      ['界面字体', '界面字体预览'],
+      ['终端字体', '终端字体预览'],
+      ['对话字体', 'AI Chat 字号预览'],
+      ['编辑器字体设置', '编辑器字体预览'],
+    ]) {
       expect(within(screen.getByRole('group', { name: group })).getByLabelText(preview)).toBeVisible();
     }
     expect(screen.queryByRole('group', { name: '预览' })).toBeNull();
@@ -18,7 +23,11 @@ describe('theme font settings', () => {
     expect(screen.getByRole('option', { name: 'JetBrains Mono' })).toBeInTheDocument();
     fireEvent.click(screen.getByRole('option', { name: 'Maple Mono NF CN' }));
     expect(document.documentElement.style.getPropertyValue('--font-ui')).toMatch(/^"Maple Mono NF CN",/);
-    expect(useTypographyStore.getState()).toMatchObject({ uiFontPreset: 'Maple Mono NF CN', terminalFontPreset: 'system', editorFontPreset: 'system' });
+    expect(useTypographyStore.getState()).toMatchObject({
+      uiFontPreset: 'Maple Mono NF CN',
+      terminalFontPreset: 'system',
+      editorFontPreset: 'system',
+    });
   });
   it('offers native defaults for the interface, terminal and editor independently', () => {
     render(<FontSettings />);
@@ -27,7 +36,11 @@ describe('theme font settings', () => {
       fireEvent.click(screen.getByRole('option', { name: '系统默认字体' }));
       expect(screen.getByRole('combobox', { name })).toHaveTextContent('系统默认字体');
     }
-    expect(useTypographyStore.getState()).toMatchObject({ uiFontPreset: 'system', terminalFontPreset: 'system-default', editorFontPreset: 'system-default' });
+    expect(useTypographyStore.getState()).toMatchObject({
+      uiFontPreset: 'system',
+      terminalFontPreset: 'system-default',
+      editorFontPreset: 'system-default',
+    });
     expect(document.documentElement.style.getPropertyValue('--font-ui')).toMatch(/^system-ui,/);
     expect(document.documentElement.style.getPropertyValue('--terminal-font-family')).toMatch(/^monospace,/);
     expect(document.documentElement.style.getPropertyValue('--editor-font-family')).toMatch(/^monospace,/);
@@ -36,7 +49,11 @@ describe('theme font settings', () => {
     render(<FontSettings />);
     fireEvent.click(screen.getByRole('combobox', { name: '页面字体' }));
     fireEvent.click(screen.getByRole('option', { name: 'Inter' }));
-    expect(useTypographyStore.getState()).toMatchObject({ uiFontPreset: 'Inter', terminalFontPreset: 'system', editorFontPreset: 'system' });
+    expect(useTypographyStore.getState()).toMatchObject({
+      uiFontPreset: 'Inter',
+      terminalFontPreset: 'system',
+      editorFontPreset: 'system',
+    });
     expect(document.documentElement.style.getPropertyValue('--font-ui')).toMatch(/^"Inter",/);
     fireEvent.click(screen.getByRole('combobox', { name: '终端字体' }));
     await waitFor(() => expect(screen.queryByRole('option', { name: 'Sarasa Term SC' })).toBeNull());
@@ -45,7 +62,10 @@ describe('theme font settings', () => {
     expect(screen.getByRole('option', { name: 'JetBrains Mono' })).toBeInTheDocument();
     expect(screen.queryByRole('option', { name: /[（）]/ })).toBeNull();
   });
-  beforeEach(() => { useTypographyStore.getState().reset(); useTypographyStore.getState().update({ commandHighlighting: false }); });
+  beforeEach(() => {
+    useTypographyStore.getState().reset();
+    useTypographyStore.getState().update({ commandHighlighting: false });
+  });
   it('updates global page and terminal fonts independently and restores defaults', () => {
     render(<FontSettings />);
     fireEvent.click(screen.getByRole('combobox', { name: '页面字号' }));
@@ -97,11 +117,19 @@ describe('theme font settings', () => {
 it('previews font family, weight and line spacing and restores them together', () => {
   render(<FontSettings />);
   expect(screen.getByRole('combobox', { name: '终端字体' })).toHaveTextContent('Maple Mono NF CN');
-  for (const [name, option] of [['终端字体', 'Cascadia Code'], ['终端字重', '350'], ['终端行距', '1.2×']]) {
+  for (const [name, option] of [
+    ['终端字体', 'Cascadia Code'],
+    ['终端字重', '350'],
+    ['终端行距', '1.2×'],
+  ]) {
     fireEvent.click(screen.getByRole('combobox', { name }));
     fireEvent.click(screen.getByRole('option', { name: option }));
   }
-  expect(useTypographyStore.getState()).toMatchObject({ terminalFontPreset: 'Cascadia Code', terminalFontWeight: 350, terminalLineHeight: 1.2 });
+  expect(useTypographyStore.getState()).toMatchObject({
+    terminalFontPreset: 'Cascadia Code',
+    terminalFontWeight: 350,
+    terminalLineHeight: 1.2,
+  });
   expect(screen.getByLabelText('终端字体预览')).toHaveTextContent('AaBb 0123');
   fireEvent.click(screen.getByRole('button', { name: '恢复默认字体设置' }));
   expect(useTypographyStore.getState()).toMatchObject({ terminalFontPreset: 'system', terminalFontWeight: 400, terminalLineHeight: 1 });

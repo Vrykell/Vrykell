@@ -18,12 +18,16 @@ async function openGitFileInTerminal(selection: GitSelection): Promise<void> {
   let command = '';
   let tabId: string;
   if (selection.target.connectionId) {
-    const spec = store.tabs.flatMap(terminalsOf).find(pane => pane.kind === 'ssh' && pane.ssh?.connectionId === selection.target.connectionId);
+    const spec = store.tabs
+      .flatMap(terminalsOf)
+      .find((pane) => pane.kind === 'ssh' && pane.ssh?.connectionId === selection.target.connectionId);
     if (!spec?.ssh) throw new Error(t('Open a terminal for this remote connection first.'));
     command = remoteOpenCommand(loadFileOpenConfig(), path);
     tabId = store.addTab({ kind: 'ssh', ssh: spec.ssh, cwd: selection.target.cwd, title });
   } else {
-    const result = await openFile(path, value => { command = value; });
+    const result = await openFile(path, (value) => {
+      command = value;
+    });
     if (result.via === 'system' || !command) return;
     tabId = store.addTab({ cwd: selection.target.cwd, title });
   }

@@ -20,7 +20,15 @@ export interface HarnessSelectorOption {
   description?: string;
 }
 
-export default function HarnessSelector({ label, value, options, onChange, testId, model = false, permission = false }: {
+export default function HarnessSelector({
+  label,
+  value,
+  options,
+  onChange,
+  testId,
+  model = false,
+  permission = false,
+}: {
   label: string;
   value: string;
   options: HarnessSelectorOption[];
@@ -38,12 +46,17 @@ export default function HarnessSelector({ label, value, options, onChange, testI
   const navigation = useListNavigationMode(true);
   const [query, setQuery] = useState('');
   const input = useRef<HTMLInputElement>(null);
-  const filtered = options.filter(option => !query || `${option.label} ${option.description ?? ''}`.toLocaleLowerCase().includes(query.toLocaleLowerCase()));
+  const filtered = options.filter(
+    (option) => !query || `${option.label} ${option.description ?? ''}`.toLocaleLowerCase().includes(query.toLocaleLowerCase()),
+  );
 
   useEffect(() => {
     if (!open) return;
     setQuery('');
-    const index = Math.max(0, options.findIndex((option) => option.value === value));
+    const index = Math.max(
+      0,
+      options.findIndex((option) => option.value === value),
+    );
     if (options.length > 8) input.current?.focus();
     else rows.current[index]?.focus();
     const outside = (event: PointerEvent) => {
@@ -83,7 +96,13 @@ export default function HarnessSelector({ label, value, options, onChange, testI
   }, [open]);
 
   useLayoutEffect(() => {
-    if (open && position.maxHeight) rows.current[Math.max(0, options.findIndex(option => option.value === value))]?.scrollIntoView?.({ block: 'nearest' });
+    if (open && position.maxHeight)
+      rows.current[
+        Math.max(
+          0,
+          options.findIndex((option) => option.value === value),
+        )
+      ]?.scrollIntoView?.({ block: 'nearest' });
   }, [open, position.maxHeight]);
 
   const close = () => {
@@ -93,10 +112,22 @@ export default function HarnessSelector({ label, value, options, onChange, testI
 
   return (
     <>
-      <button ref={trigger} type="button" data-subtle className={`harness-selector${model || permission ? ' harness-footer-choice' : ''}`} data-testid={testId}
-        aria-label={label} data-tip={`${label}: ${current?.label ?? ''}`} data-tip-description={current?.description}
-        aria-haspopup="listbox" aria-expanded={open}
-        onClick={event => { navigation.setKeyboardNavigation(event.detail === 0); setOpen(!open); }} onKeyDown={(event) => {
+      <button
+        ref={trigger}
+        type="button"
+        data-subtle
+        className={`harness-selector${model || permission ? ' harness-footer-choice' : ''}`}
+        data-testid={testId}
+        aria-label={label}
+        data-tip={`${label}: ${current?.label ?? ''}`}
+        data-tip-description={current?.description}
+        aria-haspopup="listbox"
+        aria-expanded={open}
+        onClick={(event) => {
+          navigation.setKeyboardNavigation(event.detail === 0);
+          setOpen(!open);
+        }}
+        onKeyDown={(event) => {
           if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
             event.preventDefault();
             navigation.setKeyboardNavigation(true);
@@ -108,52 +139,90 @@ export default function HarnessSelector({ label, value, options, onChange, testI
         <span className="harness-selector-value">{current?.label ?? ''}</span>
         <ChevronDown size={iconSizes.copy} aria-hidden="true" />
       </button>
-      {open && createPortal(
-        <div {...navigation.props} ref={menu} className="workspace-floating harness-select-menu"
-          style={{ ...position, zIndex: 10000, padding: 4 }}>
-          {options.length > 8 && <TextInput ref={input} className="harness-select-search" value={query} aria-label={t('Search options…')} placeholder={t('Search options…')} onChange={event => setQuery(event.target.value)} onKeyDown={event => {
-            if (event.key === 'Escape') { event.preventDefault(); event.stopPropagation(); close(); }
-            if (event.key === 'ArrowDown') { event.preventDefault(); navigation.setKeyboardNavigation(true); rows.current[0]?.focus(); }
-          }} />}
-          <div className="harness-select-options" role="listbox" aria-label={label} data-list-navigation="true" data-keyboard-navigation={navigation.keyboardNavigation}>
-          {filtered.map((option, index) => {
-            const selected = option.value === value;
-            const Mark = model ? modelMark('openai-compatible', option.value) : null;
-            return (
-              <button key={option.value} ref={(element) => { rows.current[index] = element; }}
-                type="button" data-subtle role="option" aria-selected={selected}
-                className="workspace-floating-row harness-select-option"
-                onClick={() => {
-                  if (!selected) onChange(option.value);
-                  close();
-                }}
+      {open &&
+        createPortal(
+          <div
+            {...navigation.props}
+            ref={menu}
+            className="workspace-floating harness-select-menu"
+            style={{ ...position, zIndex: 10000, padding: 4 }}>
+            {options.length > 8 && (
+              <TextInput
+                ref={input}
+                className="harness-select-search"
+                value={query}
+                aria-label={t('Search options…')}
+                placeholder={t('Search options…')}
+                onChange={(event) => setQuery(event.target.value)}
                 onKeyDown={(event) => {
                   if (event.key === 'Escape') {
                     event.preventDefault();
                     event.stopPropagation();
                     close();
-                  } else if (['ArrowDown', 'ArrowUp', 'Home', 'End'].includes(event.key)) {
+                  }
+                  if (event.key === 'ArrowDown') {
                     event.preventDefault();
                     navigation.setKeyboardNavigation(true);
-                    const next = event.key === 'Home' ? 0 : event.key === 'End' ? filtered.length - 1
-                      : (index + (event.key === 'ArrowDown' ? 1 : -1) + filtered.length) % filtered.length;
-                    rows.current[next]?.focus();
+                    rows.current[0]?.focus();
                   }
-                }}>
-                {Mark && <Mark size={iconSizes.row} aria-hidden="true" />}
-                <span className="chat-approval-option-copy">
-                  <span>{option.label}</span>
-                  {option.description && <small>{option.description}</small>}
-                </span>
-                {selected && <Check size={iconSizes.compact} aria-hidden="true" />}
-              </button>
-            );
-          })}
-          {!filtered.length && <div className="ai-launch-empty">{t('No matching options')}</div>}
-          </div>
-        </div>,
-        document.body,
-      )}
+                }}
+              />
+            )}
+            <div
+              className="harness-select-options"
+              role="listbox"
+              aria-label={label}
+              data-list-navigation="true"
+              data-keyboard-navigation={navigation.keyboardNavigation}>
+              {filtered.map((option, index) => {
+                const selected = option.value === value;
+                const Mark = model ? modelMark('openai-compatible', option.value) : null;
+                return (
+                  <button
+                    key={option.value}
+                    ref={(element) => {
+                      rows.current[index] = element;
+                    }}
+                    type="button"
+                    data-subtle
+                    role="option"
+                    aria-selected={selected}
+                    className="workspace-floating-row harness-select-option"
+                    onClick={() => {
+                      if (!selected) onChange(option.value);
+                      close();
+                    }}
+                    onKeyDown={(event) => {
+                      if (event.key === 'Escape') {
+                        event.preventDefault();
+                        event.stopPropagation();
+                        close();
+                      } else if (['ArrowDown', 'ArrowUp', 'Home', 'End'].includes(event.key)) {
+                        event.preventDefault();
+                        navigation.setKeyboardNavigation(true);
+                        const next =
+                          event.key === 'Home'
+                            ? 0
+                            : event.key === 'End'
+                              ? filtered.length - 1
+                              : (index + (event.key === 'ArrowDown' ? 1 : -1) + filtered.length) % filtered.length;
+                        rows.current[next]?.focus();
+                      }
+                    }}>
+                    {Mark && <Mark size={iconSizes.row} aria-hidden="true" />}
+                    <span className="chat-approval-option-copy">
+                      <span>{option.label}</span>
+                      {option.description && <small>{option.description}</small>}
+                    </span>
+                    {selected && <Check size={iconSizes.compact} aria-hidden="true" />}
+                  </button>
+                );
+              })}
+              {!filtered.length && <div className="ai-launch-empty">{t('No matching options')}</div>}
+            </div>
+          </div>,
+          document.body,
+        )}
     </>
   );
 }

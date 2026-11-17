@@ -20,26 +20,33 @@ test('keeps modal command and search input inside the status row', async ({ page
       const input = editor.getByRole('textbox', { name: 'Vim 命令' });
       await expect(input).toHaveValue(command.slice(1));
       const status = editor.locator('.code-editor-status');
-      expect(await input.evaluate(element => getComputedStyle(element).fontSize)).toBe(await status.evaluate(element => getComputedStyle(element).fontSize));
-      expect(await input.evaluate(element => getComputedStyle(element).fontFamily)).toBe(await status.evaluate(element => getComputedStyle(element).fontFamily));
+      expect(await input.evaluate((element) => getComputedStyle(element).fontSize)).toBe(
+        await status.evaluate((element) => getComputedStyle(element).fontSize),
+      );
+      expect(await input.evaluate((element) => getComputedStyle(element).fontFamily)).toBe(
+        await status.evaluate((element) => getComputedStyle(element).fontFamily),
+      );
       const bounds = await input.boundingBox();
       const row = await editor.locator('.code-editor-status').boundingBox();
-      expect(bounds).not.toBeNull(); expect(row).not.toBeNull();
+      expect(bounds).not.toBeNull();
+      expect(row).not.toBeNull();
       expect(bounds!.height).toBeGreaterThanOrEqual(24);
       expect(bounds!.y).toBeGreaterThanOrEqual(row!.y);
       expect(bounds!.y + bounds!.height).toBeLessThanOrEqual(row!.y + row!.height);
       expect(bounds!.x + bounds!.width).toBeLessThanOrEqual(row!.x + row!.width);
-      expect(await input.evaluate(element => {
-        const input = element.getBoundingClientRect();
-        for (let parent = element.parentElement; parent; parent = parent.parentElement) {
-          const style = getComputedStyle(parent);
-          if (style.overflowY === 'hidden' || style.overflowY === 'clip') {
-            const bounds = parent.getBoundingClientRect();
-            if (input.y < bounds.y || input.bottom > bounds.bottom) return false;
+      expect(
+        await input.evaluate((element) => {
+          const input = element.getBoundingClientRect();
+          for (let parent = element.parentElement; parent; parent = parent.parentElement) {
+            const style = getComputedStyle(parent);
+            if (style.overflowY === 'hidden' || style.overflowY === 'clip') {
+              const bounds = parent.getBoundingClientRect();
+              if (input.y < bounds.y || input.bottom > bounds.bottom) return false;
+            }
           }
-        }
-        return true;
-      })).toBe(true);
+          return true;
+        }),
+      ).toBe(true);
       await page.screenshot({ path: info.outputPath(`command-${width}-${command[0] === ':' ? 'ex' : 'search'}.png`) });
       await page.keyboard.press('Escape');
       await expect(input).toHaveCount(0);

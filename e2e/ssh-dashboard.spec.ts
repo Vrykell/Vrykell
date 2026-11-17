@@ -3,7 +3,8 @@ import { setupTauriMock } from './tauri-mock';
 
 test('one host workspace switches resource collection on and pauses while inactive', async ({ page }, info) => {
   await setupTauriMock(page, {});
-  await page.goto('/'); await page.getByTestId('workspace-area-ssh').click();
+  await page.goto('/');
+  await page.getByTestId('workspace-area-ssh').click();
   const hosts = page.getByTestId('ssh-dashboard');
   await expect(page.getByTestId('workspace-area-dashboard')).toHaveCount(0);
   await expect(hosts.getByRole('heading', { name: '主机', exact: true })).toBeVisible();
@@ -17,12 +18,18 @@ test('one host workspace switches resource collection on and pauses while inacti
   await expect(hosts.locator('.ssh-dashboard-card')).toBeVisible();
   const address = hosts.locator('.ssh-dashboard-address').first();
   await expect(address).toContainText('@');
-  expect(await address.evaluate(element => getComputedStyle(element).fontFamily)).toBe(
-    await hosts.locator('.ssh-dashboard-card-title strong').first().evaluate(element => getComputedStyle(element).fontFamily));
+  expect(await address.evaluate((element) => getComputedStyle(element).fontFamily)).toBe(
+    await hosts
+      .locator('.ssh-dashboard-card-title strong')
+      .first()
+      .evaluate((element) => getComputedStyle(element).fontFamily),
+  );
   await page.screenshot({ path: info.outputPath('hosts-resource-cards.png'), animations: 'disabled' });
   await page.getByTestId('workspace-area-terminal').click();
-  await page.waitForTimeout(300); const inactiveCalls = await calls();
-  await page.waitForTimeout(1200); expect(await calls()).toBe(inactiveCalls);
+  await page.waitForTimeout(300);
+  const inactiveCalls = await calls();
+  await page.waitForTimeout(1200);
+  expect(await calls()).toBe(inactiveCalls);
   await page.getByTestId('workspace-area-ssh').click();
   await page.getByTestId('ssh-dashboard-metrics').click();
   const menu = page.getByRole('menu', { name: '采集并显示' });
@@ -30,6 +37,7 @@ test('one host workspace switches resource collection on and pauses while inacti
   await expect(page.getByText('指标采集已暂停。开启至少一个指标后才会采集主机状态。', { exact: true })).toBeVisible();
   await page.keyboard.press('Escape');
   await hosts.getByRole('switch', { name: '资源占用', exact: true }).click();
-  await page.reload(); await page.getByTestId('workspace-area-ssh').click();
+  await page.reload();
+  await page.getByTestId('workspace-area-ssh').click();
   await expect(hosts.getByRole('switch', { name: '资源占用', exact: true })).toHaveAttribute('aria-checked', 'false');
 });

@@ -34,10 +34,14 @@ describe('useFileBrowser (SSH target)', () => {
       base: '/home/tester',
       entries: [entry('src', '/home/tester/src', true), entry('a.txt', '/home/tester/a.txt')],
     });
-    sshMocks.sshRename.mockReset().mockImplementation((_id: string, path: string, name: string) => Promise.resolve(`${path.slice(0, path.lastIndexOf('/'))}/${name}`));
+    sshMocks.sshRename
+      .mockReset()
+      .mockImplementation((_id: string, path: string, name: string) => Promise.resolve(`${path.slice(0, path.lastIndexOf('/'))}/${name}`));
     sshMocks.sshCreateFile.mockReset().mockResolvedValue('/home/tester/Untitled');
     sshMocks.sshCreateDir.mockReset().mockResolvedValue('/home/tester/NewFolder');
-    sshMocks.sshMove.mockReset().mockImplementation((_id: string, path: string, destDir: string) => Promise.resolve(`${destDir}/${path.split('/').pop()}`));
+    sshMocks.sshMove
+      .mockReset()
+      .mockImplementation((_id: string, path: string, destDir: string) => Promise.resolve(`${destDir}/${path.split('/').pop()}`));
     sshMocks.sshCopy.mockReset().mockResolvedValue({ completed: [], errors: [] });
     sshMocks.sshStageDelete.mockReset().mockResolvedValue({ completed: [], errors: [] });
     sshMocks.sshRestoreStaged.mockReset().mockResolvedValue({ completed: [], errors: [] });
@@ -47,7 +51,9 @@ describe('useFileBrowser (SSH target)', () => {
     onPathChange.mockReset();
   });
 
-  afterEach(() => { vi.clearAllMocks(); });
+  afterEach(() => {
+    vi.clearAllMocks();
+  });
 
   it('first load uses the base resolved from the remote home directory and writes the path back', async () => {
     const { result } = renderHook(() => useFileBrowser({ target: SSH_TARGET, onPathChange, openEntry }));
@@ -57,10 +63,9 @@ describe('useFileBrowser (SSH target)', () => {
   });
 
   it('does not connect while hidden and resumes loading when shown again (retry after host trust confirmation)', async () => {
-    const { result, rerender } = renderHook(
-      ({ enabled }) => useFileBrowser({ target: SSH_TARGET, enabled, openEntry }),
-      { initialProps: { enabled: false } },
-    );
+    const { result, rerender } = renderHook(({ enabled }) => useFileBrowser({ target: SSH_TARGET, enabled, openEntry }), {
+      initialProps: { enabled: false },
+    });
     expect(sshMocks.sshFsList).not.toHaveBeenCalled();
     rerender({ enabled: true });
     await waitFor(() => expect(result.current.entries).toHaveLength(2));
@@ -77,7 +82,9 @@ describe('useFileBrowser (SSH target)', () => {
     const { result } = renderHook(() => useFileBrowser({ target: SSH_TARGET, openEntry }));
     await waitFor(() => expect(result.current.entries).toHaveLength(2));
 
-    await act(async () => { await result.current.transferInto(['/home/tester/a.txt'], '/home/tester/archive', 'move'); });
+    await act(async () => {
+      await result.current.transferInto(['/home/tester/a.txt'], '/home/tester/archive', 'move');
+    });
     expect(sshMocks.sshMove).toHaveBeenCalledWith('ssh-1', '/home/tester/a.txt', '/home/tester/archive');
     expect(result.current.undo?.pairs).toEqual([{ from: '/home/tester/a.txt', to: '/home/tester/archive/a (1).txt' }]);
     expect([...result.current.selection]).toEqual(['/home/tester/archive/a (1).txt']);
@@ -86,7 +93,9 @@ describe('useFileBrowser (SSH target)', () => {
   it('dropping into the same directory is a no-op and does not call the backend', async () => {
     const { result } = renderHook(() => useFileBrowser({ target: SSH_TARGET, openEntry }));
     await waitFor(() => expect(result.current.entries).toHaveLength(2));
-    await act(async () => { await result.current.transferInto(['/home/tester/a.txt'], '/home/tester', 'move'); });
+    await act(async () => {
+      await result.current.transferInto(['/home/tester/a.txt'], '/home/tester', 'move');
+    });
     expect(sshMocks.sshMove).not.toHaveBeenCalled();
   });
 
@@ -95,11 +104,15 @@ describe('useFileBrowser (SSH target)', () => {
     await waitFor(() => expect(result.current.entries).toHaveLength(2));
 
     act(() => result.current.copySelection([entry('a.txt', '/home/tester/a.txt')]));
-    await act(async () => { await result.current.pasteInto('/home/tester/src'); });
+    await act(async () => {
+      await result.current.pasteInto('/home/tester/src');
+    });
     expect(sshMocks.sshCopy).toHaveBeenCalledWith('ssh-1', ['/home/tester/a.txt'], '/home/tester/src');
 
     act(() => result.current.cutSelection([entry('nested.txt', '/home/tester/src/nested.txt')]));
-    await act(async () => { await result.current.pasteClipboard(); });
+    await act(async () => {
+      await result.current.pasteClipboard();
+    });
     expect(sshMocks.sshMove).toHaveBeenCalledWith('ssh-1', '/home/tester/src/nested.txt', '/home/tester');
   });
 
@@ -110,11 +123,15 @@ describe('useFileBrowser (SSH target)', () => {
     await waitFor(() => expect(result.current.entries).toHaveLength(2));
 
     act(() => result.current.confirmDelete([entry('a.txt', '/home/tester/a.txt')]));
-    await act(async () => { result.current.confirmAction(); });
+    await act(async () => {
+      result.current.confirmAction();
+    });
     await waitFor(() => expect(sshMocks.sshStageDelete).toHaveBeenCalledWith('ssh-1', ['/home/tester/a.txt']));
 
     sshMocks.sshRestoreStaged.mockResolvedValue({ completed: [staged], errors: [] });
-    await act(async () => { await result.current.runUndo(); });
+    await act(async () => {
+      await result.current.runUndo();
+    });
     expect(sshMocks.sshRestoreStaged).toHaveBeenCalledWith('ssh-1', [staged]);
     expect(result.current.undoCount).toBe(0);
   });
@@ -125,7 +142,9 @@ describe('useFileBrowser (SSH target)', () => {
     await waitFor(() => expect(result.current.entries).toHaveLength(2));
 
     act(() => result.current.requestRename(entry('a.txt', '/home/tester/a.txt'), 'b.txt'));
-    await act(async () => { result.current.confirmAction(); });
+    await act(async () => {
+      result.current.confirmAction();
+    });
     await waitFor(() => expect(result.current.undo?.pairs).toEqual([{ from: '/home/tester/a.txt', to: '/home/tester/b (1).txt' }]));
   });
 
@@ -135,7 +154,9 @@ describe('useFileBrowser (SSH target)', () => {
     await waitFor(() => expect(result.current.entries).toHaveLength(2));
     const folder = result.current.entries[0]!;
 
-    await act(async () => { await result.current.createEntry('file', folder); });
+    await act(async () => {
+      await result.current.createEntry('file', folder);
+    });
     expect(sshMocks.sshCreateFile).toHaveBeenCalledWith('ssh-1', '/home/tester/src', 'Untitled');
     expect(result.current.renameTarget?.path).toBe('/home/tester/src/Untitled');
     expect(result.current.expandedSet.has('/home/tester/src')).toBe(true);
@@ -143,16 +164,19 @@ describe('useFileBrowser (SSH target)', () => {
   it('disables remote staging and clears undo without purging staged files', async () => {
     const { result } = renderHook(() => useFileBrowser({ target: SSH_TARGET, openEntry }));
     await waitFor(() => expect(result.current.entries).toHaveLength(2));
-    await act(async () => { await result.current.transferInto(['/home/tester/a.txt'], '/home/tester/archive', 'move'); });
+    await act(async () => {
+      await result.current.transferInto(['/home/tester/a.txt'], '/home/tester/archive', 'move');
+    });
     expect(result.current.undoCount).toBe(1);
     act(() => useFileUndoSettings.getState().update({ remote: false }));
     expect(result.current.undoCount).toBe(0);
     sshMocks.sshStageDelete.mockResolvedValue({ completed: [{ from: '/home/tester/a.txt', to: '' }], errors: [] });
     act(() => result.current.confirmDelete([entry('a.txt', '/home/tester/a.txt')]));
-    await act(async () => { result.current.confirmAction(); });
+    await act(async () => {
+      result.current.confirmAction();
+    });
     expect(sshMocks.sshStageDelete).toHaveBeenCalledWith('ssh-1', ['/home/tester/a.txt'], false);
     expect(sshMocks.sshPurgeStaged).not.toHaveBeenCalled();
     expect(result.current.undo).toBeNull();
   });
-
 });

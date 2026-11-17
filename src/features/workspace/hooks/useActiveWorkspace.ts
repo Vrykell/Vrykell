@@ -27,13 +27,10 @@ export function useActiveWorkspace() {
 
   const focusedSpec = useMemo<TerminalSpec | null>(() => {
     if (!activeTab || !isSessionTab(activeTab)) return null;
-    return layoutLeaves(activeTab.layout).find((spec) => spec.id === resolvedFocusedPaneId)
-      ?? firstLeaf(activeTab.layout);
+    return layoutLeaves(activeTab.layout).find((spec) => spec.id === resolvedFocusedPaneId) ?? firstLeaf(activeTab.layout);
   }, [activeTab, resolvedFocusedPaneId]);
 
-  const activeCwd = focusedSpec
-    ? terminalCwds[focusedSpec.id] ?? focusedSpec.cwd
-    : undefined;
+  const activeCwd = focusedSpec ? (terminalCwds[focusedSpec.id] ?? focusedSpec.cwd) : undefined;
 
   return {
     activeId,

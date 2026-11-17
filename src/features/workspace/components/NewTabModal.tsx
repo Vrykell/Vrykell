@@ -12,10 +12,7 @@ import { TerminalProfileIcon } from '@ui/icons/shellIcons';
 import { type ShellType } from '@platform/shells';
 import { pickPath } from '@platform/api/fs';
 import { isMacOS } from '@platform/runtime';
-import {
-  touchRecentOpen,
-  type NewTabOption,
-} from '@features/workspace/model/tabTypes';
+import { touchRecentOpen, type NewTabOption } from '@features/workspace/model/tabTypes';
 import { useSshStore } from '@features/ssh';
 import { connectionTarget, type SshConnection } from '@features/ssh/services/api';
 import { getFocusedCwd, useSessionStore } from '@features/workspace';
@@ -63,10 +60,9 @@ export default function NewTabModal({ open, onClose, groupId, onPick, source = '
   const [deleting, setDeleting] = useState<SshConnection | null>(null);
   const [location, setLocation] = useState<'profile' | 'current' | 'home' | 'custom'>('profile');
   const [customCwd, setCustomCwd] = useState('');
-  const openModeByShell = useAgentSettings(state => state.global.openModeByShell);
-  const sshOpenMode = useAgentSettings(state => state.global.sshOpenMode);
+  const openModeByShell = useAgentSettings((state) => state.global.openModeByShell);
+  const sshOpenMode = useAgentSettings((state) => state.global.sshOpenMode);
   const dialogRef = useRef<HTMLDivElement>(null);
-
 
   useEffect(() => {
     if (!open) return;
@@ -79,54 +75,78 @@ export default function NewTabModal({ open, onClose, groupId, onPick, source = '
     requestAnimationFrame(() => dialogRef.current?.focus());
   }, [open]);
 
-  const options = useMemo(() => allOptions.filter(option => (source === 'all' || option.kind === source) && (option.kind !== 'shell' || !profiles[option.shellType]?.hidden)), [allOptions, profiles, source]);
+  const options = useMemo(
+    () =>
+      allOptions.filter(
+        (option) => (source === 'all' || option.kind === source) && (option.kind !== 'shell' || !profiles[option.shellType]?.hidden),
+      ),
+    [allOptions, profiles, source],
+  );
 
   useEffect(() => {
-    if (open && keyboardNavigation) dialogRef.current?.querySelector<HTMLElement>('[data-keyboard-active="true"]')?.scrollIntoView?.({ block: 'nearest' });
+    if (open && keyboardNavigation)
+      dialogRef.current?.querySelector<HTMLElement>('[data-keyboard-active="true"]')?.scrollIntoView?.({ block: 'nearest' });
   }, [open, keyboardNavigation, selected]);
 
   const targetCwd = location === 'current' ? getFocusedCwd() : location === 'custom' ? customCwd || undefined : undefined;
   const defaultOption = useMemo(() => {
     const preferred = preferredShell(defaultShell, shells);
-    return source === 'ssh' ? options[0] : allOptions.find(option => option.kind === 'shell' && option.shellType === preferred) ?? options[0];
+    return source === 'ssh'
+      ? options[0]
+      : (allOptions.find((option) => option.kind === 'shell' && option.shellType === preferred) ?? options[0]);
   }, [options, allOptions, shells, defaultShell, source]);
 
-  const create = useCallback((opt: NewTabOption) => {
-    if (opt.kind === 'shell') {
-      touchRecentOpen(opt.key);
-      if (onPick) {
-        onPick({ id: '', kind: 'local', shellType: opt.shellType, cwd: targetCwd ?? (location === 'profile' ? profiles[opt.shellType]?.cwd || undefined : undefined), useProfileDirectory: location === 'profile' });
-        onClose();
-        return;
-      }
-      useSessionStore.getState().addTab({ shellType: opt.shellType, groupId, cwd: targetCwd, useProfileDirectory: location === 'profile' });
-    } else {
-      touchRecentOpen(opt.key);
-      void useSshStore.getState().touch(opt.sshId);
-      const conn = useSshStore.getState().connections.find((c) => c.id === opt.sshId);
-      if (conn) {
+  const create = useCallback(
+    (opt: NewTabOption) => {
+      if (opt.kind === 'shell') {
+        touchRecentOpen(opt.key);
         if (onPick) {
           onPick({
-            id: '', kind: 'ssh',
-            ssh: connectionTarget(conn),
+            id: '',
+            kind: 'local',
+            shellType: opt.shellType,
+            cwd: targetCwd ?? (location === 'profile' ? profiles[opt.shellType]?.cwd || undefined : undefined),
+            useProfileDirectory: location === 'profile',
           });
           onClose();
           return;
         }
-        useSessionStore.getState().addTab({
-          kind: 'ssh',
-          ssh: connectionTarget(conn),
-          groupId,
-        });
+        useSessionStore
+          .getState()
+          .addTab({ shellType: opt.shellType, groupId, cwd: targetCwd, useProfileDirectory: location === 'profile' });
+      } else {
+        touchRecentOpen(opt.key);
+        void useSshStore.getState().touch(opt.sshId);
+        const conn = useSshStore.getState().connections.find((c) => c.id === opt.sshId);
+        if (conn) {
+          if (onPick) {
+            onPick({
+              id: '',
+              kind: 'ssh',
+              ssh: connectionTarget(conn),
+            });
+            onClose();
+            return;
+          }
+          useSessionStore.getState().addTab({
+            kind: 'ssh',
+            ssh: connectionTarget(conn),
+            groupId,
+          });
+        }
       }
-    }
-    onClose();
-  }, [onClose, groupId, onPick, targetCwd, location, profiles]);
+      onClose();
+    },
+    [onClose, groupId, onPick, targetCwd, location, profiles],
+  );
 
   const chooseDirectory = useCallback(async () => {
     try {
       const [path] = await pickPath('directory');
-      if (path) { setCustomCwd(path); setLocation('custom'); }
+      if (path) {
+        setCustomCwd(path);
+        setLocation('custom');
+      }
     } catch (reason) {
       useToastStore.getState().addToast(t('Could not open file: {{error}}', { error: String(reason) }), 'error');
     }
@@ -143,29 +163,31 @@ export default function NewTabModal({ open, onClose, groupId, onPick, source = '
 
   /** Persist one quick-config patch back onto the saved connection. */
   const saveConnection = useCallback((conn: SshConnection, patch: Partial<SshConnection>) => {
-    void useSshStore.getState().save({ ...conn, ...patch }).catch((reason) => {
-      useToastStore.getState().addToast(
-        t('Could not save the SSH connection: {{error}}', { error: String((reason as Error)?.message ?? reason) }),
-        'error',
-      );
-    });
+    void useSshStore
+      .getState()
+      .save({ ...conn, ...patch })
+      .catch((reason) => {
+        useToastStore
+          .getState()
+          .addToast(t('Could not save the SSH connection: {{error}}', { error: String((reason as Error)?.message ?? reason) }), 'error');
+      });
   }, []);
 
   const removeConnection = useCallback((conn: SshConnection) => {
-    void useSshStore.getState().remove(conn.id).catch((reason) => {
-      useToastStore.getState().addToast(
-        t('Could not delete the SSH connection: {{error}}', { error: String((reason as Error)?.message ?? reason) }),
-        'error',
-      );
-    });
+    void useSshStore
+      .getState()
+      .remove(conn.id)
+      .catch((reason) => {
+        useToastStore
+          .getState()
+          .addToast(t('Could not delete the SSH connection: {{error}}', { error: String((reason as Error)?.message ?? reason) }), 'error');
+      });
   }, []);
 
   const openMenu = useCallback((event: React.MouseEvent, option: NewTabOption) => {
     event.preventDefault();
     event.stopPropagation();
-    const conn = option.kind === 'ssh'
-      ? useSshStore.getState().connections.find((c) => c.id === option.sshId) ?? null
-      : null;
+    const conn = option.kind === 'ssh' ? (useSshStore.getState().connections.find((c) => c.id === option.sshId) ?? null) : null;
     setMenu({ x: event.clientX, y: event.clientY, option, conn });
   }, []);
 
@@ -179,7 +201,9 @@ export default function NewTabModal({ open, onClose, groupId, onPick, source = '
       const mode = shell === 'cmd' ? 'classic' : openModeByShell[shell];
       const modes: ContextMenuItem[] = [
         { label: t('settings.openMode.classic'), checked: mode === 'classic', onClick: () => setShellMode(shell, 'classic') },
-        ...(shell === 'cmd' ? [] : [{ label: t('settings.openMode.block'), checked: mode === 'block', onClick: () => setShellMode(shell, 'block') }]),
+        ...(shell === 'cmd'
+          ? []
+          : [{ label: t('settings.openMode.block'), checked: mode === 'block', onClick: () => setShellMode(shell, 'block') }]),
       ];
       return [
         {
@@ -187,21 +211,46 @@ export default function NewTabModal({ open, onClose, groupId, onPick, source = '
           checked: shell === preferredShell(defaultShell, shells),
           onClick: () => useTerminalDefaults.getState().setShell(shell),
         },
-        ...(modes.length > 1 ? [{ label: t('Opening mode'), group: 'view' as const, submenu: { items: modes } }]
-          : modes.map(item => ({ ...item, group: 'view' as const, disabled: true }))),
+        ...(modes.length > 1
+          ? [{ label: t('Opening mode'), group: 'view' as const, submenu: { items: modes } }]
+          : modes.map((item) => ({ ...item, group: 'view' as const, disabled: true }))),
       ];
     }
     const conn = state.conn;
     if (!conn) return [];
     return [
-      { label: t('Edit connection'), group: 'edit', onClick: () => { onClose(); useHostEditor.getState().open(conn); selectWorkspaceArea('ssh'); } },
-      { label: t('Opening mode'), group: 'view', submenu: { items: [
-        { label: t('settings.openMode.classic'), checked: sshOpenMode === 'classic', onClick: () => setSshMode('classic') },
-        { label: t('settings.openMode.block'), checked: sshOpenMode === 'block', onClick: () => setSshMode('block') },
-      ] } },
+      {
+        label: t('Edit connection'),
+        group: 'edit',
+        onClick: () => {
+          onClose();
+          useHostEditor.getState().open(conn);
+          selectWorkspaceArea('ssh');
+        },
+      },
+      {
+        label: t('Opening mode'),
+        group: 'view',
+        submenu: {
+          items: [
+            { label: t('settings.openMode.classic'), checked: sshOpenMode === 'classic', onClick: () => setSshMode('classic') },
+            { label: t('settings.openMode.block'), checked: sshOpenMode === 'block', onClick: () => setSshMode('block') },
+          ],
+        },
+      },
       // Missing flags follow the form defaults: shell integration on, auto reconnect off.
-      { label: t('Shell integration'), group: 'organize', checked: conn.shellIntegration ?? true, onClick: () => saveConnection(conn, { shellIntegration: !(conn.shellIntegration ?? true) }) },
-      { label: t('Auto reconnect'), group: 'organize', checked: conn.autoReconnect ?? false, onClick: () => saveConnection(conn, { autoReconnect: !(conn.autoReconnect ?? false) }) },
+      {
+        label: t('Shell integration'),
+        group: 'organize',
+        checked: conn.shellIntegration ?? true,
+        onClick: () => saveConnection(conn, { shellIntegration: !(conn.shellIntegration ?? true) }),
+      },
+      {
+        label: t('Auto reconnect'),
+        group: 'organize',
+        checked: conn.autoReconnect ?? false,
+        onClick: () => saveConnection(conn, { autoReconnect: !(conn.autoReconnect ?? false) }),
+      },
       { label: t('Delete connection'), danger: true, onClick: () => setDeleting(conn) },
     ];
   };
@@ -209,101 +258,209 @@ export default function NewTabModal({ open, onClose, groupId, onPick, source = '
   const menuItems = menu ? buildMenuItems(menu) : [];
 
   const openWindow = useCallback(() => {
-    openAppWindow(); onClose();
+    openAppWindow();
+    onClose();
   }, [onClose]);
 
-  const handleKey = useCallback((e: React.KeyboardEvent) => {
-    if (e.key === 'Escape') { e.stopPropagation(); onClose(); return; }
-    if (e.target !== dialogRef.current && !(e.ctrlKey || e.metaKey)) return;
-    if ((isMacOS ? e.metaKey : e.ctrlKey) && !e.altKey) {
-      const key = e.key.toLowerCase();
-      const index = Number(key) - 1;
-      if (!e.shiftKey && index >= 0 && index < 9 && options[index]) {
-        e.preventDefault(); e.stopPropagation(); create(options[index]); return;
-      }
-      if (!e.shiftKey && key === 't' && defaultOption) {
-        e.preventDefault(); e.stopPropagation(); create(defaultOption); return;
-      }
-      if (!e.shiftKey && key === 'n' && !onPick) {
-        e.preventDefault(); e.stopPropagation(); openWindow(); return;
-      }
-      if (e.shiftKey && ['t', 'h', 'o'].includes(key)) {
-        e.preventDefault(); e.stopPropagation();
-        if (key === 'o') void chooseDirectory();
-        else setLocation(key === 't' ? 'current' : 'home');
+  const handleKey = useCallback(
+    (e: React.KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        e.stopPropagation();
+        onClose();
         return;
       }
-    }
-    if (e.key === 'ArrowDown') { e.preventDefault(); setKeyboardNavigation(true); setSelected((s) => Math.min(s + 1, options.length - 1)); }
-    else if (e.key === 'ArrowUp') { e.preventDefault(); setKeyboardNavigation(true); setSelected((s) => Math.max(s - 1, 0)); }
-    else if (e.key === 'Enter') { e.preventDefault(); const o = options[selected]; if (o) create(o); }
-  }, [options, selected, create, onClose, defaultOption, chooseDirectory, onPick, openWindow]);
+      if (e.target !== dialogRef.current && !(e.ctrlKey || e.metaKey)) return;
+      if ((isMacOS ? e.metaKey : e.ctrlKey) && !e.altKey) {
+        const key = e.key.toLowerCase();
+        const index = Number(key) - 1;
+        if (!e.shiftKey && index >= 0 && index < 9 && options[index]) {
+          e.preventDefault();
+          e.stopPropagation();
+          create(options[index]);
+          return;
+        }
+        if (!e.shiftKey && key === 't' && defaultOption) {
+          e.preventDefault();
+          e.stopPropagation();
+          create(defaultOption);
+          return;
+        }
+        if (!e.shiftKey && key === 'n' && !onPick) {
+          e.preventDefault();
+          e.stopPropagation();
+          openWindow();
+          return;
+        }
+        if (e.shiftKey && ['t', 'h', 'o'].includes(key)) {
+          e.preventDefault();
+          e.stopPropagation();
+          if (key === 'o') void chooseDirectory();
+          else setLocation(key === 't' ? 'current' : 'home');
+          return;
+        }
+      }
+      if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        setKeyboardNavigation(true);
+        setSelected((s) => Math.min(s + 1, options.length - 1));
+      } else if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        setKeyboardNavigation(true);
+        setSelected((s) => Math.max(s - 1, 0));
+      } else if (e.key === 'Enter') {
+        e.preventDefault();
+        const o = options[selected];
+        if (o) create(o);
+      }
+    },
+    [options, selected, create, onClose, defaultOption, chooseDirectory, onPick, openWindow],
+  );
 
   if (!open) return null;
 
-  return createPortal(<><AnchoredDropdown open={open} onClose={onClose} panelRef={dialogRef} anchor={anchor} above={!!onPick} suspended={!!menu || !!deleting} aria-label={t(source === 'ssh' ? 'Connect a server' : 'New tab')}
-        data-keyboard-navigation={keyboardNavigation} onPointerMove={() => setKeyboardNavigation(false)}
+  return createPortal(
+    <>
+      <AnchoredDropdown
+        open={open}
+        onClose={onClose}
+        panelRef={dialogRef}
+        anchor={anchor}
+        above={!!onPick}
+        suspended={!!menu || !!deleting}
+        aria-label={t(source === 'ssh' ? 'Connect a server' : 'New tab')}
+        data-keyboard-navigation={keyboardNavigation}
+        onPointerMove={() => setKeyboardNavigation(false)}
         onKeyDown={handleKey}>
         <section className="new-tab-section" aria-labelledby="new-tab-profiles">
           <h2 id="new-tab-profiles">{t(source === 'ssh' ? 'Saved hosts' : 'Choose a profile')}</h2>
           <div className="new-tab-option-list">
-            {options.map((option, index) => <OptionRow key={option.key} opt={option} index={index}
-              selected={keyboardNavigation && index === selected} isDefault={option.key === defaultOption?.key} onSelect={() => { setSelected(index); setKeyboardNavigation(false); }} onCreate={() => create(option)}
-              onContextMenu={event => { setSelected(index); openMenu(event, option); }} />)}
+            {options.map((option, index) => (
+              <OptionRow
+                key={option.key}
+                opt={option}
+                index={index}
+                selected={keyboardNavigation && index === selected}
+                isDefault={option.key === defaultOption?.key}
+                onSelect={() => {
+                  setSelected(index);
+                  setKeyboardNavigation(false);
+                }}
+                onCreate={() => create(option)}
+                onContextMenu={(event) => {
+                  setSelected(index);
+                  openMenu(event, option);
+                }}
+              />
+            ))}
           </div>
           {!options.length && <div className="new-tab-empty">{t('No matching tab types')}</div>}
-          <button type="button" className="new-tab-row workspace-floating-row" onClick={() => {
-            onClose();
-            if (source === 'ssh') { useHostEditor.getState().open(); selectWorkspaceArea('ssh'); }
-            else { useSettingsNavigationStore.getState().setSelected(`profile:${preferredShell(defaultShell, shells) ?? 'powershell'}`); useSessionStore.getState().openSettings(); }
-          }}><Settings size={20} /><span>{t(source === 'ssh' ? 'Add connection' : 'More profiles…')}</span></button>
+          <button
+            type="button"
+            className="new-tab-row workspace-floating-row"
+            onClick={() => {
+              onClose();
+              if (source === 'ssh') {
+                useHostEditor.getState().open();
+                selectWorkspaceArea('ssh');
+              } else {
+                useSettingsNavigationStore.getState().setSelected(`profile:${preferredShell(defaultShell, shells) ?? 'powershell'}`);
+                useSessionStore.getState().openSettings();
+              }
+            }}>
+            <Settings size={20} />
+            <span>{t(source === 'ssh' ? 'Add connection' : 'More profiles…')}</span>
+          </button>
         </section>
 
-        {source !== 'ssh' && <section className="new-tab-section" aria-labelledby="new-tab-location">
-          <h2 id="new-tab-location">{t('Open location')}</h2>
-          <button type="button" className="new-tab-row workspace-floating-row" data-active={location === 'current' || undefined}
-            onClick={() => setLocation('current')}><FolderOpen size={20} /><span>{t('Open in current directory')}</span>
-            <KeyHint shortcut={isMacOS ? 'Meta+Shift+T' : 'Control+Shift+T'} /></button>
-          <button type="button" className="new-tab-row workspace-floating-row" data-active={location === 'home' || undefined}
-            onClick={() => setLocation('home')}><HomeMark width={20} height={20} /><span>{t('Open in home directory')}</span>
-            <KeyHint shortcut={isMacOS ? 'Meta+Shift+H' : 'Control+Shift+H'} /></button>
-          <button type="button" className="new-tab-row workspace-floating-row" data-active={location === 'custom' || undefined}
-            onClick={() => void chooseDirectory()}><FolderPlusMark width={20} height={20} /><span>{customCwd || t('Choose a directory…')}</span>
-            <KeyHint shortcut={isMacOS ? 'Meta+Shift+O' : 'Control+Shift+O'} /></button>
-        </section>}
+        {source !== 'ssh' && (
+          <section className="new-tab-section" aria-labelledby="new-tab-location">
+            <h2 id="new-tab-location">{t('Open location')}</h2>
+            <button
+              type="button"
+              className="new-tab-row workspace-floating-row"
+              data-active={location === 'current' || undefined}
+              onClick={() => setLocation('current')}>
+              <FolderOpen size={20} />
+              <span>{t('Open in current directory')}</span>
+              <KeyHint shortcut={isMacOS ? 'Meta+Shift+T' : 'Control+Shift+T'} />
+            </button>
+            <button
+              type="button"
+              className="new-tab-row workspace-floating-row"
+              data-active={location === 'home' || undefined}
+              onClick={() => setLocation('home')}>
+              <HomeMark width={20} height={20} />
+              <span>{t('Open in home directory')}</span>
+              <KeyHint shortcut={isMacOS ? 'Meta+Shift+H' : 'Control+Shift+H'} />
+            </button>
+            <button
+              type="button"
+              className="new-tab-row workspace-floating-row"
+              data-active={location === 'custom' || undefined}
+              onClick={() => void chooseDirectory()}>
+              <FolderPlusMark width={20} height={20} />
+              <span>{customCwd || t('Choose a directory…')}</span>
+              <KeyHint shortcut={isMacOS ? 'Meta+Shift+O' : 'Control+Shift+O'} />
+            </button>
+          </section>
+        )}
 
         <section className="new-tab-section" aria-labelledby="new-tab-advanced">
           <h2 id="new-tab-advanced">{t('Advanced')}</h2>
-          {!onPick && <button type="button" className="new-tab-row workspace-floating-row" onClick={openWindow}>
-            <PanelLeft size={20} /><span>{t('Open in new window')}</span><KeyHint shortcut={isMacOS ? 'Meta+N' : 'Control+N'} /></button>}
-          <button type="button" className="new-tab-row workspace-floating-row" onClick={() => {
-            onClose(); requestTerminalSplit(null);
-          }}><Columns2 size={18} /><span>{t('Split tab')}</span></button>
+          {!onPick && (
+            <button type="button" className="new-tab-row workspace-floating-row" onClick={openWindow}>
+              <PanelLeft size={20} />
+              <span>{t('Open in new window')}</span>
+              <KeyHint shortcut={isMacOS ? 'Meta+N' : 'Control+N'} />
+            </button>
+          )}
+          <button
+            type="button"
+            className="new-tab-row workspace-floating-row"
+            onClick={() => {
+              onClose();
+              requestTerminalSplit(null);
+            }}>
+            <Columns2 size={18} />
+            <span>{t('Split tab')}</span>
+          </button>
         </section>
-    </AnchoredDropdown>
+      </AnchoredDropdown>
 
-    {/* Row quick settings */}
-    {menu && menuItems.length > 0 && (
-      <ContextMenu anchor={{ x: menu.x, y: menu.y }} items={menuItems} onClose={() => setMenu(null)} />
-    )}
-    {/* Connection editor stays above the picker; closing it keeps the picker open */}
+      {/* Row quick settings */}
+      {menu && menuItems.length > 0 && <ContextMenu anchor={{ x: menu.x, y: menu.y }} items={menuItems} onClose={() => setMenu(null)} />}
+      {/* Connection editor stays above the picker; closing it keeps the picker open */}
 
-    {deleting && (
-      <ConfirmDialog
-        open
-        danger
-        title={t('Delete SSH connection?')}
-        message={deleting.name}
-        confirmLabel={t('Delete')}
-        cancelLabel={t('Cancel')}
-        onConfirm={() => { const conn = deleting; setDeleting(null); removeConnection(conn); }}
-        onCancel={() => setDeleting(null)}
-      />
-    )}
-  </>, document.body);
+      {deleting && (
+        <ConfirmDialog
+          open
+          danger
+          title={t('Delete SSH connection?')}
+          message={deleting.name}
+          confirmLabel={t('Delete')}
+          cancelLabel={t('Cancel')}
+          onConfirm={() => {
+            const conn = deleting;
+            setDeleting(null);
+            removeConnection(conn);
+          }}
+          onCancel={() => setDeleting(null)}
+        />
+      )}
+    </>,
+    document.body,
+  );
 }
 
-function OptionRow({ opt, index, selected, isDefault, onSelect, onCreate, onContextMenu }: {
+function OptionRow({
+  opt,
+  index,
+  selected,
+  isDefault,
+  onSelect,
+  onCreate,
+  onContextMenu,
+}: {
   opt: NewTabOption;
   index: number;
   selected: boolean;
@@ -313,17 +470,28 @@ function OptionRow({ opt, index, selected, isDefault, onSelect, onCreate, onCont
   onContextMenu: (event: React.MouseEvent) => void;
 }) {
   return (
-    <button type="button" className="new-tab-row workspace-floating-row" data-keyboard-active={selected || undefined}
+    <button
+      type="button"
+      className="new-tab-row workspace-floating-row"
+      data-keyboard-active={selected || undefined}
       onClick={onCreate}
       onMouseEnter={onSelect}
       onContextMenu={onContextMenu}
-      data-testid={`new-tab-option-${opt.key}`}
-    >
-      <TerminalProfileIcon kind={opt.kind === 'ssh' ? 'ssh' : 'local'} shellType={opt.kind === 'shell' ? opt.shellType : undefined}
-        connectionId={opt.kind === 'ssh' ? opt.sshId : undefined} size={iconSizes.row} />
-      <span data-tip={opt.subtitle}><strong>{opt.label}</strong></span>
-      {isDefault ? <Check size={18} aria-label={t('Default terminal')} />
-        : index < 9 && <KeyHint shortcut={`${isMacOS ? 'Meta' : 'Control'}+${index + 1}`} />}
+      data-testid={`new-tab-option-${opt.key}`}>
+      <TerminalProfileIcon
+        kind={opt.kind === 'ssh' ? 'ssh' : 'local'}
+        shellType={opt.kind === 'shell' ? opt.shellType : undefined}
+        connectionId={opt.kind === 'ssh' ? opt.sshId : undefined}
+        size={iconSizes.row}
+      />
+      <span data-tip={opt.subtitle}>
+        <strong>{opt.label}</strong>
+      </span>
+      {isDefault ? (
+        <Check size={18} aria-label={t('Default terminal')} />
+      ) : (
+        index < 9 && <KeyHint shortcut={`${isMacOS ? 'Meta' : 'Control'}+${index + 1}`} />
+      )}
     </button>
   );
 }

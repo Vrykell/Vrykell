@@ -27,7 +27,12 @@ import type { TermBlock } from '@features/terminal/services/pipeline/termBlock';
 import { useTerminalBlockFlow } from '@features/terminal/hooks/useTerminalBlockFlow';
 import type { BlockMenuAnchor } from '@features/terminal/hooks/useTerminalBlockFlow';
 import { hasVisibleContent as hasVisibleBlockContent } from '@features/terminal/model/blockVisibility';
-import { captureTerminalPaste, copyTerminalSelection, hasCopyableSelection, pasteClipboardIntoTerminal } from '@features/terminal/services/terminalClipboard';
+import {
+  captureTerminalPaste,
+  copyTerminalSelection,
+  hasCopyableSelection,
+  pasteClipboardIntoTerminal,
+} from '@features/terminal/services/terminalClipboard';
 import { TERMINAL_FONT_FAMILY } from '@features/terminal/model/terminalFont';
 import { measureRunningTerminalRows } from '../model/runningTerminalRows';
 import { repaintTerminal } from '../model/terminalResize';
@@ -51,14 +56,7 @@ export function hasVisibleContent(b: TermBlock): boolean {
 }
 
 export default memoLocalized(function TerminalBlockList({ tabId, insetLeft = 8, insetRight = 8 }: Props) {
-  const {
-    highlightQuery,
-    running,
-    flow,
-    menuBlock,
-    openMenu,
-    closeMenu,
-  } = useTerminalBlockFlow(tabId);
+  const { highlightQuery, running, flow, menuBlock, openMenu, closeMenu } = useTerminalBlockFlow(tabId);
 
   if (flow.length === 0 && running.length === 0) return null;
 
@@ -79,8 +77,12 @@ export default memoLocalized(function TerminalBlockList({ tabId, insetLeft = 8, 
             menuOpen={menuBlock?.block.id === item.block.id}
           />
         ) : (
-          <AiBlock key={item.exchange.id} exchange={item.exchange} dividerBefore={index > 0}
-            style={{ paddingLeft: insetLeft + COMMAND_BLOCK_CONTENT_PADDING, paddingRight: insetRight + COMMAND_BLOCK_CONTENT_PADDING }} />
+          <AiBlock
+            key={item.exchange.id}
+            exchange={item.exchange}
+            dividerBefore={index > 0}
+            style={{ paddingLeft: insetLeft + COMMAND_BLOCK_CONTENT_PADDING, paddingRight: insetRight + COMMAND_BLOCK_CONTENT_PADDING }}
+          />
         ),
       )}
 
@@ -104,10 +106,7 @@ export default memoLocalized(function TerminalBlockList({ tabId, insetLeft = 8, 
           paneId={tabId}
           anchor={menuBlock.anchor}
           onClose={closeMenu}
-          getOutputText={() =>
-            menuBlock.block.outputText ||
-            menuBlock.block.outputRaw.replace(ANSI_CSI_RE, '')
-          }
+          getOutputText={() => menuBlock.block.outputText || menuBlock.block.outputRaw.replace(ANSI_CSI_RE, '')}
         />
       )}
     </>
@@ -116,10 +115,7 @@ export default memoLocalized(function TerminalBlockList({ tabId, insetLeft = 8, 
 
 // Search highlighting.
 
-function highlightFragments(
-  text: string,
-  query: string,
-): Array<{ text: string; hl: boolean }> {
+function highlightFragments(text: string, query: string): Array<{ text: string; hl: boolean }> {
   if (!query || query.length < 2 || !text) return [{ text, hl: false }];
   const lower = text.toLowerCase();
   const ql = query.toLowerCase();
@@ -152,8 +148,7 @@ function HighlightSpan({ text, query }: { text: string; query: string }) {
               color: 'inherit',
               borderRadius: 2,
               padding: '0 1px',
-            }}
-          >
+            }}>
             {f.text}
           </mark>
         ) : (
@@ -167,7 +162,14 @@ function HighlightSpan({ text, query }: { text: string; query: string }) {
 // Completed command blocks.
 
 const BlockItem = memo(function BlockItem({
-  block, tabId, insetLeft, insetRight, highlightQuery, dividerBefore, onMenu, menuOpen,
+  block,
+  tabId,
+  insetLeft,
+  insetRight,
+  highlightQuery,
+  dividerBefore,
+  onMenu,
+  menuOpen,
 }: {
   block: TermBlock;
   tabId: string;
@@ -178,9 +180,8 @@ const BlockItem = memo(function BlockItem({
   onMenu: (b: TermBlock, anchor: BlockMenuAnchor) => void;
   menuOpen: boolean;
 }) {
-  const duration = block.endedAt !== null && block.startedAt !== null
-    ? block.endedAt - block.startedAt : null;
-  const highlightCommands = useTypographyStore(state => state.commandHighlighting);
+  const duration = block.endedAt !== null && block.startedAt !== null ? block.endedAt - block.startedAt : null;
+  const highlightCommands = useTypographyStore((state) => state.commandHighlighting);
   const coloredCommand = highlightCommands ? <CommandSyntax text={block.command} /> : block.command;
 
   return (
@@ -200,15 +201,19 @@ const BlockItem = memo(function BlockItem({
         event.preventDefault();
         event.stopPropagation();
         onMenu(block, { kind: 'pointer', x: event.clientX, y: event.clientY });
-      }}
-    >
+      }}>
       <div data-selectable className="command-block-info">
         <BlockContext block={block} />
         <CommandStatus exitCode={block.exitCode} duration={duration} agent={block.agent} />
         {block.gitBranch && <span className="command-block-branch">{block.gitBranch}</span>}
         <span className="command-block-actions">
-          <IconButton compact data-subtle data-tip={t('More actions')} aria-label={t('More actions')}
-            aria-haspopup="menu" aria-expanded={menuOpen}
+          <IconButton
+            compact
+            data-subtle
+            data-tip={t('More actions')}
+            aria-label={t('More actions')}
+            aria-haspopup="menu"
+            aria-expanded={menuOpen}
             onClick={(event) => {
               const rect = event.currentTarget.getBoundingClientRect();
               onMenu(block, { kind: 'control', left: rect.left, top: rect.bottom + 4 });
@@ -220,22 +225,36 @@ const BlockItem = memo(function BlockItem({
       <div data-selectable className="command-block-command" style={{ fontFamily: TERMINAL_FONT_FAMILY }}>
         {highlightQuery ? <HighlightSpan text={block.command} query={highlightQuery} /> : coloredCommand}
       </div>
-      {(block.outputHtml || block.outputText) && <div className="command-block-output">
-        <BlockOutput text={block.outputHtml || block.outputText} isHtml={!!block.outputHtml}
-          flush highlight={highlightQuery || undefined} />
-      </div>}
-      {block.linesTruncated > 0 && <div data-selectable className="command-block-info command-block-truncation">
-        {t('Truncated {{count}} lines', { count: block.linesTruncated })}
-      </div>}
+      {(block.outputHtml || block.outputText) && (
+        <div className="command-block-output">
+          <BlockOutput
+            text={block.outputHtml || block.outputText}
+            isHtml={!!block.outputHtml}
+            flush
+            highlight={highlightQuery || undefined}
+          />
+        </div>
+      )}
+      {block.linesTruncated > 0 && (
+        <div data-selectable className="command-block-info command-block-truncation">
+          {t('Truncated {{count}} lines', { count: block.linesTruncated })}
+        </div>
+      )}
     </div>
   );
 });
 
 /** Context stays on its own row so commands and output share the full content width. */
 function BlockContext({ block }: { block: TermBlock }) {
-  return <>
-    {block.cwd && <span className="command-block-cwd" data-tip={block.cwd}>{block.cwd}</span>}
-  </>;
+  return (
+    <>
+      {block.cwd && (
+        <span className="command-block-cwd" data-tip={block.cwd}>
+          {block.cwd}
+        </span>
+      )}
+    </>
+  );
 }
 
 // Running command blocks.
@@ -261,7 +280,7 @@ function RunningItem({
     return () => clearTimeout(timer);
   }, []);
 
-  const highlightCommands = useTypographyStore(state => state.commandHighlighting);
+  const highlightCommands = useTypographyStore((state) => state.commandHighlighting);
   const coloredCommand = highlightCommands ? <CommandSyntax text={block.command || ''} /> : block.command;
 
   // Short commands publish their completed output atomically instead of inserting
@@ -278,8 +297,7 @@ function RunningItem({
       style={{
         paddingLeft: insetLeft + COMMAND_BLOCK_CONTENT_PADDING,
         paddingRight: insetRight + COMMAND_BLOCK_CONTENT_PADDING,
-      }}
-    >
+      }}>
       <RunningCommandBar block={block} paneId={tabId} />
       <div data-selectable className="command-block-command" style={{ fontFamily: TERMINAL_FONT_FAMILY }}>
         {highlightQuery ? <HighlightSpan text={block.command} query={highlightQuery} /> : coloredCommand}
@@ -301,8 +319,8 @@ function RunningTerm({ tabId, blockId }: { tabId: string; blockId: string }) {
   const hostRef = useRef<HTMLDivElement>(null);
   const occupiedRowsRef = useRef(1);
   const tuiFs = useManualFullscreenVisible(tabId);
-  const area = useWorkspaceNavigation(state => state.area);
-  const unifiedTabId = useUnifiedWorkspace(state => state.activeTabId);
+  const area = useWorkspaceNavigation((state) => state.area);
+  const unifiedTabId = useUnifiedWorkspace((state) => state.activeTabId);
 
   useEffect(() => {
     const handle = getExecutingTerm(tabId);
@@ -313,9 +331,7 @@ function RunningTerm({ tabId, blockId }: { tabId: string; blockId: string }) {
       return;
     }
     const { term, el } = handle;
-    const host = tuiFs
-      ? document.querySelector<HTMLElement>(`[data-testid="tui-fullscreen"][data-pane-id="${tabId}"]`)
-      : hostRef.current;
+    const host = tuiFs ? document.querySelector<HTMLElement>(`[data-testid="tui-fullscreen"][data-pane-id="${tabId}"]`) : hostRef.current;
     if (!host) {
       if (isTerminalDebugEnabled()) {
         terminalDebug('running-terminal-host-missing', { tabId, blockId, fullscreen: tuiFs });
@@ -376,7 +392,10 @@ function RunningTerm({ tabId, blockId }: { tabId: string; blockId: string }) {
     const updateHeight = () => {
       const occupied = measureRunningTerminalRows(term.buffer.active, term.rows, 1);
       if (occupied >= occupiedRowsRef.current) {
-        if (shrinkTimer) { clearTimeout(shrinkTimer); shrinkTimer = null; }
+        if (shrinkTimer) {
+          clearTimeout(shrinkTimer);
+          shrinkTimer = null;
+        }
         occupiedRowsRef.current = occupied;
         if (appliedRows !== occupied) applyHeight('grow');
       } else {
@@ -474,7 +493,9 @@ function RunningTerm({ tabId, blockId }: { tabId: string; blockId: string }) {
     // Coming back from a backgrounded window is a shared-atlas reset: the renderer reset and the
     // repaint cover every live terminal, because a single terminal must never clear the glyph
     // atlas that the others hold texture coordinates into.
-    const onVisibilityChange = () => { if (!document.hidden) recoverTerminalSurfaces(); };
+    const onVisibilityChange = () => {
+      if (!document.hidden) recoverTerminalSurfaces();
+    };
     document.addEventListener('visibilitychange', onVisibilityChange);
 
     return () => {
@@ -484,7 +505,10 @@ function RunningTerm({ tabId, blockId }: { tabId: string; blockId: string }) {
       }
       renderSub?.dispose();
       resizeSub?.dispose();
-      if (shrinkTimer) { clearTimeout(shrinkTimer); shrinkTimer = null; }
+      if (shrinkTimer) {
+        clearTimeout(shrinkTimer);
+        shrinkTimer = null;
+      }
       unsubscribeActiveTab();
       cancelAnimationFrame(restoreRaf);
       cancelAnimationFrame(openResyncRaf);
@@ -494,12 +518,5 @@ function RunningTerm({ tabId, blockId }: { tabId: string; blockId: string }) {
     };
   }, [tabId, blockId, tuiFs, area, unifiedTabId]);
 
-  return (
-    <div
-      ref={hostRef}
-      data-testid="running-term"
-      className="command-block-output"
-      style={{ overflow: 'hidden' }}
-    />
-  );
+  return <div ref={hostRef} data-testid="running-term" className="command-block-output" style={{ overflow: 'hidden' }} />;
 }

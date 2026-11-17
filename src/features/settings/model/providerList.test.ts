@@ -1,12 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { ProviderKind } from '@features/agent/services/provider';
-import {
-  effectiveBaseUrl,
-  providerHasKey,
-  providerId,
-  providerList,
-  providerName,
-} from './providerList';
+import { effectiveBaseUrl, providerHasKey, providerId, providerList, providerName } from './providerList';
 
 describe('effectiveBaseUrl', () => {
   it('an empty string resolves to the default endpoint for that kind', () => {

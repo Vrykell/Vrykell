@@ -36,13 +36,19 @@ it('leaves terminal fallbacks to present the terminal they create', async () => 
   expect(mocks.present).not.toHaveBeenCalled();
 });
 
-it.each(['README', '.gitignore', '.env.local', 'Dockerfile', 'C:\\repo\\MAIN.TS', '/tmp/server.log', 'config.yaml'])('recognizes text and code files: %s', path => {
-  expect(isSupportedEditorFile(path)).toBe(true);
-});
+it.each(['README', '.gitignore', '.env.local', 'Dockerfile', 'C:\\repo\\MAIN.TS', '/tmp/server.log', 'config.yaml'])(
+  'recognizes text and code files: %s',
+  (path) => {
+    expect(isSupportedEditorFile(path)).toBe(true);
+  },
+);
 
-it.each(['archive.zip', 'report.docx', 'photo.jpg', 'document.pdf', 'file.unknown', 'binary'])('routes unsupported types outside the editor: %s', path => {
-  expect(isSupportedEditorFile(path)).toBe(false);
-});
+it.each(['archive.zip', 'report.docx', 'photo.jpg', 'document.pdf', 'file.unknown', 'binary'])(
+  'routes unsupported types outside the editor: %s',
+  (path) => {
+    expect(isSupportedEditorFile(path)).toBe(false);
+  },
+);
 
 it('opens an unsupported local file through the system without opening a terminal or editor', async () => {
   useEditorPreferences.setState({ localOpenMode: 'editor' });
@@ -56,7 +62,8 @@ it('opens an unsupported local file through the system without opening a termina
 
 it('downloads an unsupported remote file before opening it and explains that the copy is separate', async () => {
   useEditorPreferences.setState({ remoteOpenMode: 'editor' });
-  mocks.download.mockResolvedValue('/tmp/report.pdf'); mocks.openPath.mockResolvedValue(undefined);
+  mocks.download.mockResolvedValue('/tmp/report.pdf');
+  mocks.openPath.mockResolvedValue(undefined);
   await openPreferredFile({ path: '/remote/report.pdf', connectionId: 'host' }, vi.fn());
   expect(mocks.download).toHaveBeenCalledWith('/remote/report.pdf');
   expect(mocks.openPath).toHaveBeenCalledWith('/tmp/report.pdf');

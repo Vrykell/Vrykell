@@ -32,10 +32,13 @@ test.describe('Command blocks (OSC 133)', () => {
 
     // Set the open mode to classic (zsh) -> a new page renders the classic terminal directly
     await page.addInitScript(() => {
-      localStorage.setItem('vrykell-agent-settings', JSON.stringify({
-        state: { global: { openModeByShell: { zsh: 'classic', bash: 'classic' } }, overrides: {} },
-        version: 8,
-      }));
+      localStorage.setItem(
+        'vrykell-agent-settings',
+        JSON.stringify({
+          state: { global: { openModeByShell: { zsh: 'classic', bash: 'classic' } }, overrides: {} },
+          version: 8,
+        }),
+      );
     });
     await page.reload();
     // Classic scene: no bottom command bar and a visible xterm
@@ -55,7 +58,7 @@ test.describe('Command blocks (OSC 133)', () => {
     // Wait for the shell startup prompt before injecting a sustained command.
     await page.waitForFunction(async () => {
       const path = '/src/features/terminal/stores/terminal.ts';
-      const { useTerminalStore } = await import(path) as typeof import('../src/features/terminal/stores/terminal');
+      const { useTerminalStore } = (await import(path)) as typeof import('../src/features/terminal/stores/terminal');
       return Object.values(useTerminalStore.getState().startupStates).includes('ready');
     });
     // Inject the altScreen sequence directly through PTY output
@@ -129,18 +132,14 @@ test.describe('Command blocks (OSC 133)', () => {
     await expect(input).toBeVisible({ timeout: 5000 });
     await page.waitForFunction(async () => {
       const path = '/src/features/terminal/stores/terminal.ts';
-      const { useTerminalStore } = await import(path) as typeof import('../src/features/terminal/stores/terminal');
+      const { useTerminalStore } = (await import(path)) as typeof import('../src/features/terminal/stores/terminal');
       return Object.values(useTerminalStore.getState().startupStates).includes('ready');
     });
     // `\x1b[?1049;2004h` shares one CSI with bracketed paste: it must still count as
     // entering the alt screen instead of leaking into the running block.
     await emitPtyOutput(
       page,
-      '\x1b]133;A\x07' +
-        '\x1b]133;E;' + btoa('htop') + '\x07' +
-        '\x1b]133;C\x07' +
-        '\x1b[?1049;2004h' +
-        'HTOP FULLSCREEN',
+      '\x1b]133;A\x07' + '\x1b]133;E;' + btoa('htop') + '\x07' + '\x1b]133;C\x07' + '\x1b[?1049;2004h' + 'HTOP FULLSCREEN',
     );
     await expect(page.getByText('TUI')).toBeVisible({ timeout: 5000 });
     await expectAnyTermContains(page, 'HTOP FULLSCREEN', 5000);
@@ -159,14 +158,7 @@ test.describe('Command blocks (OSC 133)', () => {
     await expect(page.getByPlaceholder(/输入命令/)).toBeVisible({ timeout: 5000 });
 
     // Enter altScreen (the app has not enabled mouse reporting, so the wheel must degrade to arrow keys)
-    await emitPtyOutput(
-      page,
-      '\x1b]133;A\x07' +
-        '\x1b]133;E;dm0=\x07' +
-        '\x1b]133;C\x07' +
-        '\x1b[?1049h' +
-        'TUI APP',
-    );
+    await emitPtyOutput(page, '\x1b]133;A\x07' + '\x1b]133;E;dm0=\x07' + '\x1b]133;C\x07' + '\x1b[?1049h' + 'TUI APP');
     await expect(page.getByText('TUI')).toBeVisible({ timeout: 5000 });
     await expectAnyTermContains(page, 'TUI APP', 5000);
 
