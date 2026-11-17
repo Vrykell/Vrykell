@@ -1723,6 +1723,7 @@ const zh: Record<string, string> = {
   'The provider returned a tool call as plain text, so no tool ran. Use an endpoint or model that reports tool calls in the standard format.': '服务商把工具调用当成纯文本返回了，本次没有执行任何工具。请改用按标准格式返回工具调用的端点或模型。',
   'No execution terminal is connected to this conversation.': '没有可用的终端会话，请为对话选择执行终端。',
   "New conversation": "新对话",
+  "New chat": "新对话",
   "Local terminal": "本地终端",
   "Terminal output": "终端输出",
   "Remove reference": "移除引用",
