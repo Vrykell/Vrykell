@@ -13,7 +13,7 @@ import { createScopedResource } from '../services/scopedPanes';
 import { workspacePaneCells } from '../model/workspaceResources';
 import WorkspacePaneCanvas from './WorkspacePaneCanvas';
 import { useWorkspaceHistory } from '../hooks/useWorkspaceHistory';
-import AcpLauncher from './AcpLauncher';
+import AgentLauncher from './AgentLauncher';
 import { requestWorkspaceSplit } from '../services/unifiedWorkspace';
 import { pickWorkspaceFile } from '../services/workspaceActions';
 import type { EditorFile } from '@core/editor';
@@ -36,7 +36,7 @@ export default function ScopedPaneWorkspace({ scope, selected, active }: { scope
   const [addition, setAddition] = useState<
     | { id: string }
     | { tab: string }
-    | { create: 'document' | 'conversation' }
+    | { create: 'document' | 'conversation'; cwd?: string }
     | { harness: string; cwd?: string }
     | { file: EditorFile }
     | null
@@ -163,7 +163,7 @@ export default function ScopedPaneWorkspace({ scope, selected, active }: { scope
               setAddition({ create: 'conversation' as const });
             },
           },
-          { label: t('ACP agents'), onClick: () => setLauncher({ anchor: { ...menuAnchor, aboveY: menuAnchor.y - 4 } }) },
+          { label: t('Agents'), onClick: () => setLauncher({ anchor: { ...menuAnchor, aboveY: menuAnchor.y - 4 } }) },
         ]),
   ];
   return (
@@ -201,12 +201,12 @@ export default function ScopedPaneWorkspace({ scope, selected, active }: { scope
           }}
         />
       )}
-      <AcpLauncher
+      <AgentLauncher
         open={!!launcher}
         anchor={launcher?.anchor}
         onClose={() => setLauncher(null)}
-        onPick={(harness, cwd) => {
-          setAddition({ harness, cwd });
+        onPick={(agent, cwd) => {
+          setAddition(agent.driver === 'builtin' ? { create: 'conversation', cwd } : { harness: agent.name, cwd });
           store.setState({ choosingSplit: true });
           setLauncher(null);
         }}

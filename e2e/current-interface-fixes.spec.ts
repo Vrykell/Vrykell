@@ -144,7 +144,7 @@ test('shares close-safe workspace resource navigation and reserves identical lea
   }
   await page.getByTestId('harness-add-session').click();
   await expect(page.getByTestId('acp-launcher-search')).toBeVisible();
-  const picker = page.getByRole('dialog', { name: 'ACP', exact: true });
+  const picker = page.getByRole('dialog', { name: '选择智能体', exact: true });
   await expect(picker).toHaveAttribute('aria-modal', 'false');
   expect((await picker.boundingBox())!.width).toBeLessThanOrEqual(304);
   await page.screenshot({ path: info.outputPath('acp-profile-dropdown.png') });

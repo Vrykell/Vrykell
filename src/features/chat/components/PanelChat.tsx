@@ -29,6 +29,7 @@ import { createExecutionTerminal } from '@features/workspace/services/executionT
 import type { AttachmentMeta } from '@features/agent/model/attachments';
 import { useTranscriptFollow } from '../hooks/useTranscriptFollow';
 import ChatComposerShell from './ChatComposerShell';
+import { agentDrivers } from '../services/agentDrivers';
 import type { DropdownAnchor } from '@ui/menus/AnchoredDropdown';
 import { useExecutionTerminalOptions } from '../hooks/useExecutionTerminalOptions';
 import ConversationHeading from './ConversationHeading';
@@ -101,7 +102,7 @@ export default function PanelChat({
     questions,
     draft,
     setDraft: useChatStore.getState().setDraft,
-    send: useChatStore.getState().send,
+    send: (text, options) => agentDrivers.builtin.submit(activeId, text, options),
     sending,
     queueWhileSending: true,
     isSession: ready && !loadError,
@@ -304,7 +305,13 @@ export default function PanelChat({
           <div>
             {exchanges.length
               ? exchanges.map((exchange) => (
-                  <AiBlock key={exchange.id} exchange={exchange} conversationId={activeId} presentation="conversation" />
+                  <AiBlock
+                    key={exchange.id}
+                    exchange={exchange}
+                    thread={{ driver: 'builtin', id: activeId }}
+                    conversationId={activeId}
+                    presentation="conversation"
+                  />
                 ))
               : (!workspace || inSidebar) && (
                   <div className="chat-empty">
@@ -385,7 +392,7 @@ export default function PanelChat({
                 aria-label={t('Stop generating')}
                 data-tip={t('Stop generating')}
                 data-tip-description={t('Stopping also cancels queued messages for this conversation.')}
-                onClick={() => useChatStore.getState().abortStream(activeId)}>
+                onClick={() => agentDrivers.builtin.cancel(activeId)}>
                 <Square size={15} fill="currentColor" />
               </IconButton>
             ) : (

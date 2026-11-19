@@ -16,7 +16,7 @@ it('offers the mixed-work creation and connection actions on one simple page', (
   fireEvent.click(screen.getByRole('button', { name: '连接服务器' }));
   expect(server).toHaveBeenCalledWith({ x: 0, y: 0 });
   expect(agent).not.toHaveBeenCalled();
-  fireEvent.click(screen.getByRole('button', { name: /ACP/ }));
+  fireEvent.click(screen.getByRole('button', { name: /智能体/ }));
   expect(agent).toHaveBeenCalledWith({ x: 0, y: 0 });
   fireEvent.click(screen.getByRole('button', { name: '新终端' }));
   expect(create).toHaveBeenLastCalledWith('terminal');

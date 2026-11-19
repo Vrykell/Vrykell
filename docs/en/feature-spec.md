@@ -1,5 +1,13 @@
 # Vrykell Feature Spec and Test Checklist
 
+## Agent threads
+
+The agent picker lists the built-in runtime and each configured external agent. The project folder belongs to the conversation. Terminal access still uses its selected execution terminal.
+
+- **Branch.** Open thread actions under a completed reply. Built-in threads copy the transcript through that reply into a separate conversation. External agents that advertise session forking can branch from the latest turn.
+- **Restore files.** For a turn in a local project under version control, review the changed paths and confirm the restore. It covers tracked and nonignored regular files within the selected directory. Subsequent conflicting edits block restoration. The transcript and staging area are preserved. Checkpoints are held in memory for the current app run. Overlapping turns, linked files, and snapshots above 64 MiB are outside the supported scope.
+- **Delegate.** Assign a task to an agent from a reply. Inspect the child's conversation, stop it or insert its text result into the parent draft. In agent mode the built-in runtime can request independent text analysis and receive the answer in the same turn. Analysis children receive the supplied task and have no tools. Cancelling the parent cancels these children.
+
 > Last updated: 2026-10-30
 
 Security regression checklist:
@@ -413,6 +421,7 @@ External sessions receive the internal application tool adapter on creation and 
 | A1 | Independent conversations | Creation, history, renaming and deletion do not require a terminal; history lives in a singleton workspace page and discussion remains available after closing the last terminal | ai-conversations.spec.ts, workspace and history page unit tests |
 | A2 | Code block run | Shell blocks offer execution only with a selected terminal; writes use that explicit target, disable when disconnected and never fall back to focus | CommandBlock.test.tsx checks selected targets and discussion |
 | A3 | Markdown rendering | Bold text, tables, inline math and display math share the protected renderer. Standalone formulas replace their paragraph; display formulas use a padded, keyboard-focusable horizontal scroll surface so tall fractions, roots and both ends of wide expressions remain visible. Math rendering and bundled styles use the same pinned dependency version; math fonts retain their positioning styles, use no synthetic font weight and render display math at a minimum 16 px without transform scaling. | Markdown unit tests cover standalone, inline and multiline structure; markdown-math.spec.ts checks streaming, tall glyph bounds, horizontal reachability and font loading at narrow/wide widths and 100/125/150% display scale. |
+| A3a | AI reply readability | The font and display settings preview and save the reply body weight. It defaults to 350. Consecutive successful tool calls fold into a count that reopens their original cards. Running tools, decisions and failures stay visible in transcript order. | Typography and reply unit tests. Browser tests exercise settings persistence and tool groups in the sidebar and workspace. |
 | A4 | Streaming output | The answer is displayed character by character | Send an AI message and observe |
 | A5 | Execution environment | The header's expandable conversation settings select the execution terminal through the shared dropdown, including no-terminal and disconnected states. A passive status below the title identifies the bound terminal; focus never redirects the target | PanelChat.test.tsx, executionTarget.test.ts and ai-conversations.spec.ts |
 | A6 | SSH file boundary | The captured pane determines remote access even when older callers omit environment metadata; local file tools are never registered for SSH targets | executionTarget.test.ts |

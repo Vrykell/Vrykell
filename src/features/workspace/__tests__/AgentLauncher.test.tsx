@@ -1,12 +1,6 @@
-/**
- * AcpLauncher tests — the sidebar's ACP button opens a panel that starts a session in one click.
- *
- * The panel reads the configured servers from the backend, shows one row per server and reports
- * whether the program is on PATH; picking a row is a workspace action (a tab of its own).
- */
 import { render, screen, fireEvent, waitFor, within } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import AcpLauncher from '@features/workspace/components/AcpLauncher';
+import AgentLauncher from '@features/workspace/components/AgentLauncher';
 import { useSessionStore } from '@features/workspace';
 import { useHarnessWorkspace } from '@features/chat/stores/harnessWorkspace';
 import { useUsageStore } from '@features/agent';
@@ -30,41 +24,23 @@ beforeEach(() => {
   });
 });
 
-describe('AcpLauncher', () => {
-  it('shows actual daily usage and persisted agent turns, including zero usage', async () => {
-    const view = render(<AcpLauncher embedded open onClose={() => {}} onNewConversation={() => {}} />);
-    expect(screen.getByText('今日请求').nextElementSibling).toHaveTextContent('0');
-    expect(screen.getByText('今日 Tokens').nextElementSibling).toHaveTextContent('0');
-    view.unmount();
-    useUsageStore.getState().recordTurn({ provider: 'provider', model: 'model', inputTokens: 120, outputTokens: 40 });
-    useUsageStore
-      .getState()
-      .recordTurn({ provider: 'provider', model: 'model', inputTokens: 900, outputTokens: 200, at: Date.now() - 86_400_000 });
-    useUsageStore.getState().acpTurn('Claude Code');
-    await useUsageStore.persist.rehydrate();
-    render(<AcpLauncher embedded open onClose={() => {}} onNewConversation={() => {}} />);
-    expect(screen.getByText('今日请求').nextElementSibling).toHaveTextContent('1');
-    expect(screen.getByText('今日 Tokens').nextElementSibling).toHaveTextContent('160');
-    expect(await screen.findByTestId('acp-launcher-Claude Code')).toHaveTextContent('1 轮');
-  });
-  it('separates the native entry from configured agents without losing keyboard launch', async () => {
-    const onNewConversation = vi.fn();
+describe('AgentLauncher', () => {
+  it('launches built-in and configured agents from the same keyboard list', async () => {
     const onPick = vi.fn();
-    render(<AcpLauncher embedded open onClose={() => {}} onNewConversation={onNewConversation} onPick={onPick} />);
-    const agents = screen.getByRole('region', { name: 'ACP 智能体' });
-    const native = screen.getByTestId('ai-start-new-conversation');
-    expect(within(agents).queryByTestId('ai-start-new-conversation')).toBeNull();
-    expect(native.querySelector('[data-app-mark="true"]')).not.toBeNull();
+    render(<AgentLauncher open onClose={() => {}} onPick={onPick} />);
+    const agents = screen.getByRole('dialog', { name: '选择智能体' });
+    const native = screen.getByTestId('agent-launcher-builtin');
+    expect(within(agents).getByTestId('agent-launcher-builtin')).toBe(native);
     await within(agents).findByTestId('acp-launcher-Claude Code');
     fireEvent.keyDown(screen.getByTestId('acp-launcher-search'), { key: 'ArrowDown' });
     fireEvent.keyDown(screen.getByTestId('acp-launcher-search'), { key: 'Enter' });
-    expect(onPick).toHaveBeenCalledWith('Claude Code', undefined);
+    expect(onPick).toHaveBeenCalledWith({ driver: 'acp', name: 'Claude Code' }, undefined);
     fireEvent.click(native);
-    expect(onNewConversation).toHaveBeenCalledOnce();
+    expect(onPick).toHaveBeenCalledWith({ driver: 'builtin' }, undefined);
   });
 
   it('lists the configured servers and marks one ready', async () => {
-    render(<AcpLauncher open onClose={() => {}} />);
+    render(<AgentLauncher open onClose={() => {}} />);
 
     expect(await screen.findByTestId('acp-launcher-Claude Code')).toBeTruthy();
     await waitFor(() => expect(screen.getByTestId('acp-launcher-Claude Code').textContent).toContain('可用'));
@@ -72,7 +48,7 @@ describe('AcpLauncher', () => {
 
   it('opens the server session tab and closes the panel', async () => {
     const onClose = vi.fn();
-    render(<AcpLauncher open onClose={onClose} />);
+    render(<AgentLauncher open onClose={onClose} />);
     await screen.findByTestId('acp-launcher-Claude Code');
 
     fireEvent.click(screen.getByTestId('acp-launcher-Claude Code'));
@@ -85,20 +61,20 @@ describe('AcpLauncher', () => {
 
   it('passes the project directory to the chosen session instead of silently using the default', async () => {
     const onPick = vi.fn();
-    render(<AcpLauncher open cwd="C:/work/initial" onClose={() => {}} onPick={onPick} />);
+    render(<AgentLauncher open cwd="C:/work/initial" onClose={() => {}} onPick={onPick} />);
     await screen.findByTestId('acp-launcher-Claude Code');
     expect(screen.getByRole('textbox', { name: '项目路径' })).toHaveValue('C:/work/initial');
     fireEvent.change(screen.getByRole('textbox', { name: '项目路径' }), { target: { value: 'C:/work/chosen' } });
     fireEvent.click(screen.getByTestId('acp-launcher-Claude Code'));
-    expect(onPick).toHaveBeenCalledWith('Claude Code', 'C:/work/chosen');
+    expect(onPick).toHaveBeenCalledWith({ driver: 'acp', name: 'Claude Code' }, 'C:/work/chosen');
   });
 
   it('shows the default workspace used when no project folder is chosen', async () => {
-    render(<AcpLauncher open onClose={() => {}} />);
+    render(<AgentLauncher open onClose={() => {}} />);
     await screen.findByTestId('acp-launcher-Claude Code');
     await waitFor(() =>
       expect(screen.getByRole('textbox', { name: '项目路径' })).toHaveAttribute(
-        'placeholder',
+        'data-tip',
         '在 C:/Users/test/AppData/Local/com.vrykell.app/acp-workspace 下新建文件夹',
       ),
     );
@@ -111,7 +87,7 @@ describe('AcpLauncher', () => {
       return Promise.resolve(undefined);
     });
 
-    render(<AcpLauncher open onClose={() => {}} />);
+    render(<AgentLauncher open onClose={() => {}} />);
 
     await waitFor(() => expect(screen.getByTestId('acp-launcher-Claude Code').textContent).toContain('未安装'));
     expect(screen.getByTestId('acp-launcher-Claude Code')).toHaveProperty('disabled', true);

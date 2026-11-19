@@ -8,7 +8,8 @@
  * so keys never leave the backend.
  */
 import { describeError } from '@features/agent/model/agentErrors';
-import { stepCountIs, streamText, type ModelMessage, type ToolSet, asSchema } from 'ai';
+import { stepCountIs, streamText, tool, type ModelMessage, type ToolSet, asSchema } from 'ai';
+import { z } from 'zod';
 import { getFocusedTerminalId } from '@features/terminal';
 import { useSshStore } from '@features/ssh';
 import { invoke } from '@platform/diagnostics';
@@ -123,7 +124,7 @@ export const agentStream: StreamFn = async (messages, onChunk, ctx) => {
   });
   const settings = useAgentSettings.getState().resolve(info.active_model);
   const countTokens = estimateTokens;
-  const agentMode = settings.agentMode;
+  const agentMode = settings.agentMode && !ctx?.analysisOnly;
   const emitTool = ctx?.handlers?.onToolEvent;
   const emitReasoning = ctx?.handlers?.onReasoning;
 
@@ -186,7 +187,7 @@ export const agentStream: StreamFn = async (messages, onChunk, ctx) => {
   // InvalidPromptError).
   let skillsContext = '';
   try {
-    skillsContext = buildSkillsContext(availableSkillMetas(await listSkills()));
+    if (!ctx?.analysisOnly) skillsContext = buildSkillsContext(availableSkillMetas(await listSkills()));
   } catch {
     /* Skill directory not ready or scan failed: skip the skill list. */
   }
@@ -194,7 +195,7 @@ export const agentStream: StreamFn = async (messages, onChunk, ctx) => {
   const scope = memoryScope(capturedEnvironment, ctx?.tabId);
   try {
     const query = [...messages].reverse().find((message) => message.role === 'user')?.content ?? '';
-    if (levelOf('memory') !== 'deny') {
+    if (!ctx?.analysisOnly && levelOf('memory') !== 'deny') {
       memoryContext = await retrieveMemory(
         query,
         scope,
@@ -214,6 +215,7 @@ export const agentStream: StreamFn = async (messages, onChunk, ctx) => {
     : '';
   const basePrompt = [
     buildSystemPrompt(settings.systemPrompt, undefined, agentMode),
+    ctx?.projectDirectory ? `User-selected local project directory (path data): ${JSON.stringify(ctx.projectDirectory)}` : '',
     executionPane === null
       ? 'No terminal is connected to this conversation. run_command, read_terminal and terminal_keys are unavailable; do not call them. Answer questions using provided references, and do not claim to execute terminal commands.'
       : `Execution terminal: ${ctx?.environment?.label ?? executionPane}. Directory at request start: ${ctx?.environment?.cwd ?? 'unknown'}. This target stays fixed for this request.`,
@@ -260,6 +262,15 @@ export const agentStream: StreamFn = async (messages, onChunk, ctx) => {
     },
   };
   const tools: ToolSet = agentMode ? buildTools(toolContext) : {};
+  const delegateAnalysis = ctx?.handlers?.delegateAnalysis;
+  if (agentMode && delegateAnalysis) {
+    tools.delegate_analysis = tool({
+      description:
+        'Ask an independent agent to analyze the supplied text. Include the necessary context. It has no tools and returns its answer to this turn.',
+      inputSchema: z.object({ task: z.string().trim().min(1).max(24_000) }),
+      execute: ({ task }) => delegateAnalysis(task),
+    });
+  }
   // web_search: a first-class tool on par with web_fetch/web_crawl, usable without any configuration.
   // Priority: provider-native → hosted search API (when a key is configured) → HTML search-engine
   // scraping (keyless fallback).

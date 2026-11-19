@@ -3,6 +3,7 @@ import { t } from '@i18n';
 import * as conversationApi from '@platform/api/conversation';
 import { safeLocalStorageGet, safeLocalStorageSet } from '@utils/errorHandler';
 import {
+  conversationProject,
   parseEnvironment,
   parseReferences,
   referenceHistoryText,
@@ -20,6 +21,7 @@ import { clearCompactionCache } from '@features/agent/model/context';
 import { serializeAttachments, deserializeAttachments, type AttachmentMeta } from '@features/agent/model/attachments';
 import { useComposerDrafts } from '@features/chat/stores/composerDrafts';
 import { hasChatContent, stopChatMessage } from '../model/chatContent';
+import { captureTurn } from '../services/turnCheckpoints';
 import { terminalDebug } from '@features/terminal/services/terminalDebug';
 
 export interface ChatMessage {
@@ -53,6 +55,7 @@ export interface ChatMessage {
 
 /** Tool event callback: run is an upsert patch; undefined fields keep existing values. */
 export interface StreamHandlers {
+  delegateAnalysis?: (task: string) => Promise<string>;
   onToolEvent?: (run: ToolRun) => void;
   /** Reasoning delta, appended to the answer's reasoning field. */
   onReasoning?: (chunk: string) => void;
@@ -63,10 +66,19 @@ export interface StreamHandlers {
 export type StreamFn = (
   messages: Array<{ role: string; content: string; attachments?: AttachmentMeta[]; parts?: MessagePart[] }>,
   onChunk: (text: string) => void,
-  ctx?: { signal?: AbortSignal; tabId?: string; paneId?: string | null; environment?: ChatEnvironment | null; handlers?: StreamHandlers },
+  ctx?: {
+    signal?: AbortSignal;
+    tabId?: string;
+    paneId?: string | null;
+    environment?: ChatEnvironment | null;
+    projectDirectory?: string;
+    analysisOnly?: boolean;
+    handlers?: StreamHandlers;
+  },
 ) => Promise<void>;
 
 export interface SendOptions {
+  analysisOnly?: boolean;
   ownerId?: string;
   conversationId?: string;
   references?: TerminalReference[];
@@ -84,6 +96,7 @@ const nextId = () => `m${Date.now()}-${counter++}`;
 const abortControllers = new Map<string, AbortController>();
 
 interface ChatState {
+  forkConversation: (parent: string, messageId: string) => Promise<string>;
   queuedSends: Array<{ id: string; ownerId: string; text: string; options?: SendOptions }>;
   cancelQueuedSend: (id: string) => void;
   conversations: Conversation[];
@@ -95,7 +108,10 @@ interface ChatState {
   loadConversations: () => Promise<void>;
   selectConversation: (id: string) => Promise<void>;
   ensureConversationMessages: (id: string) => Promise<void>;
-  createConversation: (environment?: ChatEnvironment | null, options?: { activate?: boolean; id?: string }) => string;
+  createConversation: (
+    environment?: ChatEnvironment | null,
+    options?: { activate?: boolean; id?: string; projectDirectory?: string },
+  ) => string;
   restoreDraftConversations: (drafts: readonly { id: string; title: string }[]) => void;
   setEnvironment: (id: string, environment: ChatEnvironment | null) => void;
   renameConversation: (id: string, title: string) => void;
@@ -113,7 +129,7 @@ interface ChatState {
   draftTabId: string | null;
   setDraft: (text: string) => void;
   appendDraft: (text: string) => void;
-  send: (text: string, opts?: SendOptions) => Promise<void>;
+  send: (text: string, opts?: SendOptions) => Promise<boolean>;
   appendChunk: (tabId: string, id: string, chunk: string) => void;
   appendReasoning: (tabId: string, id: string, chunk: string) => void;
   /** Upsert a tool action part, materializing parts lazily and keeping startedAt across patches. */
@@ -171,12 +187,15 @@ export const useChatStore = create<ChatState>((set, get) => {
     const messages = get().byTab[conversation.id];
     if (messages ? !messages.some(hasChatContent) : !savedConversationIds.has(conversation.id)) return Promise.resolve();
     return queueSave(conversation.id, async () => {
+      const context = conversation.projectDirectory
+        ? { ...conversation.environment, projectDirectory: conversation.projectDirectory }
+        : conversation.environment;
       await conversationApi.saveConversation(
         conversation.id,
         conversation.title,
         conversation.createdAt,
         conversation.updatedAt,
-        JSON.stringify(conversation.environment),
+        JSON.stringify(context),
       );
       savedConversationIds.add(conversation.id);
     });
@@ -280,7 +299,13 @@ export const useChatStore = create<ChatState>((set, get) => {
    * cancelled state, but the answer is not marked red and carries no error text; an
    * empty shell aborted immediately is removed.
    */
-  const runAssistant = async (tabId: string, assistantId: string, controller: AbortController, streamFn?: StreamFn) => {
+  const runAssistant = async (
+    tabId: string,
+    assistantId: string,
+    controller: AbortController,
+    streamFn?: StreamFn,
+    analysisOnly = false,
+  ) => {
     const ownsTurn = () => abortControllers.get(tabId) === controller;
     if (!ownsTurn() || controller.signal.aborted) return;
     // History stops before the answer placeholder; on regeneration, later exchanges are not
@@ -323,15 +348,31 @@ export const useChatStore = create<ChatState>((set, get) => {
 
     let failed = false;
     let failureText = '';
+    const environment = all[cut]?.environment;
+    const question = all[cut - 1];
+    const projectDirectory = get().conversations.find((c) => c.id === tabId)?.projectDirectory;
+    const cwd = environment?.kind === 'ssh' ? undefined : (projectDirectory ?? environment?.cwd);
+    const checkpoint = !analysisOnly && question && cwd ? captureTurn(question.id, cwd) : undefined;
     try {
+      if (checkpoint) await checkpoint.ready;
       if (!controller.signal.aborted)
         await (streamFn ?? defaultStream)(history, onChunk, {
           signal: controller.signal,
+          ...(analysisOnly && { analysisOnly: true }),
+          ...(projectDirectory && { projectDirectory }),
           tabId,
           ...(get().conversations.some((conversation) => conversation.id === tabId)
             ? { paneId: all[cut]?.environment?.paneId ?? null, environment: all[cut]?.environment ?? null }
             : {}),
           handlers: {
+            ...(!analysisOnly &&
+              question &&
+              get().conversations.some((c) => c.id === tabId) && {
+                delegateAnalysis: async (task: string) => {
+                  const { delegateAnalysis } = await import('../services/threadOperations');
+                  return delegateAnalysis({ driver: 'builtin', id: tabId }, question.id, task, controller.signal);
+                },
+              }),
             // Flush buffered text before applying a tool event so text and tools keep their order.
             onToolEvent: (run) => {
               if (!ownsTurn() || controller.signal.aborted) return;
@@ -359,6 +400,7 @@ export const useChatStore = create<ChatState>((set, get) => {
       // Keep the failure text on the message; the error row renders it in an ErrorBox.
       if (failed) failureText = err instanceof Error ? err.message : String(err);
     } finally {
+      if (checkpoint) await checkpoint.finish(controller.signal.aborted);
       controller.signal.removeEventListener('abort', flushOnAbort);
       if (timer !== null) {
         clearTimeout(timer);
@@ -448,6 +490,19 @@ export const useChatStore = create<ChatState>((set, get) => {
     conversationError: null,
     persistenceError: null,
     ensureConversationMessages: loadMessages,
+    forkConversation: async (parent, source) => {
+      const original = get().conversations.find((item) => item.id === parent);
+      if (!original || get().sendingTabs.includes(parent) || pendingConversationDeletes.has(parent))
+        throw new Error(t('Thread is unavailable'));
+      const child = `conversation-${nextId()}`;
+      const title = t('Branch of {{title}}', { title: original.title }).slice(0, 80);
+      const now = Date.now();
+      await queueSave(parent, () => conversationApi.forkConversation(parent, source, child, title, now));
+      savedConversationIds.add(child);
+      set((state) => ({ conversations: [{ ...original, id: child, title, createdAt: now, updatedAt: now }, ...state.conversations] }));
+      await loadMessages(child);
+      return child;
+    },
     loadConversations: async () => {
       if (get().conversationsLoaded || get().conversationsLoading) return;
       set({ conversationsLoading: true, conversationError: null });
@@ -463,6 +518,7 @@ export const useChatStore = create<ChatState>((set, get) => {
             createdAt: record.created_at,
             updatedAt: record.updated_at,
             environment: parseEnvironment(record.environment),
+            projectDirectory: conversationProject(record.environment),
           }));
         set({ conversations: [...existing, ...restored], conversationsLoaded: true });
         const saved = safeLocalStorageGet('active-ai-conversation');
@@ -492,7 +548,14 @@ export const useChatStore = create<ChatState>((set, get) => {
       const id = options?.id ?? `conversation-${nextId()}`;
       if (get().conversations.some((conversation) => conversation.id === id)) return id;
       const now = Date.now();
-      const conversation: Conversation = { id, title: t('New conversation'), createdAt: now, updatedAt: now, environment };
+      const conversation: Conversation = {
+        id,
+        title: t('New conversation'),
+        createdAt: now,
+        updatedAt: now,
+        environment,
+        ...(options?.projectDirectory && { projectDirectory: options.projectDirectory }),
+      };
       const activate = options?.activate !== false;
       set((state) => ({
         conversations: [conversation, ...state.conversations],
@@ -674,13 +737,13 @@ export const useChatStore = create<ChatState>((set, get) => {
     },
     send: async (text, opts) => {
       const tabId = opts?.conversationId ?? opts?.ownerId ?? useWorkspaceStore.getState().activeId;
-      if (pendingConversationDeletes.has(tabId)) return;
+      if (pendingConversationDeletes.has(tabId)) return false;
       const conversation = get().conversations.find((item) => item.id === tabId);
-      if (opts?.conversationId && (!conversation || !(tabId in get().byTab))) return;
+      if (opts?.conversationId && (!conversation || !(tabId in get().byTab))) return false;
       const trimmed = text.trim();
       const atts = opts?.attachments?.length ? opts.attachments : undefined;
       // Empty text is allowed when attachments or references exist.
-      if (!trimmed && !atts && !opts?.references?.length) return;
+      if (!trimmed && !atts && !opts?.references?.length) return false;
       if (get().sendingTabs.includes(tabId)) {
         set((state) => ({
           queuedSends: [
@@ -693,7 +756,7 @@ export const useChatStore = create<ChatState>((set, get) => {
             },
           ],
         }));
-        return;
+        return true;
       }
       const now = Date.now();
       const environment = conversation?.environment
@@ -738,7 +801,8 @@ export const useChatStore = create<ChatState>((set, get) => {
       } else useWorkspaceStore.getState().titleFromMessage(tabId, trimmed);
       if (conversation) await persistMessage(tabId, userMsg).catch(() => {});
       else void persistMessage(tabId, userMsg).catch(() => {});
-      await runAssistant(tabId, assistantMsg.id, controller, opts?.streamFn);
+      await runAssistant(tabId, assistantMsg.id, controller, opts?.streamFn, opts?.analysisOnly);
+      return true;
     },
     regenerate: async (tabId, userMsgId) => {
       if (get().sendingTabs.includes(tabId) || pendingConversationDeletes.has(tabId)) return;

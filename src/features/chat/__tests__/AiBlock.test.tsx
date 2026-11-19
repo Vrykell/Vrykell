@@ -353,6 +353,41 @@ function outputSurface(container: HTMLElement): HTMLElement {
   return container.querySelector('.ai-tool-output [data-selectable]') as HTMLElement;
 }
 
+it('automatically folds consecutive successes and preserves an open group as more tools finish', () => {
+  const first = commandPart.tool;
+  const second = { ...first, toolCallId: 'next' };
+  const third = { ...first, toolCallId: 'last' };
+  const view = (runs: ToolRun[]) => (
+    <AiBlock
+      conversationId="conversation"
+      presentation="conversation"
+      exchange={{
+        ...exchange,
+        answer: {
+          ...exchange.answer!,
+          parts: [
+            ...runs.map((tool) => ({ kind: 'tool' as const, tool })),
+            { kind: 'text', text: 'Build results' },
+            { kind: 'tool', tool: { ...first, toolCallId: 'approval', state: 'approval-pending' } },
+          ],
+        },
+      }}
+    />
+  );
+  const { rerender } = render(view([first, { ...second, state: 'running' }]));
+  expect(screen.getByRole('button', { name: /npm run build.*运行中/ })).toBeVisible();
+  rerender(view([first, second]));
+  const summary = screen.getByRole('button', { name: '已完成 2 次工具调用' });
+  expect(summary).toHaveAttribute('aria-expanded', 'false');
+  expect(screen.getByText('Build results')).toBeVisible();
+  expect(screen.getByRole('button', { name: '运行' })).toBeVisible();
+  fireEvent.click(summary);
+  rerender(view([first, second, third]));
+  expect(summary).toHaveAttribute('aria-expanded', 'true');
+  expect(summary).toHaveTextContent('已完成 3 次工具调用');
+  expect(screen.getAllByRole('button', { name: /退出码 0/ })).toHaveLength(3);
+});
+
 it('keeps panel tool output inside the shared frame without a second terminal surface or scroll container', () => {
   const { container } = render(
     <AiBlock

@@ -81,7 +81,12 @@ export function removeUnifiedPane(resourceId: string) {
   removeContainerPane(useUnifiedWorkspace.getState().activeTabId, resourceId);
 }
 
-export function createUnifiedResource(kind: 'terminal' | 'document' | 'conversation', direction?: 'row' | 'col', target?: PaneTarget) {
+export function createUnifiedResource(
+  kind: 'terminal' | 'document' | 'conversation',
+  direction?: 'row' | 'col',
+  target?: PaneTarget,
+  cwd?: string,
+) {
   const state = useUnifiedWorkspace.getState();
   if ((direction || target) && state.layout && workspacePaneCells(state.layout).length >= 4) return;
   if (target && (!state.layout || !workspacePaneCells(state.layout).some((cell) => cell.id === target.leafId))) return;
@@ -89,7 +94,7 @@ export function createUnifiedResource(kind: 'terminal' | 'document' | 'conversat
   if (kind === 'terminal') useWorkspaceStore.getState().addTab();
   else if (kind === 'document') newEditorFile();
   else {
-    useAiWorkspace.getState().openNative(useChatStore.getState().createConversation());
+    useAiWorkspace.getState().openNative(useChatStore.getState().createConversation(null, { projectDirectory: cwd }));
     useWorkspaceStore.getState().openHarnessTab();
   }
   const resource = currentWorkspaceResources().find((resource) => resource.kind === kind && !previous.has(resource.id));

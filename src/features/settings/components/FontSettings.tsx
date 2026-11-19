@@ -22,6 +22,7 @@ export default function FontSettings() {
     uiFontPreset,
     terminalFontSize,
     chatFontSize,
+    chatFontWeight,
     terminalRenderer,
     terminalFontPreset,
     terminalFontWeight,
@@ -166,6 +167,17 @@ export default function FontSettings() {
             options={terminalSizes}
             onChange={(chatFontSize) => {
               void save(() => update({ chatFontSize }));
+            }}
+            style={{ width: 110 }}
+          />
+        </Field>
+        <Field title={t('AI reply text weight')}>
+          <Select
+            aria-label={t('AI reply text weight')}
+            value={chatFontWeight}
+            options={weights}
+            onChange={(chatFontWeight) => {
+              void save(() => update({ chatFontWeight }));
             }}
             style={{ width: 110 }}
           />
