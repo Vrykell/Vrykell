@@ -22,6 +22,8 @@ import ModelPill from './ModelPill';
 import AttachmentChips from './AttachmentChips';
 import TerminalReferences from './TerminalReferences';
 import AiBlock from './AiBlock';
+import { AnalysisChildBar } from './SubagentActivity';
+import { analysisChild, useChildTasks } from '../stores/childTasks';
 import { toExchanges } from '../model/exchanges';
 import { useChatComposer } from '../hooks/useChatComposer';
 import { environmentForPane } from '../services/conversationContext';
@@ -52,6 +54,7 @@ export default function PanelChat({
   conversationId?: string;
 }) {
   const activeId = useChatStore((state) => conversationId ?? state.activeConversationId);
+  const child = useChildTasks((state) => analysisChild(state.tasks, activeId));
   const sidebarSettings = useContext(SidebarSettingsContext);
   const inSidebar = sidebarSettings?.resourceId === `chat:${activeId}`;
   const conversations = useChatStore((state) => state.conversations);
@@ -205,7 +208,7 @@ export default function PanelChat({
           data-tip-description={environmentOptions.find((option) => option.value === (environment?.paneId ?? ''))?.description}
           value={environment?.paneId ?? ''}
           options={environmentOptions}
-          disabled={!ready || sending}
+          disabled={!!child || !ready || sending}
           action={{
             label: t('New tab'),
             onSelect: (bounds) => {
@@ -308,7 +311,8 @@ export default function PanelChat({
                   <AiBlock
                     key={exchange.id}
                     exchange={exchange}
-                    thread={{ driver: 'builtin', id: activeId }}
+                    allowExchangeActions={!child}
+                    thread={child ? undefined : { driver: 'builtin', id: activeId }}
                     conversationId={activeId}
                     presentation="conversation"
                   />
@@ -341,98 +345,102 @@ export default function PanelChat({
           </button>
         </div>
       </div>
-      <ChatComposerShell
-        heading={t('AI chat')}
-        hints={
-          <>
-            <KeyHint shortcut="Enter" />
-            {t('Send')}
-          </>
-        }
-        tray={
-          <>
-            <QueuedMessages messages={queuedSends} onCancel={(id) => useChatStore.getState().cancelQueuedSend(id)} />
-            {(references.length > 0 || attachments.length > 0) && (
-              <div className="chat-context-tray" aria-label={t('Conversation context')}>
-                {attachments.length > 0 && (
-                  <AttachmentChips atts={attachments} previewId={previewId} onPreview={togglePreview} onRemove={removeAttachment} />
-                )}
-                {references.length > 0 && (
-                  <TerminalReferences
-                    references={references}
-                    onRemove={(id) => {
-                      useComposerDrafts.getState().setReferences(
-                        activeId,
-                        references.filter((reference) => reference.id !== id),
-                      );
-                    }}
-                  />
-                )}
-              </div>
-            )}
-          </>
-        }
-        status={
-          <>
-            <IconButton aria-label={t('Add attachment')} data-tip={t('Add attachment')} onClick={() => void pickFiles()}>
-              <Plus size={18} />
-            </IconButton>
-            <ChatModeSelect />
-            <span className="chat-footer-space" />
-            <ModelPill showThinking={false} />
-            {sending && composer.canSend && (
-              <IconButton compact aria-label={t('Queue message')} data-tip={t('Queue message')} onClick={submit}>
-                <ArrowUp size={18} />
+      {child ? (
+        <AnalysisChildBar task={child} side={inSidebar} />
+      ) : (
+        <ChatComposerShell
+          heading={t('AI chat')}
+          hints={
+            <>
+              <KeyHint shortcut="Enter" />
+              {t('Send')}
+            </>
+          }
+          tray={
+            <>
+              <QueuedMessages messages={queuedSends} onCancel={(id) => useChatStore.getState().cancelQueuedSend(id)} />
+              {(references.length > 0 || attachments.length > 0) && (
+                <div className="chat-context-tray" aria-label={t('Conversation context')}>
+                  {attachments.length > 0 && (
+                    <AttachmentChips atts={attachments} previewId={previewId} onPreview={togglePreview} onRemove={removeAttachment} />
+                  )}
+                  {references.length > 0 && (
+                    <TerminalReferences
+                      references={references}
+                      onRemove={(id) => {
+                        useComposerDrafts.getState().setReferences(
+                          activeId,
+                          references.filter((reference) => reference.id !== id),
+                        );
+                      }}
+                    />
+                  )}
+                </div>
+              )}
+            </>
+          }
+          status={
+            <>
+              <IconButton aria-label={t('Add attachment')} data-tip={t('Add attachment')} onClick={() => void pickFiles()}>
+                <Plus size={18} />
               </IconButton>
-            )}
-            {sending ? (
-              <IconButton
-                className="chat-send-button"
-                tone="accent"
-                aria-label={t('Stop generating')}
-                data-tip={t('Stop generating')}
-                data-tip-description={t('Stopping also cancels queued messages for this conversation.')}
-                onClick={() => agentDrivers.builtin.cancel(activeId)}>
-                <Square size={15} fill="currentColor" />
-              </IconButton>
-            ) : (
-              <IconButton
-                className="chat-send-button"
-                tone="accent"
-                aria-label={t('Send')}
-                data-tip={t('Send')}
-                data-tip-shortcut="Enter"
-                onClick={submit}
-                disabled={!composer.canSend}>
-                <ArrowUp size={18} />
-              </IconButton>
-            )}
-          </>
-        }>
-        <TextArea
-          ref={composer.inputRef}
-          data-chat-composer
-          value={composer.text}
-          placeholder={t('Describe what you want to do…')}
-          rows={1}
-          onChange={composer.handleChange}
-          onKeyDown={(event) => {
-            if (event.key === 'Enter' && !event.shiftKey && !event.nativeEvent.isComposing) {
-              event.preventDefault();
-              submit();
-            } else composer.handleKeyDown(event);
-          }}
-          onPaste={(event) => {
-            const files = Array.from(event.clipboardData.files);
-            if (files.length) {
-              event.preventDefault();
-              void addBlobs(files);
-              return;
-            }
-            if (addPastedText(event.clipboardData.getData('text/plain'))) event.preventDefault();
-          }}
-        />
-      </ChatComposerShell>
+              <ChatModeSelect />
+              <span className="chat-footer-space" />
+              <ModelPill showThinking={false} />
+              {sending && composer.canSend && (
+                <IconButton compact aria-label={t('Queue message')} data-tip={t('Queue message')} onClick={submit}>
+                  <ArrowUp size={18} />
+                </IconButton>
+              )}
+              {sending ? (
+                <IconButton
+                  className="chat-send-button"
+                  tone="accent"
+                  aria-label={t('Stop generating')}
+                  data-tip={t('Stop generating')}
+                  data-tip-description={t('Stopping also cancels queued messages for this conversation.')}
+                  onClick={() => agentDrivers.builtin.cancel(activeId)}>
+                  <Square size={15} fill="currentColor" />
+                </IconButton>
+              ) : (
+                <IconButton
+                  className="chat-send-button"
+                  tone="accent"
+                  aria-label={t('Send')}
+                  data-tip={t('Send')}
+                  data-tip-shortcut="Enter"
+                  onClick={submit}
+                  disabled={!composer.canSend}>
+                  <ArrowUp size={18} />
+                </IconButton>
+              )}
+            </>
+          }>
+          <TextArea
+            ref={composer.inputRef}
+            data-chat-composer
+            value={composer.text}
+            placeholder={t('Describe what you want to do…')}
+            rows={1}
+            onChange={composer.handleChange}
+            onKeyDown={(event) => {
+              if (event.key === 'Enter' && !event.shiftKey && !event.nativeEvent.isComposing) {
+                event.preventDefault();
+                submit();
+              } else composer.handleKeyDown(event);
+            }}
+            onPaste={(event) => {
+              const files = Array.from(event.clipboardData.files);
+              if (files.length) {
+                event.preventDefault();
+                void addBlobs(files);
+                return;
+              }
+              if (addPastedText(event.clipboardData.getData('text/plain'))) event.preventDefault();
+            }}
+          />
+        </ChatComposerShell>
+      )}
       {newTabOpen && <NewTabModal open anchor={newTabAnchor} onClose={() => setNewTabOpen(false)} onPick={createTerminalTab} />}
     </div>
   );

@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { setDefaultStream, useChatStore, type StreamFn } from '../stores/chat';
-import { delegateAnalysis, useChildTasks } from '../services/threadOperations';
+import { delegateAnalysis, openChild } from '../services/threadOperations';
+import { useChildTasks } from '../stores/childTasks';
 import { agentCatalog } from '../model/agentCatalog';
 import { captureTurn, useTurnCheckpoints, restoreTurn } from '../services/turnCheckpoints';
 
@@ -29,10 +30,16 @@ it('runs delegated analysis in a separate thread and delivers its own result', a
     chunk('Independent answer');
   };
   setDefaultStream(stream);
-  await expect(delegateAnalysis(parent, 'q', 'Review the outline', new AbortController().signal)).resolves.toBe('Independent answer');
+  await expect(delegateAnalysis(parent, 'q', 'Review the outline', new AbortController().signal, 'call-1')).resolves.toBe(
+    'Independent answer',
+  );
   const [task] = useChildTasks.getState().tasks;
   expect(task).toMatchObject({ status: 'completed', parent: 'chat:parent', question: 'q' });
+  expect(task).toMatchObject({ mode: 'analysis', toolCallId: 'call-1' });
   expect(task.thread.id).not.toBe(parent.id);
+  await expect(useChatStore.getState().send('follow up', { conversationId: task.thread.id })).resolves.toBe(false);
+  await useChatStore.getState().regenerate(task.thread.id, useChatStore.getState().byTab[task.thread.id][0].id);
+  expect(useChatStore.getState().byTab[task.thread.id]).toHaveLength(2);
   expect(task.answerId).toBeTruthy();
 });
 
@@ -52,6 +59,15 @@ it('stops the child stream when its parent cancels', async () => {
   await expect(result).rejects.toThrow();
   expect(useChildTasks.getState().tasks[0].status).toBe('stopped');
   expect(useChatStore.getState().sendingTabs).toEqual([]);
+});
+
+it('reports a failed child when its stream finishes without a text result', async () => {
+  setDefaultStream(async () => {});
+  await expect(delegateAnalysis(parent, 'q', 'Review the outline', new AbortController().signal)).rejects.toThrow();
+  const [task] = useChildTasks.getState().tasks;
+  expect(task.status).toBe('failed');
+  useChatStore.setState({ conversations: [] });
+  expect(() => openChild(task, true)).toThrow();
 });
 
 it('retains the file preview on a restore conflict and consumes it after a successful retry', async () => {

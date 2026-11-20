@@ -1,3 +1,4 @@
+import { analysisChild, useChildTasks } from './childTasks';
 import { create } from 'zustand';
 import { t } from '@i18n';
 import * as conversationApi from '@platform/api/conversation';
@@ -55,7 +56,7 @@ export interface ChatMessage {
 
 /** Tool event callback: run is an upsert patch; undefined fields keep existing values. */
 export interface StreamHandlers {
-  delegateAnalysis?: (task: string) => Promise<string>;
+  delegateAnalysis?: (task: string, toolCallId?: string) => Promise<string>;
   onToolEvent?: (run: ToolRun) => void;
   /** Reasoning delta, appended to the answer's reasoning field. */
   onReasoning?: (chunk: string) => void;
@@ -368,9 +369,9 @@ export const useChatStore = create<ChatState>((set, get) => {
             ...(!analysisOnly &&
               question &&
               get().conversations.some((c) => c.id === tabId) && {
-                delegateAnalysis: async (task: string) => {
+                delegateAnalysis: async (task: string, toolCallId?: string) => {
                   const { delegateAnalysis } = await import('../services/threadOperations');
-                  return delegateAnalysis({ driver: 'builtin', id: tabId }, question.id, task, controller.signal);
+                  return delegateAnalysis({ driver: 'builtin', id: tabId }, question.id, task, controller.signal, toolCallId);
                 },
               }),
             // Flush buffered text before applying a tool event so text and tools keep their order.
@@ -737,7 +738,8 @@ export const useChatStore = create<ChatState>((set, get) => {
     },
     send: async (text, opts) => {
       const tabId = opts?.conversationId ?? opts?.ownerId ?? useWorkspaceStore.getState().activeId;
-      if (pendingConversationDeletes.has(tabId)) return false;
+      if (pendingConversationDeletes.has(tabId) || (!opts?.analysisOnly && analysisChild(useChildTasks.getState().tasks, tabId)))
+        return false;
       const conversation = get().conversations.find((item) => item.id === tabId);
       if (opts?.conversationId && (!conversation || !(tabId in get().byTab))) return false;
       const trimmed = text.trim();
@@ -805,7 +807,12 @@ export const useChatStore = create<ChatState>((set, get) => {
       return true;
     },
     regenerate: async (tabId, userMsgId) => {
-      if (get().sendingTabs.includes(tabId) || pendingConversationDeletes.has(tabId)) return;
+      if (
+        get().sendingTabs.includes(tabId) ||
+        pendingConversationDeletes.has(tabId) ||
+        analysisChild(useChildTasks.getState().tasks, tabId)
+      )
+        return;
       const msgs = get().byTab[tabId] ?? [];
       const idx = msgs.findIndex((m) => m.id === userMsgId);
       if (idx < 0 || msgs[idx].role !== 'user') return;
@@ -840,7 +847,12 @@ export const useChatStore = create<ChatState>((set, get) => {
       await runAssistant(tabId, assistantMsg.id, controller);
     },
     deleteExchange: (tabId, userMsgId) => {
-      if (get().sendingTabs.includes(tabId) || pendingConversationDeletes.has(tabId)) return;
+      if (
+        get().sendingTabs.includes(tabId) ||
+        pendingConversationDeletes.has(tabId) ||
+        analysisChild(useChildTasks.getState().tasks, tabId)
+      )
+        return;
       const msgs = get().byTab[tabId] ?? [];
       const idx = msgs.findIndex((m) => m.id === userMsgId);
       if (idx < 0 || msgs[idx].role !== 'user') return;
@@ -856,7 +868,12 @@ export const useChatStore = create<ChatState>((set, get) => {
       for (const id of ids) void deleteMessage(tabId, id).catch(() => {});
     },
     editResend: (tabId, userMsgId) => {
-      if (get().sendingTabs.includes(tabId) || pendingConversationDeletes.has(tabId)) return;
+      if (
+        get().sendingTabs.includes(tabId) ||
+        pendingConversationDeletes.has(tabId) ||
+        analysisChild(useChildTasks.getState().tasks, tabId)
+      )
+        return;
       const msgs = get().byTab[tabId] ?? [];
       const idx = msgs.findIndex((m) => m.id === userMsgId);
       if (idx < 0 || msgs[idx].role !== 'user') return;

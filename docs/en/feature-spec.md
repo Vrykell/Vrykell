@@ -6,7 +6,7 @@ The agent picker lists the built-in runtime and each configured external agent. 
 
 - **Branch.** Open thread actions under a completed reply. Built-in threads copy the transcript through that reply into a separate conversation. External agents that advertise session forking can branch from the latest turn.
 - **Restore files.** For a turn in a local project under version control, review the changed paths and confirm the restore. It covers tracked and nonignored regular files within the selected directory. Subsequent conflicting edits block restoration. The transcript and staging area are preserved. Checkpoints are held in memory for the current app run. Overlapping turns, linked files, and snapshots above 64 MiB are outside the supported scope.
-- **Delegate.** Assign a task to an agent from a reply. Inspect the child's conversation, stop it or insert its text result into the parent draft. In agent mode the built-in runtime can request independent text analysis and receive the answer in the same turn. Analysis children receive the supplied task and have no tools. Cancelling the parent cancels these children.
+- **Delegated analysis.** In agent mode the built-in runtime can delegate a text analysis task. Its tool call shows the child conversation and its status. Open the row to read the transcript, use the child status bar to return to the parent, or stop a running child from the row. The result goes directly to the parent turn and preserves the user's draft. Each child receives only the supplied task and runs without tools. Stopping the parent also stops its running children.
 
 > Last updated: 2026-10-30
 

@@ -268,7 +268,7 @@ export const agentStream: StreamFn = async (messages, onChunk, ctx) => {
       description:
         'Ask an independent agent to analyze the supplied text. Include the necessary context. It has no tools and returns its answer to this turn.',
       inputSchema: z.object({ task: z.string().trim().min(1).max(24_000) }),
-      execute: ({ task }) => delegateAnalysis(task),
+      execute: ({ task }, { toolCallId }) => delegateAnalysis(task, toolCallId),
     });
   }
   // web_search: a first-class tool on par with web_fetch/web_crawl, usable without any configuration.
