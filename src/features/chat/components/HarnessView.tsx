@@ -40,6 +40,7 @@ import type { DropdownAnchor } from '@ui/menus/AnchoredDropdown';
 import AiBlock, { WorkingIndicator } from '@features/chat/components/AiBlock';
 import AttachmentChips from './AttachmentChips';
 import ChatComposerShell from './ChatComposerShell';
+import { agentDrivers } from '../services/agentDrivers';
 import QueuedMessages from './QueuedMessages';
 import HarnessPermission from './HarnessPermission';
 import HarnessSelector, { type HarnessSelectorOption } from './HarnessSelector';
@@ -351,7 +352,7 @@ export default function HarnessView({
     follow.jumpToLatest();
     submitting.current = true;
     try {
-      const accepted = await useHarnessStore.getState().prompt(tabId, value, pending);
+      const accepted = await agentDrivers.acp.submit(tabId, value, { attachments: pending });
       if (!accepted) return;
       const current = useComposerDrafts.getState().byTab[tabId];
       if (!current) return;
@@ -459,10 +460,11 @@ export default function HarnessView({
               exchange.question && !session?.pending && !session?.opening && !session?.stopping
                 ? () => {
                     follow.jumpToLatest();
-                    void useHarnessStore.getState().prompt(tabId, exchange.question!.content, exchange.question!.attachments);
+                    void agentDrivers.acp.submit(tabId, exchange.question!.content, { attachments: exchange.question!.attachments });
                   }
                 : undefined
             }
+            thread={{ driver: 'acp', id: tabId }}
             allowExchangeActions={false}
             toolContextId={session?.toolContextId ?? tabId}
             presentation="conversation"
@@ -665,7 +667,7 @@ export default function HarnessView({
                 tone="accent"
                 aria-label={t('Stop the harness turn')}
                 data-tip={t('Stop the harness turn')}
-                onClick={() => void useHarnessStore.getState().cancel(tabId)}>
+                onClick={() => agentDrivers.acp.cancel(tabId)}>
                 <Square size={15} fill="currentColor" />
               </IconButton>
             ) : (

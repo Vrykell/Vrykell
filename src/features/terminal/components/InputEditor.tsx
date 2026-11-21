@@ -10,6 +10,7 @@ import { useUiStore } from '@features/workspace';
 import { useCanRemoveWorkspacePane, useWorkspaceNavigation } from '@features/workspace';
 import { closeTerminalPane } from '@features/workspace/services/unifiedWorkspace';
 import { getLongRunningHint } from '@features/terminal/inputVisibility';
+import { PaneStatusFooter } from '@ui/layout/PaneStatusFooter';
 import ShellIndicator from '@features/terminal/components/ShellIndicator';
 import { useInputEditorController } from '@features/terminal/hooks/useInputEditorController';
 import { TERMINAL_FONT_FAMILY } from '@features/terminal/model/terminalFont';
@@ -126,20 +127,12 @@ export default function InputEditor({
     return (
       <>
         {sessionNotice}
-        <div
+        <PaneStatusFooter
           ref={panelRef}
           style={{
-            flexShrink: 0,
             background: 'var(--xterm-bg)',
-            borderTop: '1px solid var(--block-divider)',
-            padding: `5px ${insetRight + 8}px 5px ${insetLeft + 8}px`,
-            fontSize: 'calc(12px * var(--ui-font-scale))',
-            color: 'var(--text-secondary)',
+            paddingInline: `${insetLeft + 8}px ${insetRight + 8}px`,
             fontFamily: 'var(--font-mono)',
-            display: 'flex',
-            alignItems: 'center',
-            gap: 8,
-            minHeight: 28,
           }}>
           <span
             style={{
@@ -173,7 +166,7 @@ export default function InputEditor({
             aria-label={t('Jump to latest output')}>
             <ArrowDown size={iconSizes.compact} />
           </IconButton>
-        </div>
+        </PaneStatusFooter>
       </>
     );
   }

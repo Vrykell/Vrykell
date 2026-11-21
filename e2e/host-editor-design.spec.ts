@@ -20,7 +20,7 @@ for (const theme of ['dark', 'light'])
     const ai = page.getByTestId('ai-start-page');
     await expect(ai.getByTestId('ai-start-new-conversation')).toBeVisible();
     await page.getByTestId('ai-start-agents').click();
-    const picker = page.getByRole('dialog', { name: 'ACP', exact: true });
+    const picker = page.getByRole('dialog', { name: '选择智能体', exact: true });
     await expect(picker).toHaveClass(/new-tab-dialog/);
     await expect(picker).toHaveAttribute('aria-modal', 'false');
     await page.keyboard.press('Escape');

@@ -15,7 +15,7 @@ for (const width of [640, 1240])
       for (const [label, dialog] of [
         ['新终端', '新建标签页'],
         ['连接服务器', '连接服务器'],
-        ['ACP 智能体', 'ACP'],
+        ['智能体', '选择智能体'],
       ]) {
         await surface.click({ button: 'right', position: { x: 20, y: 12 } });
         const action = page.getByRole('menu').getByText(label, { exact: true });
@@ -56,7 +56,7 @@ for (const theme of ['dark', 'light'])
     const serverPicker = page.getByRole('dialog', { name: '连接服务器', exact: true });
     await expect(serverPicker.getByTestId('new-tab-option-ssh:ssh-1')).toBeVisible();
     await expect(serverPicker.locator('[data-testid^="new-tab-option-shell:"]')).toHaveCount(0);
-    await expect(page.getByRole('dialog', { name: 'ACP', exact: true })).toHaveCount(0);
+    await expect(page.getByRole('dialog', { name: '选择智能体', exact: true })).toHaveCount(0);
     await page.keyboard.press('Escape');
     await start.getByRole('button', { name: '新终端', exact: true }).click();
     const profiles = page.getByRole('dialog', { name: '新建标签页', exact: true });
@@ -160,9 +160,9 @@ for (const theme of ['dark', 'light'])
     for (const width of [640, 1240]) {
       await page.setViewportSize({ width, height: 800 });
       const split = bar.getByRole('button', { name: '新建工作区标签', exact: true });
-      await chooseSplitType(page, 'ACP 智能体');
+      await chooseSplitType(page, '智能体');
       await expect(page.getByRole('menu')).toHaveCount(0);
-      const picker = page.getByRole('dialog', { name: 'ACP', exact: true });
+      const picker = page.getByRole('dialog', { name: '选择智能体', exact: true });
       await expect(picker.getByTestId('acp-launcher-directory')).toBeVisible();
       const directory = (await picker.getByTestId('acp-launcher-directory').boundingBox())!;
       const browse = (await picker.getByRole('button', { name: '选择项目文件夹', exact: true }).boundingBox())!;

@@ -10,7 +10,9 @@ import ResourceContent from '@ui/layout/ResourceContent';
 import { registerHarnessCloseGuard } from '@core/harness';
 import { pickPath } from '@platform/api/fs';
 import { useToastStore } from '@ui/feedback/Toast';
-import AcpLauncher from '@features/workspace/components/AcpLauncher';
+import { createAgentSession } from '../services/agentDrivers';
+import type { AgentInstance } from '../model/agentCatalog';
+import AgentLauncher from '@features/workspace/components/AgentLauncher';
 import AiStartPage from './AiStartPage';
 import { useSessionStore, useUiStore, ScopedPaneWorkspace, useScopedPaneActive, WorkspaceResourceSwitcher } from '@features/workspace';
 import { UnifiedHistoryView } from '@features/session-history';
@@ -66,7 +68,7 @@ export default function HarnessWorkspace({ active, headerActive = active }: { ac
   const [closing, setClosing] = useState<(() => void) | null>(null);
   const newConversation = () => {
     useSessionStore.getState().openHarnessTab();
-    useAiWorkspace.getState().openNative(useChatStore.getState().createConversation());
+    createAgentSession({ driver: 'builtin' }, 'main');
   };
   const relocate = () => {
     if (!moveMainConversationToSide(selected)) return;
@@ -95,8 +97,9 @@ export default function HarnessWorkspace({ active, headerActive = active }: { ac
       useToastStore.getState().addToast(t('Could not choose a project folder.'), 'error');
     }
   };
-  const pick = (name: string, cwd?: string) => {
-    useSessionStore.getState().openHarnessTab(name, cwd ?? directory);
+  const pick = (instance: AgentInstance, cwd?: string) => {
+    createAgentSession(instance, 'main', cwd ?? directory);
+    useSessionStore.getState().openHarnessTab();
     setDirectory(undefined);
   };
   const activeSystemPage =
@@ -182,7 +185,7 @@ export default function HarnessWorkspace({ active, headerActive = active }: { ac
   );
   return (
     <div data-testid="harness-workspace" style={{ display: 'flex', flex: 1, minWidth: 0, minHeight: 0, flexDirection: 'column' }}>
-      <AcpLauncher
+      <AgentLauncher
         open={!!launcherOpen}
         anchor={launcherOpen ?? undefined}
         onClose={() => setLauncherOpen(null)}

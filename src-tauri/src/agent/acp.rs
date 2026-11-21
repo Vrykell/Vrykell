@@ -1163,6 +1163,20 @@ fn replay_events(messages: Vec<Value>, session_id: &str) -> Vec<AcpEvent> {
         .collect()
 }
 
+async fn fork_session(client: &AcpClient, info: &Value, cwd: &str, parent: &str) -> Result<(Value, String, Vec<AcpEvent>, bool), String> {
+    if !info.pointer("/agentCapabilities/sessionCapabilities/fork").is_some_and(Value::is_object)
+        || parent.is_empty() || parent.len() > 2048 {
+        return Err("This agent cannot fork the session".into());
+    }
+    let servers = client.mcp_servers.lock().map_err(|_| "application tools unavailable")?.clone();
+    let params = json!({ "sessionId": parent, "cwd": cwd, "mcpServers": servers });
+    let (session, events) = collect_open_events(client, client.request("session/fork", params, LOAD_TIMEOUT)).await?;
+    let child = session.get("sessionId").and_then(Value::as_str).filter(|id| !id.is_empty() && *id != parent)
+        .ok_or("The agent did not return an independent session")?.to_owned();
+    let replayed = replay_events(events, &child);
+    Ok((session, child, replayed, false))
+}
+
 async fn open_session(
     client: &AcpClient,
     name: &str,
@@ -1197,6 +1211,7 @@ pub async fn acp_open<R: tauri::Runtime>(
     name: String,
     cwd: String,
     resume_session_id: Option<String>,
+    fork_from: Option<String>,
     app_tools: Option<Vec<Value>>,
 ) -> Result<Value, String> {
     let catalog = super::app_mcp::validate_catalog(app_tools.unwrap_or_default())?;
@@ -1321,7 +1336,12 @@ pub async fn acp_open<R: tauri::Runtime>(
         if let Ok(mut servers) = client.mcp_servers.lock() { *servers = vec![bridge.descriptor()]; }
         Some(bridge)
     };
-    let (session, agent_session_id, mut replayed, resumed) = match open_session(&client, &harness.name, &session_cwd, resume.as_deref(), can_load).await {
+    let opened = if let Some(parent) = fork_from {
+        fork_session(&client, &info, &session_cwd, &parent).await
+    } else {
+        open_session(&client, &harness.name, &session_cwd, resume.as_deref(), can_load).await
+    };
+    let (session, agent_session_id, mut replayed, resumed) = match opened {
         Ok(result) => result,
         Err(error) => { client.shutdown().await; state.reject_pending(&connection_id); return Err(error); }
     };
@@ -1667,6 +1687,25 @@ mod tests {
             assert_eq!(received, EVENT_QUEUE_CAPACITY * 3);
         };
         tokio::time::timeout(Duration::from_secs(5), run).await.unwrap();
+        writer.await.unwrap();
+        client.shutdown().await;
+    }
+
+    #[tokio::test]
+    async fn advertised_fork_creates_a_separate_provider_session() {
+        let (ours, mut agent) = tokio::io::duplex(8192);
+        let (read, write) = tokio::io::split(ours);
+        let client = AcpClient::over(read, write, Arc::new(|_| None));
+        assert!(fork_session(&client,&json!({}),"/project","parent").await.is_err());
+        let writer = tokio::spawn(async move {
+            let request = read_line(&mut agent).await.unwrap();
+            assert_eq!(request["method"],"session/fork");
+            assert_eq!(request["params"]["sessionId"],"parent");
+            agent.write_all(format!("{}\n",json!({"id":request["id"],"result":{"sessionId":"child"}})).as_bytes()).await.unwrap();
+        });
+        let caps = json!({"agentCapabilities":{"sessionCapabilities":{"fork":{}}}});
+        let (_,child,_,_) = fork_session(&client,&caps,"/project","parent").await.unwrap();
+        assert_eq!(child,"child");
         writer.await.unwrap();
         client.shutdown().await;
     }

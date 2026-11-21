@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { setupTauriMock, mockAnthropic, ptyWrites, ensureChatSettingsOpen } from './tauri-mock';
+import { setupTauriMock, mockAnthropic, mockAnthropicToolCall, ptyWrites, ensureChatSettingsOpen } from './tauri-mock';
 
 test.describe('Command block flow', () => {
   test('a bash code block shows a run button that writes to the PTY and echoes back', async ({ page }) => {
@@ -93,8 +93,9 @@ test('keeps a streamed code block colored instead of flashing to plain text', as
 });
 
 for (const mode of ['dark', 'light'] as const) {
-  test(`code and table surfaces share the neutral palette in ${mode}`, async ({ page }, info) => {
+  test(`tool, code and table surfaces share the neutral palette in ${mode}`, async ({ page }, info) => {
     await mockAnthropic(page, '```\n17:32:10  400\n17:32:24  400  interval 14s\n```\n\n| Status | Count |\n| --- | --- |\n| Ready | 2 |');
+    await mockAnthropicToolCall(page, 'read_file', { path: '/home/e2e/project/status.log' });
     await setupTauriMock(page);
     await page.addInitScript((theme) => localStorage.setItem('vrykell-theme-mode', theme), mode);
     await page.goto('/');
@@ -107,6 +108,9 @@ for (const mode of ['dark', 'light'] as const) {
     await expect(frame).toBeVisible();
     const table = page.locator('.md table').first();
     await expect(table).toBeVisible();
+    const tool = page.locator('.ai-tool-card[data-tool-state="done"]:visible');
+    await tool.getByRole('button', { name: /status.log/ }).click();
+    await page.mouse.move(0, 0);
 
     // Custom terminal block colors must not recolor read-only answer content.
     await page.evaluate(() => {
@@ -141,9 +145,13 @@ for (const mode of ['dark', 'light'] as const) {
       expect(colors.table).toBe(colors.expected.card);
       expect(colors.header).toBe(colors.expected.field);
       expect(colors.tableHeader).toBe(colors.expected.field);
+      await expect(tool).toHaveCSS('background-color', colors.header);
+      await expect(tool.locator('.ai-tool-details')).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
+      await expect(tool.locator('.ai-tool-input')).toHaveCSS('background-color', colors.body);
+      await expect(tool.locator('.ai-tool-output')).toHaveCSS('background-color', colors.body);
       expect(colors.borders).toEqual(Array(3).fill(colors.expected.border));
       expect(colors.fits).toBe(true);
-      await page.screenshot({ path: info.outputPath(`content-surfaces-${mode}-${width}.png`) });
+      await tool.locator('..').screenshot({ path: info.outputPath(`content-surfaces-${mode}-${width}.png`) });
     }
   });
 }

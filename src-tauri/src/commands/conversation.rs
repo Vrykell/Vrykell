@@ -1,6 +1,14 @@
 use crate::db::{ConversationEntry, ConversationMessageEntry, HistoryState};
 
 #[tauri::command]
+pub fn fork_conversation(state: tauri::State<'_, HistoryState>, parent: String, source: String, child: String, title: String, now: i64) -> Result<(), String> {
+    if [&parent,&source,&child].iter().any(|id| id.is_empty() || id.len() > 2048) || title.len() > 1024 {
+        return Err("Invalid branch".into());
+    }
+    state.0.lock().map_err(|e| e.to_string())?.fork_conversation(&parent,&source,&child,&title,now)
+}
+
+#[tauri::command]
 pub fn get_conversation(state: tauri::State<'_, HistoryState>, id: String) -> Result<ConversationEntry, String> {
     if id.is_empty() || id.len() > 2048 { return Err("Invalid conversation identifier".into()); }
     state.0.lock().map_err(|error| error.to_string())?.get_conversation(&id)

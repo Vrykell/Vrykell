@@ -7,7 +7,7 @@ import { currentWorkspaceResources } from './workspaceResources';
 import { editorFileKey, type EditorFile } from '@core/editor';
 
 export function createScopedResource(
-  addition: { create: 'document' | 'conversation' } | { harness: string; cwd?: string } | { file: EditorFile },
+  addition: { create: 'document' | 'conversation'; cwd?: string } | { harness: string; cwd?: string } | { file: EditorFile },
 ) {
   if ('file' in addition) {
     useWorkspaceStore.getState().openEditorFile(addition.file);
@@ -17,7 +17,7 @@ export function createScopedResource(
   const before = new Set(currentWorkspaceResources().map((resource) => resource.id));
   if (addition.create === 'document') newEditorFile();
   else {
-    useAiWorkspace.getState().openNative(useChatStore.getState().createConversation());
+    useAiWorkspace.getState().openNative(useChatStore.getState().createConversation(null, { projectDirectory: addition.cwd }));
     useWorkspaceStore.getState().openHarnessTab();
   }
   return currentWorkspaceResources().find((resource) => !before.has(resource.id))?.id;

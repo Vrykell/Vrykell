@@ -26,7 +26,7 @@ import { openWorkspaceFile, pickWorkspaceFile } from '../services/workspaceActio
 import WorkspaceResourceSwitcher from './WorkspaceResourceSwitcher';
 import SshResourcesAction from './SshResourcesAction';
 import UnifiedStartPage from './UnifiedStartPage';
-import AcpLauncher from './AcpLauncher';
+import AgentLauncher from './AgentLauncher';
 import type { TerminalSpec } from '../model/windowLayout';
 import NewTabModal from './NewTabModal';
 import { useWorkspaceHistory } from '../hooks/useWorkspaceHistory';
@@ -44,7 +44,7 @@ type Creation = 'terminal' | 'document' | 'conversation';
 type Addition =
   | { kind: 'tab'; id: string }
   | { kind: 'existing'; id: string }
-  | { kind: 'new'; resource: Creation }
+  | { kind: 'new'; resource: Creation; cwd?: string }
   | { kind: 'agent'; harness: string; cwd?: string }
   | { kind: 'terminal'; spec: TerminalSpec }
   | { kind: 'file'; file: EditorFile };
@@ -125,7 +125,7 @@ export default function UnifiedWorkspace({ active }: { active: boolean }) {
     else if (placement.kind === 'existing') {
       state.place(placement.id, target);
       focusUnifiedResource(placement.id);
-    } else if (placement.kind === 'new') createUnifiedResource(placement.resource, undefined, target);
+    } else if (placement.kind === 'new') createUnifiedResource(placement.resource, undefined, target, placement.cwd);
     else if (placement.kind === 'terminal') createUnifiedTerminal(placement.spec, target);
     else if (placement.kind === 'file') {
       const id = createScopedResource({ file: placement.file });
@@ -177,7 +177,7 @@ export default function UnifiedWorkspace({ active }: { active: boolean }) {
         void openWorkspaceFile();
       },
     },
-    { label: t('ACP agents'), onClick: (row, menuAnchor) => setLauncher(pickerOrigin(row, menuAnchor)) },
+    { label: t('Agents'), onClick: (row, menuAnchor) => setLauncher(pickerOrigin(row, menuAnchor)) },
   ];
   const focusedResource = resources.find((resource) => resource.id === focused?.resourceId);
   return (
@@ -278,13 +278,17 @@ export default function UnifiedWorkspace({ active }: { active: boolean }) {
           )}
         />
       )}
-      <AcpLauncher
+      <AgentLauncher
         open={!!launcher}
         anchor={launcher?.anchor}
         onClose={() => setLauncher(null)}
-        onPick={(name, cwd) => {
-          if (launcher?.split) setPlacement({ kind: 'agent', harness: name, cwd });
-          else connectUnifiedAgent(name, undefined, cwd);
+        onPick={(agent, cwd) => {
+          if (launcher?.split)
+            setPlacement(
+              agent.driver === 'builtin' ? { kind: 'new', resource: 'conversation', cwd } : { kind: 'agent', harness: agent.name, cwd },
+            );
+          else if (agent.driver === 'builtin') createUnifiedResource('conversation', undefined, undefined, cwd);
+          else connectUnifiedAgent(agent.name, undefined, cwd);
           setLauncher(null);
         }}
       />

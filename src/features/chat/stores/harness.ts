@@ -40,6 +40,14 @@ import { clearSessionGrants } from '@features/agent/stores/permissions';
 import { executionPaneSpec } from '@features/agent/services/executionTarget';
 import { environmentForPane } from '../services/conversationContext';
 import { hasChatContent, stopChatMessage } from '../model/chatContent';
+import { captureTurn } from '../services/turnCheckpoints';
+
+const checkpoints = new Map<string, ReturnType<typeof captureTurn>>();
+function finishCheckpoint(tabId: string, discard = false) {
+  const checkpoint = checkpoints.get(tabId);
+  checkpoints.delete(tabId);
+  if (checkpoint) void checkpoint.finish(discard);
+}
 import { loadHarnessTranscript } from '../services/harnessTranscripts';
 import { terminalDebug } from '@features/terminal/services/terminalDebug';
 
@@ -115,7 +123,7 @@ interface HarnessStore {
   cancelQueuedInput: (tabId: string, id: string) => void;
   setExecutionPane: (tabId: string, paneId: string | null) => void;
   byTab: Record<string, HarnessSession>;
-  open: (tabId: string, harness: string, cwd: string, fresh?: boolean, resumeSessionId?: string) => Promise<void>;
+  open: (tabId: string, harness: string, cwd: string, fresh?: boolean, resumeSessionId?: string, forkFrom?: string) => Promise<void>;
   prompt: (tabId: string, text: string, attachments?: AttachmentMeta[]) => Promise<boolean>;
   cancel: (tabId: string) => Promise<void>;
   close: (tabId: string) => Promise<void>;
@@ -227,6 +235,7 @@ async function stopUnansweredTurn(tabId: string) {
   clearTimeout(timer);
   cancellationAcks.delete(tabId);
   if (useHarnessStore.getState().byTab[tabId]?.sessionId !== session.sessionId) return;
+  finishCheckpoint(tabId, !acknowledged);
   if (!acknowledged) {
     tabOfSession.delete(session.sessionId);
     patch(tabId, (current) => ({ ...current, sessionId: null }));
@@ -391,7 +400,7 @@ export const useHarnessStore = create<HarnessStore>()((set, get) => ({
     patch(tabId, (current) => ({ ...current, executionPaneId: paneId, toolContextId: `${session.sessionId}:app:${++toolScopeSequence}` }));
   },
 
-  open: async (tabId, harness, cwd, newSession = false, resumeSessionId) => {
+  open: async (tabId, harness, cwd, newSession = false, resumeSessionId, forkFrom) => {
     // One open per tab prevents a remount racing the first attempt from starting an extra process.
     if (get().byTab[tabId]?.opening) return;
     disarmFirstResponse(tabId);
@@ -417,7 +426,12 @@ export const useHarnessStore = create<HarnessStore>()((set, get) => ({
             return null;
           })
         : Promise.resolve(null);
-      const [result, retained] = await Promise.all([acpOpen(harness, cwd, resume, applicationToolCatalog()), retainedRequest]);
+      const [result, retained] = await Promise.all([
+        forkFrom
+          ? acpOpen(harness, cwd, undefined, applicationToolCatalog(), forkFrom)
+          : acpOpen(harness, cwd, resume, applicationToolCatalog()),
+        retainedRequest,
+      ]);
       const known = get().byTab[tabId];
       if (!known || openVersions.get(tabId) !== version) {
         // The tab was closed while this open was in flight: do not resurrect it, and do not leave a
@@ -428,7 +442,7 @@ export const useHarnessStore = create<HarnessStore>()((set, get) => ({
       }
       // A new session adopts the choices remembered for this harness; a loaded one keeps the state
       // its agent returns. The page stays in its opening state until the choices are settled.
-      const restored = resume ? null : await restoreSessionConfig(harness, result);
+      const restored = resume || forkFrom ? null : await restoreSessionConfig(harness, result);
       if (!get().byTab[tabId] || openVersions.get(tabId) !== version) {
         await acpClose(result.sessionId).catch(() => undefined);
         openingEvents.delete(result.sessionId);
@@ -610,9 +624,19 @@ export const useHarnessStore = create<HarnessStore>()((set, get) => ({
     );
     try {
       armFirstResponse(tabId);
+      if (session.cwd) {
+        const checkpoint = captureTurn(question.id, session.cwd);
+        checkpoints.set(tabId, checkpoint);
+        await checkpoint.ready;
+        if (turnVersions.get(tabId) !== version || get().byTab[tabId]?.sessionId !== sessionId) {
+          void checkpoint.finish();
+          return false;
+        }
+      }
       await acpPrompt(sessionId, content.text, content.images);
     } catch (error) {
       if (turnVersions.get(tabId) !== version || get().byTab[tabId]?.sessionId !== sessionId) return true;
+      finishCheckpoint(tabId);
       disarmFirstResponse(tabId);
       stopApplicationTools(tabId);
       patch(tabId, (current) => failHarnessTurn(current, String((error as Error)?.message ?? error)));
@@ -652,6 +676,7 @@ export const useHarnessStore = create<HarnessStore>()((set, get) => ({
     clearTimeout(timer);
     cancellationAcks.delete(tabId);
     if (get().byTab[tabId]?.sessionId !== session.sessionId) return;
+    finishCheckpoint(tabId, !acknowledged);
     if (!acknowledged) {
       tabOfSession.delete(session.sessionId);
       patch(tabId, (current) => ({ ...current, sessionId: null, stopping: false, opening: false }));
@@ -722,6 +747,7 @@ export const useHarnessStore = create<HarnessStore>()((set, get) => ({
   },
 
   close: async (tabId) => {
+    finishCheckpoint(tabId, true);
     inputVersions.set(tabId, (inputVersions.get(tabId) ?? 0) + 1);
     disarmFirstResponse(tabId);
     openVersions.set(tabId, (openVersions.get(tabId) ?? 0) + 1);
@@ -872,6 +898,7 @@ export const useHarnessStore = create<HarnessStore>()((set, get) => ({
       return;
     }
     if (event.kind === 'stop' || event.kind === 'error') {
+      finishCheckpoint(tabId, event.kind === 'error' || !!session?.stopping);
       stopApplicationTools(tabId);
       patch(tabId, (current) => ({ ...current, questions: [], permissionQueue: [] }));
     }

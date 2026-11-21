@@ -3,7 +3,8 @@ import { t } from '@i18n';
 import { OutlineButton } from '@ui/actions/OutlineButton';
 import AppMark from '@ui/icons/AppMark';
 import WorkspaceStartPage from '@features/workspace/components/WorkspaceStartPage';
-import AcpLauncher from '@features/workspace/components/AcpLauncher';
+import type { AgentInstance } from '../model/agentCatalog';
+import AgentLauncher from '@features/workspace/components/AgentLauncher';
 
 /**
  * The AI start page matches every other workspace: one action to begin and one to reach the
@@ -19,7 +20,7 @@ export default function AiStartPage({
   open: boolean;
   active: boolean;
   onNewConversation: () => void;
-  onPick: (name: string, cwd?: string) => void;
+  onPick: (instance: AgentInstance, cwd?: string) => void;
   suspended?: boolean;
 }) {
   const [launcher, setLauncher] = useState<{ x: number; y: number } | null>(null);
@@ -51,7 +52,7 @@ export default function AiStartPage({
           </>
         }
       />
-      <AcpLauncher
+      <AgentLauncher
         open={!!launcher && open && !suspended && active}
         anchor={launcher ?? undefined}
         onClose={() => setLauncher(null)}

@@ -218,6 +218,9 @@ registerField(
   'Adjust text size in the AI chat panel. Changes are saved and applied immediately.',
   () => String(useTypographyStore.getState().chatFontSize),
 );
+registerField('chat-font-weight', 'appearance-typography', 'AI reply text weight', 'AI chat font preview', () =>
+  String(useTypographyStore.getState().chatFontWeight),
+);
 registerField(
   'terminal-font-family',
   'appearance-typography',

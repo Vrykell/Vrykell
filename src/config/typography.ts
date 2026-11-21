@@ -5,6 +5,7 @@ import { BUNDLED_MONO_FONT } from './bundledFonts';
 export const DEFAULT_UI_FONT_SIZE = 13;
 export const DEFAULT_TERMINAL_FONT_SIZE = 14;
 export const DEFAULT_CHAT_FONT_SIZE = 14;
+const DEFAULT_CHAT_FONT_WEIGHT = 350;
 export const DEFAULT_TERMINAL_FONT_WEIGHT = 400;
 export const DEFAULT_TERMINAL_LINE_HEIGHT = 1;
 const monoFontFamilies = [
@@ -69,6 +70,7 @@ interface TypographyState {
   uiFontSize: number;
   terminalFontSize: number;
   chatFontSize: number;
+  chatFontWeight: number;
   editorFontSize: number;
   editorFontPreset: TerminalFontPreset;
   editorFontWeight: number;
@@ -91,6 +93,7 @@ const defaults: TypographyPreferences = {
   uiFontSize: DEFAULT_UI_FONT_SIZE,
   terminalFontSize: DEFAULT_TERMINAL_FONT_SIZE,
   chatFontSize: DEFAULT_CHAT_FONT_SIZE,
+  chatFontWeight: DEFAULT_CHAT_FONT_WEIGHT,
   editorFontSize: 13,
   editorFontPreset: 'system',
   editorFontWeight: 400,
@@ -111,6 +114,7 @@ function sanitize(values: Partial<TypographyPreferences>): TypographyPreferences
     uiFontSize: boundedFontSize(values.uiFontSize, DEFAULT_UI_FONT_SIZE, 18),
     terminalFontSize: boundedFontSize(values.terminalFontSize, DEFAULT_TERMINAL_FONT_SIZE),
     chatFontSize: boundedFontSize(values.chatFontSize, DEFAULT_CHAT_FONT_SIZE),
+    chatFontWeight: Math.round(boundedNumber(values.chatFontWeight, DEFAULT_CHAT_FONT_WEIGHT, 100, 900)),
     editorFontSize: boundedFontSize(values.editorFontSize, 13),
     editorFontPreset: boundedFontPreset(values.editorFontPreset),
     editorFontWeight: Math.round(boundedNumber(values.editorFontWeight, 400, 100, 900)),
@@ -164,6 +168,7 @@ function applyTypography(state: TypographyState): void {
   root.setProperty('--ui-font-scale', String(state.uiFontSize / DEFAULT_UI_FONT_SIZE));
   root.setProperty('--terminal-font-size', `${state.terminalFontSize}px`);
   root.setProperty('--chat-font-size', `${state.chatFontSize}px`);
+  root.setProperty('--chat-font-weight', String(state.chatFontWeight));
   root.setProperty('--chat-font-scale', String(state.chatFontSize / DEFAULT_CHAT_FONT_SIZE));
   root.setProperty('--editor-font-family', terminalFontFamily(state.editorFontPreset));
   root.setProperty('--editor-font-size', `${state.editorFontSize}px`);

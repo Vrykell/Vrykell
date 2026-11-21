@@ -1,5 +1,11 @@
 # Security model
 
+## Thread operations
+
+Thread branching copies already redacted records in a database transaction. A provider fork requires the negotiated capability and a distinct returned session identity. Children use a fresh conversation and tool permission scope. Model-requested analysis children have no tools or memory lookup.
+
+Local workspace checkpoints keep bounded before and after images in native memory. The renderer receives an opaque key and relative filenames. Restore accepts only that key, checks the affected paths against the captured directory, and compares file contents and permissions before writing. Concurrent turns in overlapping directories invalidate capture. These commands are absent from the model tool catalog.
+
 ## Window shell actions
 
 The main window gains native resize dragging and always-on-top capabilities for its shared titlebar menu. Actions target the current window only; close retains existing unsaved-work guards. No new application command, filesystem access, network source, rendered HTML or terminal input is introduced.

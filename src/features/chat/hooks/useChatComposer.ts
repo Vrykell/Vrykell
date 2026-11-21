@@ -9,7 +9,7 @@ interface UseChatComposerOptions {
   questions: string[];
   draft: string;
   setDraft: (text: string) => void;
-  send: (text: string, options?: SendOptions) => Promise<void>;
+  send: (text: string, options?: SendOptions) => Promise<void | boolean>;
   sending: boolean;
   queueWhileSending?: boolean;
   isSession: boolean;

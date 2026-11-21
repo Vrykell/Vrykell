@@ -1,5 +1,13 @@
 import { test, expect, type Page } from '@playwright/test';
-import { mockAnthropic, paceLlmStream, setupTauriMock, ensureTabsOpen, ptyWrites, ensureChatSettingsOpen } from './tauri-mock';
+import {
+  mockAnthropic,
+  mockAnthropicToolCall,
+  paceLlmStream,
+  setupTauriMock,
+  ensureTabsOpen,
+  ptyWrites,
+  ensureChatSettingsOpen,
+} from './tauri-mock';
 import { fillHistorySearch } from './history-search';
 
 async function boot(page: Page, reply = 'The build is fixed.') {
@@ -11,6 +19,172 @@ async function boot(page: Page, reply = 'The build is fixed.') {
   await expect(page.locator('[data-chat-composer]:visible')).toBeVisible();
   await expect(page.getByRole('button', { name: '会话设置' })).toBeVisible();
 }
+
+test('completed tool cards fold while reply text remains visible', async ({ page }, info) => {
+  await boot(page);
+  await page.evaluate(async () => {
+    const chatPath = '/src/features/chat/stores/chat.ts';
+    const workspacePath = '/src/features/chat/stores/aiWorkspace.ts';
+    const { useChatStore } = (await import(chatPath)) as typeof import('../src/features/chat/stores/chat');
+    const { useAiWorkspace } = (await import(workspacePath)) as typeof import('../src/features/chat/stores/aiWorkspace');
+    await useChatStore.getState().send('检查项目的构建配置', {
+      conversationId: useAiWorkspace.getState().sideSelected.slice(5),
+      streamFn: async (_history, send, context) => {
+        for (const path of ['package.json', 'tsconfig.json', 'vite.config.ts']) {
+          const tool = { toolName: 'read_file', toolCallId: path, input: { path }, startedAt: 1 };
+          context?.handlers?.onToolEvent?.({ ...tool, state: 'running' });
+          context?.handlers?.onToolEvent?.({ ...tool, state: 'done', output: 'Configuration loaded.' });
+        }
+        send('已检查三个配置文件，**构建命令**是 `npm run build`。');
+      },
+    });
+  });
+  for (const placement of ['side', 'main'] as const) {
+    if (placement === 'main') await page.getByTestId('ai-return-to-workspace').click();
+    const surface = page.getByTestId(`ai-surface-${placement}`);
+    const summary = surface.getByRole('button', { name: '已完成 3 次工具调用' });
+    await expect(summary).toHaveAttribute('aria-expanded', 'false');
+    const reply = surface.locator('.ai-block-answer > .md p');
+    await expect(reply).toHaveCSS('font-weight', '350');
+    await expect(reply.locator('strong')).toBeVisible();
+    await summary.press('Enter');
+    const file = surface.getByRole('button', { name: /读取文件.*package.json/ });
+    const title = file.locator('.ai-tool-label');
+    for (const property of ['font-family', 'font-size', 'font-weight', 'color']) {
+      const expected = await title.evaluate((element, css) => getComputedStyle(element).getPropertyValue(css), property);
+      await expect(summary.locator('.ai-tool-label')).toHaveCSS(property, expected);
+    }
+    await file.click();
+    await expect(surface.getByText('Configuration loaded.', { exact: true })).toBeVisible();
+    await surface.screenshot({ path: info.outputPath(`cards-open-${placement}.png`) });
+    await summary.press('Enter');
+    await expect(file).toBeHidden();
+    await surface.screenshot({ path: info.outputPath(`cards-closed-${placement}.png`) });
+  }
+});
+
+for (const placement of ['side', 'main'] as const)
+  test(`model delegation opens a child and returns to the ${placement} parent`, async ({ page }, info) => {
+    const task = '核对项目说明中关于会话恢复的描述';
+    await mockAnthropicToolCall(page, 'delegate_analysis', { task });
+    await boot(page, '已核对恢复条件。');
+    if (placement === 'main') await page.getByTestId('ai-return-to-workspace').click();
+    const surface = page.getByTestId(`ai-surface-${placement}`);
+    const composer = surface.locator('[data-chat-composer]:visible');
+    // Hold the child transport so navigation and cancellation are exercised during real execution.
+    await page.evaluate((task) => {
+      const bridge = window as unknown as {
+        __TAURI_INTERNALS__: { invoke: (command: string, args?: { req?: { body?: string } }) => Promise<unknown> };
+        releaseAnalysis?: () => void;
+      };
+      const invoke = bridge.__TAURI_INTERNALS__.invoke.bind(bridge.__TAURI_INTERNALS__);
+      bridge.__TAURI_INTERNALS__.invoke = async (command, args) => {
+        if (command === 'llm_stream') {
+          const messages = JSON.parse(args?.req?.body || '{}').messages ?? [];
+          if (messages.at(-1)?.role === 'user' && JSON.stringify(messages.at(-1).content).includes(task)) {
+            await new Promise<void>((resolve) => {
+              bridge.releaseAnalysis = resolve;
+            });
+          }
+        }
+        return invoke(command, args);
+      };
+    }, task);
+    await composer.fill('请独立复核会话恢复条件');
+    await composer.press('Enter');
+    const row = surface.locator('.subagent-row');
+    await expect(row).toHaveCount(1);
+    await expect(row.locator('.ai-tool-label')).toHaveText('子智能体');
+    await expect(row.locator('.ai-tool-state')).toHaveAttribute('data-state', 'running');
+    await expect(row.getByRole('status')).toHaveText('运行中');
+    await expect(surface.locator('.ai-tool-summary').filter({ hasText: 'delegate_analysis' })).toHaveCount(0);
+    await composer.fill('稍后继续的草稿');
+    const open = row.getByRole('button', { name: /打开子智能体/ });
+    const stop = row.getByRole('button', { name: /停止子智能体/ });
+    const openRect = (await open.boundingBox())!;
+    const stopRect = (await stop.boundingBox())!;
+    expect(stopRect.x - openRect.x - openRect.width).toBeGreaterThanOrEqual(7);
+    await surface.screenshot({ path: info.outputPath(`parent-${placement}.png`) });
+    await open.press('Enter');
+    const bar = surface.getByRole('region', { name: '子智能体' });
+    const edges = await bar.evaluate((footer) => {
+      const rect = footer.getBoundingClientRect();
+      const pane = footer.closest('.ai-chat-panel')!.getBoundingClientRect();
+      return [rect.left - pane.left, pane.right - rect.right, pane.bottom - rect.bottom];
+    });
+    expect(edges.every((inset) => Math.abs(inset) <= 1)).toBe(true);
+    await expect(bar).toHaveCSS('border-top-width', '1px');
+    await expect(bar).toHaveCSS('border-radius', '0px');
+    await expect(bar.getByRole('status')).toHaveText('运行中');
+    await expect(composer).toHaveCount(0);
+    await surface.screenshot({ path: info.outputPath(`child-${placement}.png`) });
+    await bar.getByRole('button', { name: '返回父会话' }).press('Enter');
+    await expect(composer).toHaveValue('稍后继续的草稿');
+    if (placement === 'main') await stop.click();
+    await page.evaluate(() => (window as unknown as { releaseAnalysis: () => void }).releaseAnalysis());
+    await expect(row.getByRole('status')).toHaveText(placement === 'main' ? '已停止' : '完成');
+    await expect(stop).toHaveCount(0);
+    await surface.screenshot({ path: info.outputPath(`parent-settled-${placement}.png`) });
+    await expect(surface.locator('.ai-block-answer .md')).toContainText('已核对恢复条件。');
+    await expect(composer).toHaveValue('稍后继续的草稿');
+  });
+
+test('branches inherit only the chosen reply', async ({ page }) => {
+  await boot(page, 'Review complete.');
+  const composer = page.locator('[data-chat-composer]:visible');
+  await composer.fill('Read the first draft');
+  await composer.press('Enter');
+  const first = page.getByTestId('ai-surface-side').locator('.chat-exchange').first();
+  await expect(first).toContainText('Review complete.');
+  await composer.fill('A later unrelated question');
+  await composer.press('Enter');
+  const exchanges = page.getByTestId('ai-surface-side').locator('.chat-exchange');
+  await expect(exchanges).toHaveCount(2);
+  await expect(exchanges.last().getByRole('button', { name: '线程操作' })).toBeVisible();
+  await first.getByRole('button', { name: '线程操作' }).click();
+  await page.getByRole('menuitem', { name: '从这条回复创建分支' }).click();
+  await expect(exchanges).toHaveCount(1);
+  await expect(first).toContainText('Read the first draft');
+  await expect(first).toContainText('Review complete.');
+  await composer.fill('Continue on the branch');
+  await composer.press('Enter');
+  await expect(exchanges.last()).toContainText('Continue on the branch');
+  await expect(exchanges.last()).toContainText('Review complete.');
+});
+
+test('workspace restore previews changed files and preserves the reply', async ({ page }, info) => {
+  await boot(page);
+  await page.evaluate(async () => {
+    const host = (window as unknown as { __TAURI_INTERNALS__: { invoke: (command: string, args?: unknown) => Promise<unknown> } })
+      .__TAURI_INTERNALS__;
+    const invoke = host.invoke.bind(host);
+    host.invoke = async (command, args) => {
+      if (command === 'begin_turn_checkpoint') return true;
+      if (command === 'finish_turn_checkpoint') return ['src/example.ts', 'README.md'];
+      if (command === 'restore_turn_checkpoint') return;
+      return invoke(command, args);
+    };
+    const path = '/src/features/chat/services/agentDrivers.ts';
+    const { createAgentSession } = (await import(path)) as typeof import('../src/features/chat/services/agentDrivers');
+    createAgentSession({ driver: 'builtin' }, 'side', '/example');
+  });
+  const composer = page.locator('[data-chat-composer]:visible');
+  await composer.fill('Update the example');
+  await composer.press('Enter');
+  await expect(page.getByText('The build is fixed.', { exact: true })).toBeVisible();
+  const actions = page.getByRole('button', { name: '线程操作' });
+  await actions.click();
+  await page.getByRole('menuitem', { name: '回退本轮文件改动' }).click();
+  const preview = page.getByRole('dialog', { name: '回退本轮文件改动' });
+  await expect(preview.getByText('src/example.ts')).toBeVisible();
+  await expect(preview.getByText('README.md')).toBeVisible();
+  await preview.screenshot({ path: info.outputPath('restore-files.png') });
+  await preview.getByRole('button', { name: '恢复文件' }).click();
+  await expect(preview).toBeHidden();
+  await expect(page.getByText('The build is fixed.', { exact: true })).toBeVisible();
+  await actions.click();
+  await expect(page.getByRole('menuitem', { name: '回退本轮文件改动' })).toHaveCount(0);
+});
 
 test('conversation drafts survive terminal navigation, settings and closing the final terminal', async ({ page }) => {
   await boot(page);
@@ -261,14 +435,16 @@ test('tool activity stays available within the plain conversation flow', async (
   await page.reload();
   await page.getByTestId('workspace-history').click();
   await page.getByTestId('unified-history-conversation:tool-row-review').click();
-  const rows = page.locator('.ai-tool-card:visible');
+  await page.getByRole('button', { name: '已完成 2 次工具调用' }).click();
+  const rows = page.locator('.ai-tool-card[data-tool-state]:visible');
   await expect(rows).toHaveCount(3);
   const presentation = await rows.first().evaluate((element) => ({
     background: getComputedStyle(element).backgroundColor,
     radius: getComputedStyle(element).borderRadius,
     borderTop: getComputedStyle(element).borderTopStyle,
   }));
-  expect(presentation).toMatchObject({ radius: '8px', borderTop: 'none' });
+  const cardRadius = await rows.first().evaluate((element) => getComputedStyle(element).getPropertyValue('--radius-inner').trim());
+  expect(presentation).toMatchObject({ radius: cardRadius, borderTop: 'none' });
   expect(presentation.background).not.toBe('rgba(0, 0, 0, 0)');
   await expect(rows.first().locator('.ai-tool-label')).toHaveText('运行命令');
   await expect(rows.first().locator('.ai-tool-state')).toHaveText('退出码 0');
@@ -284,7 +460,7 @@ test('tool activity stays available within the plain conversation flow', async (
     borderTop: getComputedStyle(element).borderTopStyle,
     paddingLeft: getComputedStyle(element).paddingLeft,
   }));
-  expect(frame).toMatchObject({ radius: '8px', borderTop: 'solid', paddingLeft: '12px' });
+  expect(frame).toMatchObject({ radius: cardRadius, borderTop: 'solid', paddingLeft: '12px' });
   expect(frame.background).not.toBe('rgba(0, 0, 0, 0)');
   // One scroll container only: the framed box scrolls, the terminal snapshot inside does not.
   const scroll = await output.evaluate((element) => ({
@@ -299,8 +475,7 @@ test('tool activity stays available within the plain conversation flow', async (
   await failed.locator('.ai-tool-summary').click();
   await expect(failed.locator('.ai-tool-verdict')).toContainText('Exit code 2');
   await expect(page.getByRole('alert')).toHaveCount(0);
-  // The copy target sits in the frame corner and appears with the hovered output. Scope it to the
-  // first card: an expanded failed card carries its own output frame too.
+  // The copy target sits in the frame corner and appears with the hovered output.
   const copy = rows.first().getByTestId('tool-output-copy');
   await expect(copy).toHaveCSS('opacity', '0');
   await output.hover();

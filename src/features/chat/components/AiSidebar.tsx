@@ -8,7 +8,8 @@ import type { MenuAnchor } from '@ui/menus/ContextMenu';
 import SettingsPopover from '@ui/menus/SettingsPopover';
 import type { DropdownAnchor } from '@ui/menus/AnchoredDropdown';
 import { ResourceContentSlot } from '@ui/layout/ResourceContent';
-import AcpLauncher from '@features/workspace/components/AcpLauncher';
+import { createAgentSession } from '../services/agentDrivers';
+import AgentLauncher from '@features/workspace/components/AgentLauncher';
 import { useSessionStore as useWorkspaceStore, usePlacedWorkspaceResourceIds } from '@features/workspace';
 import { harnessMark } from '@features/agent/components/HarnessBadge';
 import { useAiWorkspace } from '../stores/aiWorkspace';
@@ -113,7 +114,7 @@ export default function AiSidebar({
               />
             </div>
             <div className="chat-setting-row">
-              <span>{t('ACP agents')}</span>
+              <span>{t('Agents')}</span>
               <SelectTrigger
                 aria-label={t('Choose agent')}
                 aria-haspopup="dialog"
@@ -122,7 +123,7 @@ export default function AiSidebar({
                   const bounds = event.currentTarget.getBoundingClientRect();
                   setLauncher({ anchor: { x: bounds.right, y: bounds.bottom + 4, aboveY: bounds.top, align: 'end' } });
                 }}>
-                <span className="ui-select-value">{connection?.harness ?? t('Choose agent')}</span>
+                <span className="ui-select-value">{connection?.harness ?? t('Built-in agent')}</span>
               </SelectTrigger>
             </div>
             <div ref={onSettingsTarget} />
@@ -135,12 +136,12 @@ export default function AiSidebar({
           </section>
         </SettingsPopover>
       )}
-      <AcpLauncher
+      <AgentLauncher
         open={!!launcher}
         anchor={launcher?.anchor}
         onClose={() => setLauncher(null)}
-        onPick={(name, cwd) => {
-          createSideAgent(name, cwd);
+        onPick={(instance, cwd) => {
+          createAgentSession(instance, 'side', cwd);
           setLauncher(null);
         }}
       />
