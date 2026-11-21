@@ -94,6 +94,8 @@ for (const placement of ['side', 'main'] as const)
     await composer.press('Enter');
     const row = surface.locator('.subagent-row');
     await expect(row).toHaveCount(1);
+    await expect(row.locator('.ai-tool-label')).toHaveText('子智能体');
+    await expect(row.locator('.ai-tool-state')).toHaveAttribute('data-state', 'running');
     await expect(row.getByRole('status')).toHaveText('运行中');
     await expect(surface.locator('.ai-tool-summary').filter({ hasText: 'delegate_analysis' })).toHaveCount(0);
     await composer.fill('稍后继续的草稿');
@@ -105,6 +107,14 @@ for (const placement of ['side', 'main'] as const)
     await surface.screenshot({ path: info.outputPath(`parent-${placement}.png`) });
     await open.press('Enter');
     const bar = surface.getByRole('region', { name: '子智能体' });
+    const edges = await bar.evaluate((footer) => {
+      const rect = footer.getBoundingClientRect();
+      const pane = footer.closest('.ai-chat-panel')!.getBoundingClientRect();
+      return [rect.left - pane.left, pane.right - rect.right, pane.bottom - rect.bottom];
+    });
+    expect(edges.every((inset) => Math.abs(inset) <= 1)).toBe(true);
+    await expect(bar).toHaveCSS('border-top-width', '1px');
+    await expect(bar).toHaveCSS('border-radius', '0px');
     await expect(bar.getByRole('status')).toHaveText('运行中');
     await expect(composer).toHaveCount(0);
     await surface.screenshot({ path: info.outputPath(`child-${placement}.png`) });
@@ -114,6 +124,7 @@ for (const placement of ['side', 'main'] as const)
     await page.evaluate(() => (window as unknown as { releaseAnalysis: () => void }).releaseAnalysis());
     await expect(row.getByRole('status')).toHaveText(placement === 'main' ? '已停止' : '完成');
     await expect(stop).toHaveCount(0);
+    await surface.screenshot({ path: info.outputPath(`parent-settled-${placement}.png`) });
     await expect(surface.locator('.ai-block-answer .md')).toContainText('已核对恢复条件。');
     await expect(composer).toHaveValue('稍后继续的草稿');
   });

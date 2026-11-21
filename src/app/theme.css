@@ -671,55 +671,29 @@ input.range-input:disabled {
   display: flex;
   align-items: center;
   gap: 8px;
-  min-width: 0;
-  margin: 6px 0;
-  padding: 3px 8px;
-  background: var(--card-bg);
-  border-radius: var(--radius-inner);
 }
-.subagent-row button.subagent-open {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  flex: 1 1 0;
-  min-width: 0;
-  min-height: 32px;
-  padding: 4px;
-  text-align: start;
-}
-.subagent-row svg, .subagent-bar svg, .subagent-status {
-  flex-shrink: 0;
-}
-.subagent-title {
+.subagent-row .ai-tool-summary {
   flex: 1;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
-.subagent-status {
-  color: var(--text-muted);
-  font-size: var(--fs-caption);
+.subagent-row > .icon-button {
+  margin-inline-end: 4px;
 }
-.subagent-status[data-state='running'] {
-  color: var(--accent);
-}
-.subagent-bar {
+.pane-status-footer {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  flex-wrap: wrap;
-  gap: 8px 16px;
-  margin: 0 12px 12px;
-  padding: 8px 12px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-inner);
+  flex-shrink: 0;
+  gap: 8px;
+  min-height: 28px;
+  padding: 5px 16px;
+  border-top: 1px solid var(--block-divider);
   color: var(--text-secondary);
-  font-size: var(--fs-caption);
+  font-size: calc(12px * var(--ui-font-scale));
 }
-.subagent-info, .subagent-bar button.text-control {
+.subagent-footer .text-control {
+  margin-inline-start: auto;
   display: inline-flex;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
 }
 .tool-dialog-footer {
   display: flex;
