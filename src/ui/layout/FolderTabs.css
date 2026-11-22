@@ -152,6 +152,9 @@
   padding: 2px 6px;
   font-size: var(--fs-caption);
 }
+.folder-tab:not([data-active='true']):hover {
+  color: var(--text-primary);
+}
 .folder-tab:not([data-active='true']):hover > .folder-tab-content {
   background: var(--hover);
 }

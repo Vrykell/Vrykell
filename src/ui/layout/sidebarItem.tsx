@@ -196,7 +196,6 @@ export default function SidebarItem({
           ...(tree ? { minHeight: 32, padding: `5px 10px 5px ${4 + tree.depth * 14}px`, gap: 4 } : {}),
           ...(dense ? { minHeight: compactSidebarRowContent.minHeight, paddingTop: 0, paddingBottom: 0 } : {}),
           background: variant === 'history' ? undefined : command && focused && !active ? 'var(--hover)' : background,
-          color: active ? 'var(--text-primary)' : 'var(--text-secondary)',
         }}>
         {tree && (
           <span

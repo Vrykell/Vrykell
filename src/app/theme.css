@@ -6509,6 +6509,16 @@ textarea.config-text-input[data-font='ui'] {
 .sidebar-row:hover {
   --sidebar-row-hover: var(--hover);
 }
+/* Rows lift their label and icon together on hover, matching the icon buttons elsewhere. */
+.sidebar-row > .sidebar-row-content {
+  color: var(--text-secondary);
+}
+.sidebar-row[data-active='true'] > .sidebar-row-content {
+  color: var(--text-primary);
+}
+.sidebar-row:not([data-active='true']):is(:hover, :focus-visible) > .sidebar-row-content {
+  color: var(--text-primary);
+}
 .workspace-sidebar:has(.sidebar-row:hover) .sidebar-row:focus-visible:not(:hover):not([data-active='true']) > .sidebar-row-content {
   background: transparent;
 }

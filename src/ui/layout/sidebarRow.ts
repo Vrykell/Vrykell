@@ -10,7 +10,7 @@ export const sidebarRowContent: CSSProperties = {
   padding: '8px 10px',
   minHeight: 40,
   borderRadius: 'var(--radius-inner)',
-  transition: 'background 0.12s ease',
+  transition: 'background 0.12s ease, color 0.12s ease',
 };
 export const sidebarRowIcon: CSSProperties = {
   width: iconSizes.row,

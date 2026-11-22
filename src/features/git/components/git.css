@@ -50,6 +50,10 @@
 .git-group-heading:focus-within {
   background: var(--hover);
 }
+/* The disclosure row lifts with its heading, like the other list rows. */
+.git-group:is(:hover, :focus-visible) {
+  color: var(--text-primary);
+}
 .git-group {
   display: flex;
   align-items: center;

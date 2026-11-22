@@ -502,7 +502,7 @@ button.ssh-host-connect {
 }
 .ssh-dashboard button.ssh-host-filter:enabled:is(:hover, :focus-visible) {
   background: var(--card-hover-bg);
-  color: var(--text-secondary);
+  color: var(--text-primary);
 }
 .ssh-dashboard .ssh-host-new-actions {
   background: var(--primary-button-bg);

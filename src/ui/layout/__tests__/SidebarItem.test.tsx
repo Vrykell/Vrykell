@@ -117,6 +117,15 @@ describe('SidebarItem', () => {
     expect(screen.getByRole('button', { name: '关闭标签' })).toHaveStyle({ opacity: '1' });
   });
 
+  it('leaves the resting colour to the stylesheet so hover can lift the row', () => {
+    renderItem({ testId: 'row' });
+    const row = screen.getByTestId('row');
+    const content = row.querySelector('.sidebar-row-content') as HTMLElement;
+    // An inline colour would win over the shared hover rule.
+    expect(content.style.color).toBe('');
+    expect(row).toHaveAttribute('data-active', 'false');
+  });
+
   it('preserves page navigation semantics supplied by the owner', () => {
     renderItem({ active: true, testId: 'settings-page', dataAttributes: { 'aria-current': 'page' } });
     expect(screen.getByTestId('settings-page')).toHaveAttribute('aria-current', 'page');

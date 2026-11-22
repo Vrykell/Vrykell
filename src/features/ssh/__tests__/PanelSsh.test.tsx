@@ -35,9 +35,11 @@ it('keeps the SSH tile color stable while selection highlights the row', () => {
   expect(icon).toHaveAttribute('data-shell-mark', 'linux');
   expect(icon.parentElement!.style.background).toBe('');
   const content = row.firstElementChild as HTMLElement;
-  expect(content.style.color).toBe('var(--text-secondary)');
+  // The stylesheet owns the resting colour now, so hover can lift it; selection is the row state.
+  expect(content.style.color).toBe('');
+  expect(row).toHaveAttribute('data-active', 'false');
   fireEvent.click(row);
-  expect(content.style.color).toBe('var(--text-primary)');
+  expect(row).toHaveAttribute('data-active', 'true');
   expect(content.style.background).toBe('var(--selection-bg)');
   expect(icon.style.color).toBe('var(--text-primary)');
 });
