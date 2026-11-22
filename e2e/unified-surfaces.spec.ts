@@ -34,7 +34,8 @@ for (const theme of ['dark', 'light'])
     await page.locator('[data-dock-zone="right"] [data-dock-btn="files"]').click();
     const rightSurface = page.locator('.workspace-side-panel[data-side="right"][data-visible="true"] > div').first();
     expect(await rgb(page, rightSurface)).toBe(auxiliary);
-    expect(await rgb(page, page.locator('.workspace-instance-bar'))).toBe(auxiliary);
+    // The tab strip is transparent inside the titlebar row; the row paints the chrome surface.
+    expect(await rgb(page, page.locator('.workspace-instance-bar'))).toBe('rgba(0, 0, 0, 0)');
     const divider = page.locator('.workspace-side-panel[data-side="right"] [data-resize-line]').first();
     expect(await rgb(page, divider)).not.toBe('rgba(0, 0, 0, 0)');
 

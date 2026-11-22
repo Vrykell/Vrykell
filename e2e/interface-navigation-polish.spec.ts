@@ -54,7 +54,6 @@ for (const theme of ['dark', 'light'] as const) {
     await expect(terminal).toHaveAttribute('aria-current', 'page');
     await expect(content).toHaveCSS('background-color', selection);
     expect(selection).toBe(selectedToken);
-    await expect(page.locator('.workspace-title > span')).toHaveText('终端会话');
     // Profile selection lives in the shared picker the start page opens.
     await start.getByTestId('terminal-start-picker').click();
     const picker = page.getByRole('dialog', { name: '新建标签页' });
@@ -88,7 +87,7 @@ for (const theme of ['dark', 'light'] as const) {
     expect(Math.abs(emptyBox.y + emptyBox.height / 2 - strip.y - strip.height / 2)).toBeLessThan(2);
     await page.getByTestId('tab-search-toggle').click();
     await page.getByTestId('workspace-area-ai').click();
-    await expect(page.locator('.workspace-title > span')).toHaveText('智能对话');
+    await expect(page.getByTestId('workspace-area-ai')).toHaveAttribute('aria-current', 'page');
     await expect(page.getByTestId('ai-start-new-conversation')).toBeVisible();
     // The agent list stays one action away, in the shared launcher dialog.
     await page.getByTestId('ai-start-agents').click();

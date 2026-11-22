@@ -191,6 +191,7 @@ export default function GroupedTabList({
         aria-label={label}
         data-reorder-list={listId}
         data-empty={!items.length || undefined}
+        data-tauri-drag-region
         onContextMenu={(event) => {
           event.preventDefault();
           onBlankContext?.({ x: event.clientX, y: event.clientY, trigger: event.currentTarget });
@@ -300,7 +301,7 @@ export default function GroupedTabList({
           );
         })}
         {grouping && (
-          <div data-reorder-zone="ungrouped" data-reorder-kind="loose-tab" className="terminal-ungrouped-tail">
+          <div data-reorder-zone="ungrouped" data-reorder-kind="loose-tab" data-tauri-drag-region className="terminal-ungrouped-tail">
             <ListReorderZonePlaceholder listId={listId} zoneId="ungrouped" />
           </div>
         )}

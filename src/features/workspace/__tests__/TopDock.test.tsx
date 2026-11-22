@@ -83,18 +83,19 @@ describe('desktop titlebar', () => {
     expect(screen.queryByRole('button', { name: '连接面板' })).toBeNull();
     useWorkspaceNavigation.setState({ area: previous });
   });
-  it('steps back and forward through visited workspaces and disables the missing direction', () => {
+  it('shows the trail pair only once the session has somewhere to go', () => {
     useWorkspaceNavigation.setState({ area: 'terminal', areaHistory: ['terminal'], areaHistoryIndex: 0 });
     render(<TopDock />);
-    const back = screen.getByTestId('workspace-history-back');
-    const forward = screen.getByTestId('workspace-history-forward');
-    expect(back).toBeDisabled();
-    expect(forward).toBeDisabled();
+    expect(screen.queryByTestId('workspace-history-back')).toBeNull();
+    expect(screen.queryByTestId('workspace-history-forward')).toBeNull();
     act(() => {
       useWorkspaceNavigation.getState().selectArea('code');
       useWorkspaceNavigation.getState().selectArea('ssh');
     });
+    const back = screen.getByTestId('workspace-history-back');
+    const forward = screen.getByTestId('workspace-history-forward');
     expect(back).toBeEnabled();
+    expect(forward).toBeDisabled();
     act(() => fireEvent.click(back));
     expect(useWorkspaceNavigation.getState().area).toBe('code');
     expect(forward).toBeEnabled();
@@ -105,16 +106,34 @@ describe('desktop titlebar', () => {
       useWorkspaceNavigation.setState({ area: 'terminal', previousArea: 'terminal', areaHistory: ['terminal'], areaHistoryIndex: 0 }),
     );
   });
+  it('hosts the tab strip slot in the row for tabbed areas and hides it elsewhere', () => {
+    useWorkspaceNavigation.setState({ area: 'terminal', collapsed: false });
+    useUiStore.setState({ settingsOpen: false });
+    const { container } = render(<TopDock />);
+    const slot = container.querySelector('header .workspace-instance-bar') as HTMLElement;
+    expect(slot).not.toBeNull();
+    expect(slot.style.display).not.toBe('none');
+    act(() => useWorkspaceNavigation.setState({ area: 'ssh' }));
+    expect(slot.style.display).toBe('none');
+    act(() => useWorkspaceNavigation.setState({ area: 'terminal' }));
+    act(() => useUiStore.setState({ settingsOpen: true }));
+    expect(slot.style.display).toBe('none');
+    act(() => useUiStore.setState({ settingsOpen: false }));
+  });
   it('uses the native-control layout and keeps search clickable', async () => {
+    useWorkspaceNavigation.setState({ collapsed: false });
     const { container } = render(<TopDock />);
     const header = container.querySelector('header');
     expect(header).toHaveAttribute('data-platform', 'macos');
     expect(header).toHaveAttribute('data-fullscreen', 'false');
+    // The area anchor stays out of the row while the sidebar already names the area.
+    expect(screen.queryByText('终端会话')).toBeNull();
+    act(() => useWorkspaceNavigation.setState({ collapsed: true }));
     expect(screen.getByText('终端会话')).toHaveAttribute('data-tauri-drag-region');
     expect(screen.queryByTestId('window-controls')).not.toBeInTheDocument();
     fireEvent.click(screen.getByTestId('global-search-trigger'));
     expect(useUiStore.getState().globalSearchOpen).toBe(true);
-    expect(screen.getByLabelText('Meta+F')).toBeVisible();
+    expect(screen.getByTestId('global-search-trigger').getAttribute('data-tip')).toContain('Meta+F');
     await waitFor(() => expect(native.resize).toBeDefined());
   });
 
@@ -140,7 +159,7 @@ describe('desktop titlebar', () => {
     native.macOS = false;
     const { container } = render(<TopDock />);
     expect(container.querySelector('header')).toHaveAttribute('data-platform', 'other');
-    expect(screen.getByLabelText('Control+F')).toBeVisible();
+    expect(screen.getByTestId('global-search-trigger').getAttribute('data-tip')).toContain('Control+F');
     expect(native.isFullscreen).not.toHaveBeenCalled();
   });
 

@@ -15,6 +15,9 @@ interface WindowState {
   pinned: boolean;
 }
 
+/** The tab strip owns its own context menus, so the window menu only answers the chrome around it. */
+const OWN_CONTEXT_MENU = '.folder-header';
+
 /** Titlebar actions share the same menu surface as workspace actions. */
 export default function WindowMenu({ titlebar }: { titlebar: RefObject<HTMLElement | null> }) {
   const [state, setState] = useState<WindowState | null>(null);
@@ -23,7 +26,8 @@ export default function WindowMenu({ titlebar }: { titlebar: RefObject<HTMLEleme
     const element = titlebar.current;
     if (!element || !usesCustomWindowControls) return;
     const open = (event: MouseEvent) => {
-      if (!(event.target instanceof Element) || event.target.closest('button, input, textarea, a, [role="menu"]')) return;
+      if (!(event.target instanceof Element) || event.target.closest(`button, input, textarea, a, [role="menu"], ${OWN_CONTEXT_MENU}`))
+        return;
       event.preventDefault();
       const version = ++generation.current;
       const anchor = { x: event.clientX, y: event.clientY };

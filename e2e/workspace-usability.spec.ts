@@ -20,23 +20,32 @@ test.beforeEach(async ({ page }) => {
   await expect(page.getByPlaceholder(/输入命令/)).toBeVisible();
 });
 
-test('global search stays centered without covering actions or the title in both page types', async ({ page }) => {
+test('global search keeps its own slot between the tab strip and the window actions', async ({ page }) => {
   for (const width of [600, 720, 900, 1240, 1550]) {
     await page.setViewportSize({ width, height: 800 });
+    // Resizing can re-flow the sidebar and the strip over a couple of frames, so wait for the
+    // finished row before asserting its geometry.
     await expect
       .poll(async () => {
         const search = (await page.getByTestId('global-search-trigger').boundingBox())!;
         const bar = (await page.locator('.workspace-titlebar').boundingBox())!;
-        return Math.abs(search.x + search.width / 2 - bar.x - bar.width / 2);
+        const strip = (await page.getByTestId('workspace-instance-bar').boundingBox())!;
+        const actions = (await page.locator('.workspace-title-actions').boundingBox())!;
+        return [
+          Math.abs(search.y + search.height / 2 - bar.y - bar.height / 2) < 1,
+          search.x >= strip.x + strip.width - 1,
+          search.x + search.width <= actions.x + 1,
+          search.y >= bar.y,
+          search.y + search.height <= bar.y + bar.height,
+        ].every(Boolean);
       })
-      .toBeLessThan(1);
-    const search = await page.getByTestId('global-search-trigger').boundingBox();
-    const actions = await page.locator('.workspace-title-actions').boundingBox();
-    const title = await page.locator('.workspace-title').boundingBox();
-    const bar = (await page.locator('.workspace-titlebar').boundingBox())!;
-    expect(Math.abs(search!.x + search!.width / 2 - (bar.x + bar.width / 2))).toBeLessThan(1);
-    expect(search!.x).toBeGreaterThanOrEqual(title!.x + title!.width);
-    expect(search!.x + search!.width).toBeLessThanOrEqual(actions!.x);
+      .toBe(true);
+    const search = (await page.getByTestId('global-search-trigger').boundingBox())!;
+    const actions = (await page.locator('.workspace-title-actions').boundingBox())!;
+    const strip = (await page.getByTestId('workspace-instance-bar').boundingBox())!;
+    // The tab strip owns the middle of the row; global search follows it and stops before the actions.
+    expect(search.x).toBeGreaterThanOrEqual(strip.x + strip.width - 1);
+    expect(search.x + search.width).toBeLessThanOrEqual(actions.x + 1);
     if (await page.evaluate(() => /Mac/.test(navigator.userAgent))) {
       await expect(page.getByTestId('window-controls')).toHaveCount(0);
     } else {
@@ -44,9 +53,10 @@ test('global search stays centered without covering actions or the title in both
     }
   }
   await page.keyboard.press('Control+,');
-  const search = await page.getByTestId('global-search-trigger').boundingBox();
+  await expect(page.locator('.workspace-title span')).toHaveText('设置');
+  const search = (await page.getByTestId('global-search-trigger').boundingBox())!;
   const bar = (await page.locator('.workspace-titlebar').boundingBox())!;
-  expect(Math.abs(search!.x + search!.width / 2 - (bar.x + bar.width / 2))).toBeLessThan(1);
+  expect(Math.abs(search.y + search.height / 2 - bar.y - bar.height / 2)).toBeLessThan(1);
 });
 
 test('Windows working directories show their drive prefix without the URI slash', async ({ page }) => {

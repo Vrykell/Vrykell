@@ -18,7 +18,7 @@ import WorkspaceSidebar from '@features/workspace/components/WorkspaceSidebar';
 import PanelTabs from '@features/workspace/components/PanelTabs';
 import { WORKSPACE_GAP, workspaceFrameWidth } from '@features/workspace/stores/dock';
 import { useWorkspaceNavigation, workspaceAreaForKind, workspaceSidebarWidth } from '@features/workspace/stores/navigation';
-import { WorkspaceHeaderProvider, WorkspaceHeaderSlot } from '@ui/layout/WorkspaceHeader';
+import { WorkspaceHeaderProvider } from '@ui/layout/WorkspaceHeader';
 import { AiWorkspaceProvider } from '@features/chat/components/AiWorkspaceSurface';
 import PanelSsh from '@features/ssh/components/PanelSsh';
 import PortForwardingPage from '@features/ssh/components/PortForwardingPage';
@@ -166,9 +166,6 @@ export default function WorkspaceShell() {
                   } as CSSProperties
                 }>
                 <div className="workspace-primary" style={{ minWidth: area === 'terminal' ? terminalMinWidth : 0 }}>
-                  <WorkspaceHeaderSlot
-                    visible={!settingsOpen && (area === 'terminal' || area === 'code' || area === 'ai' || area === 'unified')}
-                  />
                   <main
                     className="workspace-main"
                     inert={settingsOpen}

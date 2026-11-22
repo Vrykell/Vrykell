@@ -125,9 +125,14 @@ test('light workspace tabs and toolbars remain distinct from content, panels and
   await expect(page.getByPlaceholder(/输入命令/)).toBeVisible();
   const strip = page.locator('.folder-header:visible').first();
   const activeTab = strip.locator('.folder-tab[data-active="true"]').first();
-  await expect(strip).toHaveCSS('background-color', 'rgb(235, 238, 242)');
+  // The strip is transparent inside the titlebar row, so the row paints the chrome the tabs rest on.
+  await expect(strip).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
+  await expect(page.locator('.workspace-titlebar')).toHaveCSS('background-color', 'rgb(223, 231, 241)');
   await expect(activeTab).toHaveCSS('background-color', 'rgb(255, 255, 255)');
-  await expect(activeTab).not.toHaveCSS('background-color', await strip.evaluate((element) => getComputedStyle(element).backgroundColor));
+  await expect(activeTab).not.toHaveCSS(
+    'background-color',
+    await page.locator('.workspace-titlebar').evaluate((element) => getComputedStyle(element).backgroundColor),
+  );
   for (const width of [1240, 760]) {
     await page.setViewportSize({ width, height: 900 });
     await page.screenshot({ path: info.outputPath(`light-workspace-layers-${width}.png`), animations: 'disabled' });

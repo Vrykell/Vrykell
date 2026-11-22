@@ -9,7 +9,9 @@ async function expectJoinedCorners(page: Page, pane: Locator, path: string) {
   await page.mouse.move(0, 0);
   const bounds = (await active.boundingBox())!;
   const colors = await header.evaluate((element) => ({
-    surface: getComputedStyle(element).backgroundColor,
+    // The strip is transparent inside the titlebar row, so the notch beside a tab shows the
+    // titlebar surface the row paints behind it.
+    surface: getComputedStyle(element.closest('.workspace-titlebar') ?? element).backgroundColor,
     canvas: getComputedStyle(element.querySelector('.folder-tab[data-active="true"]')!).backgroundColor,
   }));
   const screenshot = await page.screenshot({ path, animations: 'disabled' });

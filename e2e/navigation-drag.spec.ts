@@ -92,16 +92,16 @@ test('Escape cancels the preview without toggling or saving a panel', async ({ p
   await expect(panel(page).getByText('notes.txt')).toBeVisible();
 });
 
-test('search stays centered within the whole application and never overlaps actions', async ({ page }) => {
+test('search sits between the tab strip and the actions without overlapping either', async ({ page }) => {
   for (const width of [1550, 1240, 900, 720]) {
     await page.setViewportSize({ width, height: 600 });
     await expect
       .poll(async () => {
         const search = (await page.getByTestId('global-search-trigger').boundingBox())!;
-        const header = (await page.locator('.application-window').boundingBox())!;
-        return Math.abs(search.x + search.width / 2 - header.x - header.width / 2);
+        const strip = (await page.getByTestId('workspace-instance-bar').boundingBox())!;
+        return Math.round(search.x - (strip.x + strip.width));
       })
-      .toBeLessThan(1);
+      .toBeGreaterThanOrEqual(8);
     const search = (await page.getByTestId('global-search-trigger').boundingBox())!;
     const actions = (await page.locator('.workspace-title-actions').boundingBox())!;
     expect(search.x + search.width).toBeLessThanOrEqual(actions.x - 4);

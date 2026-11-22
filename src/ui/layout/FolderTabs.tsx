@@ -83,6 +83,7 @@ export default function FolderTabs({
   return (
     <div
       className={`folder-header ${headerClassName}`}
+      data-tauri-drag-region
       style={{ '--workspace-toolbar-icon-size': `${iconSizes.control}px` } as CSSProperties}>
       {(leading || menuItems) && (
         <div className="folder-more">{leading ?? <EditorActions label={menuLabel} items={menuItems ?? []} />}</div>

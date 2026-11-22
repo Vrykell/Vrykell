@@ -27,7 +27,11 @@ test('sidebar width is bounded, reversible while held, persisted and fully colla
   await expect.poll(async () => (await sidebar.boundingBox())!.width).toBe(280);
   await expect(input).toHaveValue('keep command draft');
   const search = (await page.getByTestId('global-search-trigger').boundingBox())!;
-  expect(Math.abs(search.x + search.width / 2 - 620)).toBeLessThan(1);
+  const actions = (await page.locator('.workspace-title-actions').boundingBox())!;
+  const strip = (await page.getByTestId('workspace-instance-bar').boundingBox())!;
+  // The row follows the resized sidebar, and search keeps its slot before the actions.
+  expect(strip.x).toBeGreaterThanOrEqual(280);
+  expect(search.x + search.width).toBeLessThanOrEqual(actions.x);
   await page.screenshot({ path: info.outputPath('sidebar-expanded-280.png'), animations: 'disabled' });
   await page.reload();
   await expect.poll(async () => (await sidebar.boundingBox())!.width).toBe(280);

@@ -89,3 +89,21 @@ it('opens when the application capture handler has suppressed the native context
     window.removeEventListener('contextmenu', preventNative, true);
   }
 });
+it('leaves the nested tab strip to its own context menus', async () => {
+  const ref = createRef<HTMLElement>();
+  render(
+    <>
+      <header ref={ref}>
+        <span>Title</span>
+        <div className="folder-header">
+          <span>Tab track</span>
+        </div>
+      </header>
+      <WindowMenu titlebar={ref} />
+    </>,
+  );
+  fireEvent.contextMenu(screen.getByText('Tab track'));
+  expect(screen.queryByRole('menu')).toBeNull();
+  fireEvent.contextMenu(screen.getByText('Title'), { clientX: 30, clientY: 20 });
+  expect(await screen.findByRole('menu', { name: '窗口操作' })).toBeVisible();
+});

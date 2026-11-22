@@ -202,9 +202,11 @@ export default function UnifiedWorkspace({ active }: { active: boolean }) {
               {!state.startActive && resources.find((resource) => resource.id === focused?.resourceId)?.kind === 'terminal' && (
                 <SshResourcesAction />
               )}
-              <IconButton compact aria-label={t('All history')} data-tip={t('All history')} onClick={history}>
-                <History size={16} />
-              </IconButton>
+              <span className="folder-action-secondary">
+                <IconButton compact aria-label={t('All history')} data-tip={t('All history')} onClick={history}>
+                  <History size={16} />
+                </IconButton>
+              </span>
               <span ref={setResourceToolbar} className="unified-resource-actions" />
               {!state.startActive && focusedResource && (focusedResource.kind === 'conversation' || focusedResource.kind === 'agent') && (
                 <IconButton
@@ -217,9 +219,11 @@ export default function UnifiedWorkspace({ active }: { active: boolean }) {
                   <PanelRight size={16} />
                 </IconButton>
               )}
-              <IconButton compact aria-label={t('Open file')} data-tip={t('Open file')} onClick={() => void openWorkspaceFile()}>
-                <FolderOpen size={16} />
-              </IconButton>
+              <span className="folder-action-secondary">
+                <IconButton compact aria-label={t('Open file')} data-tip={t('Open file')} onClick={() => void openWorkspaceFile()}>
+                  <FolderOpen size={16} />
+                </IconButton>
+              </span>
               <IconButton
                 ref={newButton}
                 compact

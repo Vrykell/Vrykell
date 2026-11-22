@@ -77,7 +77,6 @@
   /* Titlebar and sidebar heading share one row height. The search field is sized from the same
      row so the two stay in proportion when the height changes. */
   --workspace-titlebar-height: 40px;
-  --workspace-search-height: calc(var(--workspace-titlebar-height) - 12px);
   --control-hover-bg: var(--hover);
   --action-button-bg: color-mix(in srgb, var(--text-primary) 10%, var(--surface));
   --action-button-hover-bg: color-mix(in srgb, var(--text-primary) 16%, var(--surface));
@@ -1487,24 +1486,15 @@ button.state-icon-button[aria-pressed='true']:hover {
 
 /* Use spacing and subtle surfaces to keep the workspace visually continuous. */
 .workspace-titlebar {
-  --workspace-title-gap: 12px;
+  --workspace-title-gap: 8px;
   --workspace-title-inset: 20px;
   --workspace-actions-inset: 0px;
-  /* How far the history pair leans toward the search field, capped by the actual column gap
-     so a tight bar never overlaps the two. */
-  --workspace-history-pull: 6px;
-  display: grid;
-  /* The action cluster keeps its intrinsic width so it can never overflow onto the search
-     field (a narrow window squeezes the title instead, which truncates). */
-  grid-template-columns: minmax(0, var(--workspace-title-space, 1fr)) var(--workspace-search-width, 32px) minmax(
-      var(--workspace-actions-width, 220px),
-      1fr
-    );
+  display: flex;
   align-items: center;
   flex-shrink: 0;
   height: var(--workspace-titlebar-height);
   background: var(--chrome-bg);
-  gap: var(--workspace-search-gap, var(--workspace-title-gap));
+  gap: var(--workspace-title-gap);
   user-select: none;
 }
 .workspace-titlebar[data-platform='macos'] {
@@ -1523,11 +1513,14 @@ button.state-icon-button[aria-pressed='true']:hover {
   height: 100%;
   display: flex;
   align-items: center;
+  gap: 2px;
+  flex-shrink: 0;
+  margin-right: auto;
   padding-left: var(--workspace-title-inset);
 }
 /* The label yields its content width so it truncates instead of pushing the actions out. */
 .workspace-title span {
-  flex: 1 1 auto;
+  flex: 0 1 auto;
   min-width: 0;
   font-size: calc(13px * var(--ui-font-scale));
   font-weight: var(--fw-medium);
@@ -1536,20 +1529,13 @@ button.state-icon-button[aria-pressed='true']:hover {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-/* Back and forward sit at the right edge of the title column: they re-enter the previous
-   workspace without competing with the navigation or window controls. The column yields part
-   of the shared gap so the pair reads as attached to the search field it sits beside. Below
-   the folding threshold they are removed entirely instead of overlapping the search field. */
+/* Back and forward only exist while the session trail has somewhere to go, so an idle bar
+   keeps its left edge for the tab strip instead of a pair of dead arrows. */
 .workspace-title-history {
-  display: none;
+  display: flex;
   align-items: center;
   gap: 2px;
   flex-shrink: 0;
-  margin-left: auto;
-  margin-right: calc(-1 * min(var(--workspace-history-pull), var(--workspace-search-gap, var(--workspace-title-gap))));
-}
-.workspace-titlebar[data-history='true'] .workspace-title-history {
-  display: flex;
 }
 .workspace-title-history > button.icon-button {
   color: var(--text-muted);
@@ -1558,58 +1544,23 @@ button.state-icon-button[aria-pressed='true']:hover {
   background: var(--control-hover-bg);
   color: var(--text-primary);
 }
+.workspace-title-divider {
+  width: 1px;
+  height: 16px;
+  flex-shrink: 0;
+  margin-inline: 2px;
+  background: var(--border);
+}
 .workspace-title-actions {
   display: flex;
   align-items: center;
   justify-content: flex-end;
-  justify-self: end;
   width: max-content;
-  gap: 12px;
+  gap: 8px;
   height: 100%;
   min-width: 0;
-  padding-right: var(--workspace-actions-inset);
-}
-.workspace-search {
-  width: 100%;
-  min-width: 0;
-  height: var(--workspace-search-height);
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 0 10px;
-  background: var(--field-bg);
-  color: var(--text-secondary);
-  border: none;
-  border-radius: var(--radius-inner);
-  cursor: pointer;
-  font: calc(13px * var(--ui-font-scale)) var(--font-ui);
-}
-.workspace-search span {
-  flex: 1;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  text-align: left;
-}
-.workspace-search:is(:hover, :focus-visible) {
-  background: var(--button-hover);
-}
-.workspace-search kbd {
-  color: var(--text-muted);
-  font: calc(10px * var(--ui-font-scale)) var(--font-ui);
-  white-space: nowrap;
-}
-.workspace-search > svg {
   flex-shrink: 0;
-}
-.workspace-titlebar[data-search-compact='true'] .workspace-search {
-  padding: 0;
-  gap: 0;
-  justify-content: center;
-}
-.workspace-titlebar[data-search-compact='true'] .workspace-search > :not(svg) {
-  display: none;
+  padding-right: var(--workspace-actions-inset);
 }
 .workspace-settings,
 .workspace-panel-close {
@@ -1796,7 +1747,6 @@ button.activity-button[aria-pressed='true'] {
   background: var(--control-active-bg) !important;
   color: var(--text-primary) !important;
 }
-.workspace-search:focus-visible,
 .activity-button:focus-visible,
 .workspace-settings:focus-visible,
 .workspace-panel-close:focus-visible {
@@ -2124,9 +2074,6 @@ input.ssh-auth-response::placeholder {
   .workspace-title-actions {
     gap: 8px;
   }
-  .workspace-search kbd {
-    display: none;
-  }
 }
 @media (max-width: 640px) {
   .workspace-titlebar {
@@ -2137,6 +2084,14 @@ input.ssh-auth-response::placeholder {
   }
   .workspace-title-actions .window-control-button {
     width: 40px !important;
+  }
+}
+/* A tight bar keeps the tab strip and the window controls; the area anchor and the trail
+   pair are the first things to yield. */
+@media (max-width: 560px) {
+  .workspace-title span,
+  .workspace-title-history {
+    display: none;
   }
 }
 

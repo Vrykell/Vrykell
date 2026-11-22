@@ -12,7 +12,11 @@ test('uses a full-height sidebar and keeps terminals alive across empty workspac
   const rail = page.getByTestId('workspace-sidebar');
   expect(await rail.boundingBox()).toMatchObject({ x: 0, y: 0, width: 208, height: 800 });
   expect((await page.locator('.workspace-titlebar').boundingBox())!.x).toBe(208);
-  expect((await page.getByTestId('workspace-instance-bar').boundingBox())!.y).toBe(40);
+  // The tab strip sits inside the titlebar row; content begins at the row's bottom edge.
+  const stripBar = (await page.getByTestId('workspace-instance-bar').boundingBox())!;
+  const titlebar = (await page.locator('.workspace-titlebar').boundingBox())!;
+  expect(stripBar.y).toBe(titlebar.y);
+  expect(stripBar.height).toBe(titlebar.height);
   await page.getByTestId('workspace-area-code').click();
   await expect(page.getByTestId('code-start-page')).toBeVisible();
   await page.getByTestId('workspace-area-ssh').click();
@@ -128,8 +132,10 @@ test('routes every auxiliary panel to the right and keeps the workspace full hei
     await expect(visible).toHaveAttribute('data-side', 'right');
     expect((await visible.boundingBox())!.y).toBe(40);
     expect((await visible.boundingBox())!.height).toBe(760);
-    const strip = (await page.getByTestId('workspace-instance-bar').boundingBox())!;
-    expect(strip.x + strip.width).toBeCloseTo((await visible.boundingBox())!.x, 0);
+    const header = (await page.locator('.workspace-titlebar').boundingBox())!;
+    // The row spans the whole window; the docked panel reaches the same right edge from below it.
+    const panelBox = (await visible.boundingBox())!;
+    expect(header.x + header.width).toBeCloseTo(panelBox.x + panelBox.width, 0);
   }
   await page.getByTestId('workspace-settings').click();
   await expect(page.locator('.settings-screen')).toBeVisible();

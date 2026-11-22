@@ -20,6 +20,10 @@ test.beforeEach(async ({ page }) => {
   await setupTauriMock(page);
   await page.goto('/');
   await expect(page.locator('.workspace-titlebar')).toBeVisible();
+  // Give the trail somewhere to go so the history pair is part of the row under test.
+  await page.getByTestId('workspace-area-code').click();
+  await page.getByTestId('workspace-area-terminal').click();
+  await expect(page.getByTestId('workspace-history-back')).toBeVisible();
 });
 
 for (const width of [1240, 720]) {
@@ -32,34 +36,23 @@ for (const width of [1240, 720]) {
     const searchBox = (await search.boundingBox())!;
     const actionsBox = (await actions.boundingBox())!;
     const middle = Math.round(headerBox.y + headerBox.height / 2);
-    const titleSpan = await page.evaluate(() => {
-      const rect = document.querySelector<HTMLElement>('.workspace-title span')!.getBoundingClientRect();
-      return { left: Math.round(rect.x), right: Math.round(rect.x + rect.width) };
-    });
 
-    // Empty space right of the search field and left of the navigation buttons.
+    // The title inset left of the tab strip stays a drag handle.
+    const title = (await page.locator('.workspace-title').boundingBox())!;
+    expect((await elementAt(page, Math.round(title.x + 4), middle))?.isDragRegion).toBe(true);
+
+    // The empty end of the tab strip drags the window while the tabs keep their own gestures.
+    const slot = page.getByTestId('workspace-instance-bar');
+    const strip = (await slot.locator('.folder-tab-list').boundingBox())!;
+    const lastTab = (await slot.locator('.folder-tab').last().boundingBox())!;
+    const blank = Math.round((lastTab.x + lastTab.width + strip.x + strip.width) / 2);
+    expect(blank).toBeGreaterThan(lastTab.x + lastTab.width);
+    expect((await elementAt(page, blank, middle))?.isDragRegion).toBe(true);
+
+    // Empty space between the search control and the navigation buttons.
     const gap = Math.round((searchBox.x + searchBox.width + actionsBox.x) / 2);
     expect(gap).toBeGreaterThan(searchBox.x + searchBox.width);
     expect((await elementAt(page, gap, middle))?.isDragRegion).toBe(true);
-
-    // Title text drags the window instead of being inert text.
-    expect((await elementAt(page, titleSpan.left + 4, middle))?.isDragRegion).toBe(true);
-
-    // Empty space between the title text and the titlebar history actions. The resize above
-    // also collapses the sidebar, so wait until the pair has been laid out again.
-    const history = page.locator('.workspace-title-history');
-    await expect(history).toBeVisible();
-    const historyBox = (await history.boundingBox())!;
-    const beforeHistory = Math.round((titleSpan.right + historyBox.x) / 2);
-    if (beforeHistory - titleSpan.right > 8) {
-      expect((await elementAt(page, beforeHistory, middle))?.isDragRegion).toBe(true);
-    }
-
-    // Empty space between the history actions and the search field.
-    const afterHistory = Math.round((historyBox.x + historyBox.width + searchBox.x) / 2);
-    if (afterHistory - historyBox.x - historyBox.width > 8) {
-      expect((await elementAt(page, afterHistory, middle))?.isDragRegion).toBe(true);
-    }
 
     // Controls keep their own behaviour: a clickable element without the attribute
     // stops the drag, so clicking them never moves the window.

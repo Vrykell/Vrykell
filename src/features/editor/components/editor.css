@@ -63,7 +63,9 @@ button.editor-readonly-label {
 .editor-pane .folder-actions > .folder-action-secondary {
   align-items: center;
 }
-@container (max-width: 880px) {
+/* The shared titlebar row leaves the strip less width than the content area, so the fold
+   threshold is measured against the strip itself rather than the old full-width header. */
+@container (max-width: 460px) {
   .editor-pane .folder-actions .folder-action-secondary {
     display: none;
   }

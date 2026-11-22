@@ -259,7 +259,8 @@ test('reorders connected file tabs and keeps compact actions above the text', as
   await expect(strip.getByRole('tab').first()).toContainText('new file.ts');
   await expect(strip.getByRole('tab').first()).toHaveAttribute('aria-selected', 'true');
   const header = page.getByTestId('workspace-instance-bar').locator('.folder-header');
-  expect((await header.boundingBox())!.height).toBeLessThanOrEqual(34);
+  // The strip fills the single titlebar row instead of adding a second surface below it.
+  expect((await header.boundingBox())!.height).toBe((await page.locator('.workspace-titlebar').boundingBox())!.height);
   const first = strip.locator('.folder-tab').first();
   expect((await first.boundingBox())!.x).toBe((await strip.boundingBox())!.x + 4);
   expect(await first.evaluate((element) => getComputedStyle(element, '::before').content)).toBe('""');

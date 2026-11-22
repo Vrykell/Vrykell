@@ -131,9 +131,9 @@ test('isolates a compact menu slot and keeps create actions at the far right', a
   }
   await page.setViewportSize({ width: 500, height: 800 });
   const search = page.getByTestId('global-search-trigger');
-  await expect(page.locator('.workspace-titlebar')).toHaveAttribute('data-search-compact', 'true');
-  await expect(search.locator('kbd')).toBeHidden();
-  expect(await search.evaluate((element) => element.scrollWidth - element.clientWidth)).toBeLessThanOrEqual(1);
+  // Search is an icon control at every width; the palette and its shortcut hint stay reachable.
+  await expect(search.locator('span')).toHaveCount(0);
+  expect((await search.boundingBox())!.width).toBeLessThanOrEqual(33);
   await search.click();
   await expect(page.getByRole('dialog', { name: '全局搜索', exact: true })).toBeVisible();
   await page.keyboard.press('Escape');

@@ -10,7 +10,7 @@ test.beforeEach(async ({ page }) => {
 });
 
 for (const width of [720, 1240]) {
-  test(`native controls, title, search and actions have room at ${width}px`, async ({ page }) => {
+  test(`native controls, tabs, search and actions have room at ${width}px`, async ({ page }) => {
     await page.setViewportSize({ width, height: 800 });
     const header = page.locator('.workspace-titlebar');
     await expect(header).toHaveAttribute('data-platform', 'macos');
@@ -19,12 +19,11 @@ for (const width of [720, 1240]) {
     const inset = Math.max(16, 92 - sidebarWidth);
     await expect(page.locator('.workspace-title')).toHaveCSS('padding-left', `${inset}px`);
     const search = (await page.getByTestId('global-search-trigger').boundingBox())!;
-    const title = (await page.locator('.workspace-title span').boundingBox())!;
+    const strip = (await page.getByTestId('workspace-instance-bar').boundingBox())!;
     const ai = (await page.locator(width <= 760 ? '[data-testid="auxiliary-more"]' : '[data-dock-btn="chat"]').boundingBox())!;
-    expect(title.x).toBe(sidebarWidth + inset + (sidebarWidth === 0 ? 36 : 0));
-    expect(title.width).toBeGreaterThan(0);
-    expect(title.x + title.width).toBeLessThan(search.x);
-    expect(Math.abs(search.x + search.width / 2 - width / 2)).toBeLessThan(1);
+    // The tab strip owns the middle of the row and ends before the global controls.
+    expect(strip.x).toBeGreaterThanOrEqual(sidebarWidth + inset);
+    expect(strip.x + strip.width).toBeLessThan(search.x);
     expect(search.x + search.width).toBeLessThan(ai.x);
     expect(width - ai.x - ai.width).toBe(16);
     await expect(header).toHaveCSS('height', '40px');
