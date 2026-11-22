@@ -1,3 +1,4 @@
+import { createAgentSession } from './agentDrivers';
 import { useAiWorkspace } from '../stores/aiWorkspace';
 import { useHarnessWorkspace } from '../stores/harnessWorkspace';
 import { useChatStore } from '../stores/chat';
@@ -71,13 +72,9 @@ export function moveMainConversationToSide(id: string) {
 }
 
 export function createSideConversation() {
-  const id = useChatStore.getState().createConversation(null, { activate: false });
-  useAiWorkspace.getState().selectSide(`chat:${id}`);
-  return id;
+  return createAgentSession({ driver: 'builtin' }, 'side').id;
 }
 
 export function createSideAgent(harness: string, cwd?: string) {
-  const id = useHarnessWorkspace.getState().connect(harness, cwd, true);
-  useAiWorkspace.getState().selectSide(`acp:${id}`);
-  return id;
+  return createAgentSession({ driver: 'acp', name: harness }, 'side', cwd).id;
 }

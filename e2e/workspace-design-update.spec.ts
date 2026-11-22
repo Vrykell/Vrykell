@@ -147,7 +147,11 @@ for (const theme of ['dark', 'light'])
     await expect(aiEntry.locator('.sidebar-row-icon svg')).toHaveCSS('color', inheritedColor);
     await expect(aiEntry.locator('.sidebar-row-icon svg')).toHaveCSS('filter', 'none');
     await expect(page.getByTestId('ai-start-new-conversation')).toBeVisible();
+    await expect(page.getByTestId('ai-start-agents')).toBeVisible();
+    await expect(page.getByTestId('agent-launcher-builtin')).toHaveCount(0);
+    await page.screenshot({ path: info.outputPath(`ai-home-${theme}.png`), animations: 'disabled' });
     await page.getByTestId('ai-start-agents').click();
+    await expect(page.getByRole('dialog', { name: '选择智能体' }).getByTestId('agent-launcher-builtin')).toBeVisible();
     await expect(page.getByTestId('acp-launcher-Fake ACP')).toBeVisible();
     await page.screenshot({ path: info.outputPath(`ai-launch-${theme}.png`) });
     await page.setViewportSize({ width: 700, height: 800 });

@@ -20,11 +20,21 @@ export interface TerminalReference {
 }
 
 export interface Conversation {
+  projectDirectory?: string;
   id: string;
   title: string;
   createdAt: number;
   updatedAt: number;
   environment: ChatEnvironment | null;
+}
+
+export function conversationProject(raw: string): string | undefined {
+  try {
+    const project: unknown = JSON.parse(raw)?.projectDirectory;
+    return typeof project === 'string' && project.trim() ? project : undefined;
+  } catch {
+    return undefined;
+  }
 }
 
 export function parseEnvironment(raw: string): ChatEnvironment | null {

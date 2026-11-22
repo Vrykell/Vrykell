@@ -2,6 +2,15 @@ import { beforeEach, describe, expect, it } from 'vitest';
 import { boundedFontSize, boundedTerminalRenderer, terminalFontFamily, uiFontFamily, useTypographyStore } from '../typography';
 
 describe('font preferences', () => {
+  it('gives older profiles the lighter reply weight and persists a custom weight', async () => {
+    localStorage.setItem('vrykell-typography', JSON.stringify({ version: 0, state: { chatFontSize: 16 } }));
+    await useTypographyStore.persist.rehydrate();
+    expect(useTypographyStore.getState()).toMatchObject({ chatFontWeight: 350, chatFontSize: 16 });
+    useTypographyStore.getState().update({ chatFontWeight: 450 });
+    await useTypographyStore.persist.rehydrate();
+    expect(document.documentElement.style.getPropertyValue('--chat-font-weight')).toBe('450');
+    expect(useTypographyStore.getState().terminalFontWeight).toBe(400);
+  });
   it('persists explicit native font choices separately from bundled defaults', async () => {
     useTypographyStore
       .getState()

@@ -23,6 +23,8 @@ Xcode Command Line Tools, Perl and Make are required (`xcode-select --install`).
 
 ## Critical Constraints
 
+For each reference-based feature, trace its entry point, component, and underlying data flow in the supplied source before implementing it. Record the source locations and the behavior being matched.
+
 **Existing design first:** inspect the closest existing UI and reuse its components, spacing, input, menu, hover, and focus patterns. Extend or extract existing code instead of inventing another visual treatment. Review narrow and wide layouts in the running UI.
 
 **Menu hierarchy:** color palettes always sit directly below actions in the shared menu footer. Use meaningful submenus for multiple related choices; keep single settings destinations and switches directly accessible without a generic Settings parent.

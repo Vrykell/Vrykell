@@ -14,6 +14,8 @@ export interface BackendConversationMessage extends BackendChatMessage {
 }
 
 export const listConversations = () => invoke<BackendConversation[]>('list_conversations');
+export const forkConversation = (parent: string, source: string, child: string, title: string, now: number) =>
+  invoke<void>('fork_conversation', { parent, source, child, title, now });
 export const getConversation = (id: string) => invoke<BackendConversation>('get_conversation', { id });
 export const saveConversation = (id: string, title: string, createdAt: number, updatedAt: number, environment: string) =>
   invoke<void>('save_conversation', { id, title, createdAt, updatedAt, environment });

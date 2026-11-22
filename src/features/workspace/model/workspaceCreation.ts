@@ -15,7 +15,7 @@ const labels: Record<WorkspaceCreation, string> = {
   document: 'New file',
   file: 'Open file',
   conversation: 'New conversation',
-  agent: 'ACP agents',
+  agent: 'Agents',
 };
 
 /** Every split entry exposes resource types before opening their existing creation flow. */

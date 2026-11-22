@@ -95,7 +95,10 @@ for (const theme of ['dark', 'light'])
         await page.getByTestId('workspace-area-unified').click();
         await page.getByTestId('workspace-instance-bar').getByRole('button', { name: '全部历史', exact: true }).click();
         await page.getByTestId('unified-history-conversation:tool-baseline-chat').click();
-        await expect(page.locator('.ai-tool-summary-text')).toHaveCount(9);
+        const completed = page.getByRole('button', { name: '已完成 3 次工具调用' });
+        await expect(completed).toHaveAttribute('aria-expanded', 'false');
+        await completed.click();
+        await expect(page.locator('.ai-tool-summary-text')).toHaveCount(10);
         await page.evaluate(async () => {
           const path = '/src/features/chat/stores/chat.ts';
           const { useChatStore } = (await import(path)) as typeof import('../src/features/chat/stores/chat');
@@ -113,7 +116,7 @@ for (const theme of ['dark', 'light'])
         await page.setViewportSize({ width, height: 800 });
         await expect(page.locator('.ai-thinking .ai-tool-summary')).toHaveCount(1);
         await expect(page.locator('.chat-reference .ai-tool-summary')).toHaveCount(1);
-        await expect(page.locator('.ai-tool-summary')).toHaveCount(11);
+        await expect(page.locator('.ai-tool-summary')).toHaveCount(12);
         await expect(page.locator('.chat-exchange > .ai-block-question').first()).toHaveCSS('border-top-left-radius', '8px');
         await expect(page.locator('.ai-tool-card:not(.ai-thinking)').first()).toHaveCSS('border-top-left-radius', '8px');
         await expect(page.locator('.terminal-composer').first()).toHaveCSS('border-top-left-radius', '12px');
@@ -128,7 +131,7 @@ for (const theme of ['dark', 'light'])
           Array.from(document.querySelectorAll('.ai-tool-summary')).map((element) => {
             const row = element.getBoundingClientRect();
             const label = element.querySelector<HTMLElement>('.ai-tool-label');
-            const detail = element.querySelector<HTMLElement>('.ai-tool-description')!;
+            const detail = element.querySelector<HTMLElement>('.ai-tool-description');
             const texts = [label, detail].filter((node): node is HTMLElement => Boolean(node?.textContent?.trim()));
             const boxes = texts.map((node) => node.getBoundingClientRect());
             const textCenter = (Math.min(...boxes.map((box) => box.top)) + Math.max(...boxes.map((box) => box.bottom))) / 2;
@@ -144,7 +147,7 @@ for (const theme of ['dark', 'light'])
               (node) => node.tagName.toLowerCase() === 'svg' || node.classList.contains('ai-tool-state'),
             );
             return {
-              baseline: label && detail.textContent?.trim() ? Math.abs(baseline(label) - baseline(detail)) : 0,
+              baseline: label && detail?.textContent?.trim() ? Math.abs(baseline(label) - baseline(detail)) : 0,
               center: Math.abs(textCenter - (row.top + row.bottom) / 2),
               accessories: accessories.map((node) => {
                 const box = node.getBoundingClientRect();

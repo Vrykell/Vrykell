@@ -5,6 +5,7 @@ use std::{io::Read, path::Path, process::Stdio, time::Duration};
 const MAX_CONTENT: usize = 2 * 1024 * 1024;
 const MAX_STATUS: usize = 8 * 1024 * 1024;
 mod references;
+pub mod checkpoints;
 pub use references::{GitReference, GitReferenceAction};
 
 #[derive(Clone, Deserialize)]

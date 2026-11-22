@@ -7,7 +7,7 @@ import { clearWorkspaceHistorySuppression } from './workspaceHistory';
 import * as sessionManager from './sessionManager';
 import { getSession, listSessions } from '@platform/api/session';
 import { getConversation } from '@platform/api/conversation';
-import { parseEnvironment } from '@features/chat/model/conversation';
+import { conversationProject, parseEnvironment } from '@features/chat/model/conversation';
 import { useChatStore } from '@features/chat/stores/chat';
 import { useAiWorkspace } from '@features/chat/stores/aiWorkspace';
 import { useHarnessWorkspace } from '@features/chat/stores/harnessWorkspace';
@@ -132,6 +132,7 @@ async function restoreMemberResource(member: WorkspaceHistoryMember, activate: b
               createdAt: record.created_at,
               updatedAt: record.updated_at,
               environment: parseEnvironment(record.environment),
+              projectDirectory: conversationProject(record.environment),
             },
           ],
         }));

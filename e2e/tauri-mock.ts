@@ -2295,6 +2295,18 @@ export async function setupTauriMock(page: Page | BrowserContext, opts: TauriMoc
               return undefined;
             case 'list_conversations':
               return mockConversations;
+            case 'fork_conversation': {
+              const original = mockConversations.find((item) => item.id === args.parent);
+              const messages = mockConversationMessages.filter((item) => item.conversation_id === args.parent);
+              const cut = messages.findIndex((message) => message.id === args.source && message.role === 'assistant');
+              if (!original || cut < 0) throw new Error('Unknown branch point');
+              mockConversations.push({ ...original, id: args.child, title: args.title, created_at: args.now, updated_at: args.now });
+              mockConversationMessages.push(
+                ...messages.slice(0, cut + 1).map((message) => ({ ...message, id: crypto.randomUUID(), conversation_id: args.child })),
+              );
+              saveConversations();
+              return undefined;
+            }
             case 'save_conversation': {
               const entry = {
                 id: args.id,

@@ -44,7 +44,7 @@ export default function UnifiedStartPage({
             <OutlineButton aria-label={t('Connect a server')} onClick={(event) => openUnderTrigger(event, onConnect)}>
               {t('Connect')}
             </OutlineButton>
-            <OutlineButton onClick={(event) => openUnderTrigger(event, onAgent)}>{t('ACP agents')}</OutlineButton>
+            <OutlineButton onClick={(event) => openUnderTrigger(event, onAgent)}>{t('Agents')}</OutlineButton>
           </>
         }
       />

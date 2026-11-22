@@ -1,21 +1,8 @@
 import { useState } from 'react';
 import { t, type I18nKey } from '@i18n';
-import {
-  AskQuestion,
-  Brain,
-  Check,
-  ChevronRight,
-  FileText,
-  Folder,
-  Globe,
-  Pencil,
-  RefreshCw,
-  Search,
-  TerminalPrompt,
-  Wrench,
-  X,
-} from '@ui/icons';
+import { AskQuestion, Brain, ChevronRight, FileText, Folder, Globe, Pencil, Search, TerminalPrompt, Wrench } from '@ui/icons';
 import ToolOutput from './ToolOutput';
+import ToolStateBadge from './ToolStateBadge';
 import BlockOutput from '@features/terminal/components/BlockOutput';
 import { useBlockStore } from '@features/terminal';
 import { agentControl } from '@features/agent/services/agentControl';
@@ -190,16 +177,7 @@ export default function ToolRunCard({
             {summaryText}
           </span>
         </span>
-        <span className="ai-tool-state" data-state={run.state}>
-          {run.state === 'done' ? (
-            <Check size={12} />
-          ) : run.state === 'running' ? (
-            <RefreshCw size={12} className="reload-spin" />
-          ) : problem || run.state === 'cancelled' ? (
-            <X size={12} />
-          ) : null}
-          {status}
-        </span>
+        <ToolStateBadge state={run.state} label={status} />
         {expandable && !pending && <ChevronRight size={14} style={{ transform: open ? 'rotate(90deg)' : undefined }} />}
       </button>
       {run.toolName === 'ask_user' && <ToolQuestion run={run} conversationId={conversationId} />}

@@ -60,7 +60,7 @@ test('starts ACP in the side panel and moves the same connection back to the wor
   const sidebar = page.getByTestId('ai-sidebar-content');
   await sidebar.getByRole('button', { name: '会话设置', exact: true }).click();
   await page.getByRole('button', { name: '选择智能体', exact: true }).click();
-  const launcher = page.getByRole('dialog', { name: 'ACP', exact: true });
+  const launcher = page.getByRole('dialog', { name: '选择智能体', exact: true });
   const folder = (await launcher.getByTestId('acp-launcher-directory').boundingBox())!;
   const browse = (await launcher.getByRole('button', { name: '选择项目文件夹', exact: true }).boundingBox())!;
   expect(Math.abs(folder.height - browse.height)).toBeLessThan(1);

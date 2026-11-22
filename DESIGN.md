@@ -40,6 +40,8 @@ components:
 
 # Design System
 
+A child conversation docks its return action in the same full-width bottom row as a running terminal.
+
 ## Overview
 
 Titlebar background actions use the shared context menu: restore, move, resize, minimize, maximize, pin and close. Native window state controls availability; interactive titlebar controls keep their own interactions. Close uses the existing native close request and its unsaved-work protection.

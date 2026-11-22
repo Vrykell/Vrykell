@@ -2,6 +2,20 @@ import { test, expect } from '@playwright/test';
 import { setupTauriMock } from './tauri-mock';
 import { gotoSetting } from './settings';
 
+test('reply weight updates the preview and survives a reload', async ({ page }) => {
+  await setupTauriMock(page);
+  await page.goto('/');
+  await gotoSetting(page, '字体与显示');
+  const weight = page.getByRole('combobox', { name: 'AI 回复正文字重' });
+  await expect(weight).toHaveText('350');
+  await weight.click();
+  await page.getByRole('option', { name: '450', exact: true }).click();
+  await expect(page.getByLabel('AI Chat 字号预览')).toHaveCSS('font-weight', '450');
+  await page.reload();
+  await gotoSetting(page, '字体与显示');
+  await expect(weight).toHaveText('450');
+});
+
 test('interface, terminal and editor fonts load locally and keep mixed text aligned', async ({ page }) => {
   await setupTauriMock(page);
   const fonts: string[] = [];

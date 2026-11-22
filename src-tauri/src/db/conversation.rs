@@ -38,6 +38,10 @@ pub(super) fn init_conversations(conn: &Connection) -> Result<(), String> {
             pane_id TEXT, context TEXT NOT NULL DEFAULT '{}'
         );
         CREATE INDEX IF NOT EXISTS idx_ai_messages_conversation ON ai_messages(conversation_id);
+        CREATE TABLE IF NOT EXISTS ai_conversation_branches (
+            child TEXT PRIMARY KEY REFERENCES ai_conversations(id) ON DELETE CASCADE,
+            parent TEXT NOT NULL, source_message TEXT NOT NULL
+        );
         CREATE TABLE IF NOT EXISTS app_migrations (name TEXT PRIMARY KEY);",
     )
     .map_err(|e| e.to_string())?;
@@ -60,6 +64,31 @@ pub(super) fn init_conversations(conn: &Connection) -> Result<(), String> {
 }
 
 impl HistoryDb {
+    pub fn fork_conversation(&self, parent: &str, source: &str, child: &str, title: &str, now: i64) -> Result<(), String> {
+        let fork = || -> rusqlite::Result<()> {
+            let tx = self.conn().unchecked_transaction()?;
+            let (at, ordinal): (i64, i64) = tx.query_row(
+                "SELECT created_at,rowid FROM ai_messages WHERE conversation_id=?1 AND id=?2 AND role='assistant'",
+                (parent, source), |row| Ok((row.get(0)?, row.get(1)?)),
+            )?;
+            tx.execute(
+                "INSERT INTO ai_conversations (id,title,created_at,updated_at,environment)
+                 SELECT ?1,?2,?3,?3,environment FROM ai_conversations WHERE id=?4",
+                params![child, crate::redact::redact_text(title), now, parent],
+            )?;
+            tx.execute(
+                "INSERT INTO ai_messages (id,conversation_id,role,content,created_at,parts,attachments,pane_id,context)
+                 SELECT lower(hex(randomblob(16))),?1,role,content,created_at,parts,attachments,pane_id,context
+                 FROM ai_messages WHERE conversation_id=?2 AND (created_at,rowid) <= (?3,?4)
+                 ORDER BY created_at,rowid",
+                params![child, parent, at, ordinal],
+            )?;
+            tx.execute("INSERT INTO ai_conversation_branches(child,parent,source_message) VALUES (?1,?2,?3)", (child,parent,source))?;
+            tx.commit()
+        };
+        fork().map_err(|e| e.to_string())
+    }
+
     pub fn get_conversation(&self, id: &str) -> Result<ConversationEntry, String> {
         self.conn().query_row("SELECT id,title,created_at,updated_at,environment FROM ai_conversations WHERE id=?1", [id], |row| {
             Ok(ConversationEntry { id: row.get(0)?, title: row.get(1)?, created_at: row.get(2)?, updated_at: row.get(3)?, environment: row.get(4)? })
@@ -172,6 +201,23 @@ impl HistoryDb {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn fork_copies_only_the_selected_prefix_and_is_independent() {
+        let db = HistoryDb::open_in_memory();
+        db.save_conversation("parent", "A", 1, 2, "{}").unwrap();
+        for (id, role) in [("q","user"),("a","assistant"),("next","user")] {
+            db.append_conversation_message(id,"parent",role,id,2,"[]","[]",None,"{}").unwrap();
+        }
+        assert!(db.fork_conversation("elsewhere","a","invalid","B",3).is_err());
+        assert!(db.get_conversation("invalid").is_err());
+        db.fork_conversation("parent","a","child","B",3).unwrap();
+        assert!(db.fork_conversation("parent","a","child","B",3).is_err());
+        db.delete_conversation("parent").unwrap();
+        let messages = db.list_conversation_messages("child").unwrap();
+        assert_eq!(messages.iter().map(|m| m.content.as_str()).collect::<Vec<_>>(), ["q","a"]);
+        assert_ne!(messages[1].id, "a");
+    }
 
     #[test]
     fn independent_conversations_redact_secrets_at_every_persistence_boundary() {

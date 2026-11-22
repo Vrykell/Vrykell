@@ -30,7 +30,7 @@ afterEach(() => {
 });
 
 it('starts memory review in its own briefly named conversation through the normal send path', () => {
-  const send = vi.spyOn(useChatStore.getState(), 'send').mockResolvedValue(undefined);
+  const send = vi.spyOn(useChatStore.getState(), 'send').mockResolvedValue(true);
   try {
     organizeMemoryWithAssistant();
     const id = useAiWorkspace.getState().selected.slice(5);

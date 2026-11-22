@@ -140,7 +140,15 @@ export const acpOpen = (
   cwd: string,
   resumeSessionId?: string,
   appTools?: Array<{ name: string; description?: string; inputSchema: Record<string, unknown> }>,
-) => invoke<HarnessOpenResult>('acp_open', { name, cwd, resumeSessionId: resumeSessionId ?? null, appTools: appTools ?? null });
+  forkFrom?: string,
+) =>
+  invoke<HarnessOpenResult>('acp_open', {
+    name,
+    cwd,
+    resumeSessionId: resumeSessionId ?? null,
+    appTools: appTools ?? null,
+    ...(forkFrom ? { forkFrom } : {}),
+  });
 
 export const acpAppToolResult = (sessionId: string, requestId: string, payload: unknown) =>
   invoke<void>('acp_app_tool_result', { sessionId, requestId, payload });
