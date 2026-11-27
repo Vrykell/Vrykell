@@ -60,6 +60,11 @@ pub fn run() {
         .manage(terminal::pty::KillState::default())
         .manage(platform::context_menu::ForwardedLaunchDirectories::default())
         .on_window_event(|window, event| {
+            if matches!(event, tauri::WindowEvent::Destroyed)
+                && window.app_handle().webview_windows().keys().any(|label| label != window.label())
+            {
+                terminal::pty::close_window_sessions(window.app_handle(), window.label());
+            }
             if window.label() == "main" {
                 if let tauri::WindowEvent::Focused(focused) = event {
                     let _ = diagnostics::record("window-native-focus", serde_json::json!({ "focused": focused }));
@@ -69,6 +74,14 @@ pub fn run() {
                 for (label, tool) in window.app_handle().webview_windows() {
                     if label.starts_with("tool-") {
                         let _ = tool.destroy();
+                    }
+                }
+            }
+            if window.label().starts_with("app-") && matches!(event, tauri::WindowEvent::Destroyed) {
+                let workspaces = window.app_handle().webview_windows();
+                if !workspaces.keys().any(|label| label != window.label() && label.starts_with("app-")) {
+                    if let Some(main) = workspaces.get("main").filter(|main| main.is_visible().ok() == Some(false)) {
+                        let _ = main.destroy();
                     }
                 }
             }
@@ -137,7 +150,9 @@ pub fn run() {
             platform::context_menu::context_menu_manage,
             platform::context_menu::shell_launch_directory,
             platform::context_menu::shell_take_forwarded_directories,
-            platform::window_chrome::apply_window_frame,
+            platform::window_frame::apply_window_frame,
+            platform::window_frame::drag_workspace_window,
+            platform::window_frame::restore_workspace_dock,
             agent::ai::set_ai_key,
             agent::ai::clear_ai_key,
             agent::ai::set_ai_base_url,
@@ -193,6 +208,7 @@ pub fn run() {
             agent::permissions::tool_policy_set_level,
             agent::permissions::tool_policy_clear_session_grants,
             terminal::pty::pty_spawn,
+            terminal::pty::pty_move_to_window,
             terminal::completion::shell_complete,
             terminal::completion::warm_shell_completion,
             terminal::pty::pty_close_all,

@@ -138,6 +138,10 @@ function GitComparisonContent({
           selected={codeTabs.selected ?? ''}
           grouping={codeTabs.grouping}
           onRename={codeTabs.onRename}
+          onDropOutsideWindow={codeTabs.onDropOutsideWindow}
+          canDropOutsideWindow={codeTabs.canDropOutsideWindow}
+          onDragSingleTab={codeTabs.onDragSingleTab}
+          onTrackWindowDrag={codeTabs.onTrackWindowDrag}
           label={t('Open files and comparisons')}
           listId="code-documents"
           className="git-review-tabs"

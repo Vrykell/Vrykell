@@ -7,6 +7,7 @@ import { t } from '@i18n';
 import { safeJsonParse, safeLocalStorageGet } from '@utils/errorHandler';
 import { parseWorkbench } from '../workbench';
 import { WORKBENCH_STORAGE_KEY } from '../../stores/workbench';
+import { otherWorkspaceSessionPrefixes } from '@platform/appWindows';
 
 const startupWorkbench = parseWorkbench(safeJsonParse<unknown>(safeLocalStorageGet(WORKBENCH_STORAGE_KEY) ?? 'null'));
 const startupSessionIds = startupWorkbench
@@ -155,8 +156,8 @@ export function restoreWorkspace(
     restorableSessionIds: startupSessionIds,
     archiveSession: (id) => archiveSession(id, Date.now()),
     listSessions: async () => {
-      const sessions = await listSessions();
-      return sessions.map(toWorkspaceSession);
+      const [sessions, otherWindows] = await Promise.all([listSessions(), otherWorkspaceSessionPrefixes()]);
+      return sessions.filter((session) => !otherWindows.some((prefix) => session.id.startsWith(prefix))).map(toWorkspaceSession);
     },
     loadGroups: () => useWorkspaceStore.getState().loadGroups(),
     restoreSession: (session) => sessionManager.restore(session.id, session.title),

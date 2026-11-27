@@ -1,5 +1,6 @@
 import { invoke } from '@platform/diagnostics';
 import { listen, type UnlistenFn } from '@tauri-apps/api/event';
+import { getCurrentWindow } from '@tauri-apps/api/window';
 import type { DispatchEvent } from '@core/terminal/events';
 import type { SshOptions } from '@core/ssh';
 
@@ -54,19 +55,43 @@ export function ptyClose(id: string): Promise<void> {
   return invoke('pty_close', { id });
 }
 
-/** Terminate every PTY session of this process (page reload / startup sweep). */
+export function movePtySessions(target: string, moves: { id: string; inputEpoch: number; tabId: string }[]): Promise<void> {
+  return invoke('pty_move_to_window', { target, moves });
+}
+
+export function rememberPtyInputEpoch(id: string, epoch: number): void {
+  observedInputEpochs.set(id, epoch);
+}
+
+/** Terminate the current workspace window's PTY sessions on reload. */
 export function ptyCloseAll(): Promise<number> {
   return invoke('pty_close_all');
 }
 
+function ownerTarget() {
+  try {
+    return { target: getCurrentWindow().label };
+  } catch {
+    return undefined;
+  }
+}
+
 export function onPtyOutput(cb: (id: string, events: DispatchEvent[]) => void): Promise<UnlistenFn> {
-  return listen<{ id: string; events: DispatchEvent[]; inputEpoch?: number }>('pty-output', (e) => {
-    if (typeof e.payload.inputEpoch === 'number') observedInputEpochs.set(e.payload.id, e.payload.inputEpoch);
-    cb(e.payload.id, e.payload.events);
-  });
+  return listen<{ id: string; events: DispatchEvent[]; inputEpoch?: number }>(
+    'pty-output',
+    (e) => {
+      if (typeof e.payload.inputEpoch === 'number') observedInputEpochs.set(e.payload.id, e.payload.inputEpoch);
+      cb(e.payload.id, e.payload.events);
+    },
+    ownerTarget(),
+  );
 }
 
 /** `code` is the child exit code, or null when the reader ended without one. */
 export function onPtyExit(cb: (id: string, code: number | null) => void): Promise<UnlistenFn> {
-  return listen<{ id: string; code: number | null }>('pty-exit', (e) => cb(e.payload.id, e.payload.code ?? null));
+  return listen<{ id: string; code: number | null }>('pty-exit', (e) => cb(e.payload.id, e.payload.code ?? null), ownerTarget());
+}
+
+export function onPtyMoved(cb: (ids: string[]) => void): Promise<UnlistenFn> {
+  return listen<string[]>('pty-moved', (event) => cb(event.payload), ownerTarget());
 }

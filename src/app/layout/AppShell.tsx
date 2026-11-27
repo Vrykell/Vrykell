@@ -7,7 +7,7 @@ import WorkspaceShell from '@app/layout/WorkspaceShell';
 import ApplicationOverlays from '@app/layout/ApplicationOverlays';
 import OverlayScrollbars from '@ui/layout/OverlayScrollbars';
 import { useTheme } from '@app/providers/ThemeProvider';
-import { syncWindowMaterial } from '@platform/windowChrome';
+import { syncWindowMaterial } from '@platform/windowFrame';
 import { requestTerminalSplit } from '@features/workspace/services/unifiedWorkspace';
 
 /** Paint the window surface, workspace, and application overlays. */

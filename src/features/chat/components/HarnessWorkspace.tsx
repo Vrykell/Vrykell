@@ -2,6 +2,7 @@ import { useCallback, useContext, useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { t } from '@i18n';
 import FolderTabs from '@ui/layout/FolderTabs';
+import { dropdownAnchorBelow, type DropdownAnchor } from '@ui/menus/AnchoredDropdown';
 import { IconButton } from '@ui/actions/IconButton';
 import ConfirmDialog from '@ui/feedback/ConfirmDialog';
 import { Plus, DataUsage, PanelRight, History, Sparkles } from '@ui/icons';
@@ -64,7 +65,7 @@ export default function HarnessWorkspace({ active, headerActive = active }: { ac
   const visible = active && !settingsOpen;
   const paneActive = useScopedPaneActive('ai');
   const [directory, setDirectory] = useState<string | undefined>(undefined);
-  const [launcherOpen, setLauncherOpen] = useState<{ x: number; y: number } | null>(null);
+  const [launcherOpen, setLauncherOpen] = useState<DropdownAnchor | null>(null);
   const [closing, setClosing] = useState<(() => void) | null>(null);
   const newConversation = () => {
     useSessionStore.getState().openHarnessTab();
@@ -119,6 +120,10 @@ export default function HarnessWorkspace({ active, headerActive = active }: { ac
       tabActions={strip.tabActions}
       onMove={strip.onMove}
       onClose={strip.onClose}
+      onDragSingleTab={strip.onDragSingleTab}
+      onDropOutsideWindow={strip.onDropOutsideWindow}
+      canDropOutsideWindow={strip.canDropOutsideWindow}
+      onTrackWindowDrag={strip.onTrackWindowDrag}
       onRename={strip.onRename}
       menuLabel={t('Conversation actions')}
       menuItems={[
@@ -175,7 +180,7 @@ export default function HarnessWorkspace({ active, headerActive = active }: { ac
             data-tip={t('Connect a server')}
             onClick={(event) => {
               setDirectory(undefined);
-              setLauncherOpen({ x: event.clientX, y: event.clientY });
+              setLauncherOpen(dropdownAnchorBelow(event.currentTarget));
             }}>
             <Plus size={16} />
           </IconButton>

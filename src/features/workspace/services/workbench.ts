@@ -192,13 +192,13 @@ export function rebindWorkspaceResourceId(previousId: string, nextId: string) {
   });
 }
 
-export function activateContainer(id: string) {
+export function activateContainer(id: string, expandGroup = true) {
   synchronizeWorkbench();
   const tab = useWorkbenchStore.getState().snapshot.tabs.find((tab) => tab.id === id);
   if (!tab) return;
   useWorkbenchStore.getState().update((state) => selectContainer(state, id));
   const group = useWorkbenchStore.getState().snapshot.groups.find((group) => group.id === tab.groupId);
-  if (group?.collapsed) {
+  if (group?.collapsed && expandGroup) {
     const retry = () => {
       void updateWorkspaceGroup(group.id, { collapsed: false }).catch((error) => reportWorkbenchFailure(error, retry));
     };

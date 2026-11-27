@@ -162,6 +162,15 @@ export class SessionController {
     return this._scene;
   }
 
+  get atMovablePrompt(): boolean {
+    return this._scene === 'blockList' && this.activeBlock?.status === 'pending' && !this.pendingUiCommand && !this.pendingShellCommand;
+  }
+
+  resumeAtPrompt(cwd: string | undefined): void {
+    this.lastCwd = cwd;
+    this.onPrecmd();
+  }
+
   get blocks(): readonly TermBlock[] {
     return this._blocks;
   }

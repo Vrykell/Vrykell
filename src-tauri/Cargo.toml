@@ -71,4 +71,4 @@ tokio = { version = "1.54.1", features = ["test-util"] }
 # DPAPI for the local secret store: only the current user can unseal the values.
 windows-sys = { version = "0.60", features = ["Win32_Foundation", "Win32_Security_Cryptography", "Win32_System_Registry"] }
 # 进程树快照/终结（tlhelp32）、ConPTY 的 Ctrl+C/强杀路径，以及文件剪贴板（winuser/shellapi）
-winapi = { version = "0.3", features = ["tlhelp32", "processthreadsapi", "handleapi", "minwinbase", "minwindef", "winnt", "winbase", "winuser", "shellapi"] }
+winapi = { version = "0.3", features = ["tlhelp32", "processthreadsapi", "handleapi", "minwinbase", "minwindef", "winnt", "winbase", "winuser", "shellapi", "wingdi", "libloaderapi"] }

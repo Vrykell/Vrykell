@@ -10,6 +10,12 @@ export interface DropdownAnchor {
   align?: 'start' | 'end';
 }
 
+/** Anchor a toolbar picker below its trigger and keep the upper edge for fallback placement. */
+export function dropdownAnchorBelow(trigger: HTMLElement, align: 'start' | 'end' = 'start'): DropdownAnchor {
+  const box = trigger.getBoundingClientRect();
+  return { x: align === 'end' ? box.right : box.left, y: box.bottom + 4, aboveY: box.top, align };
+}
+
 /** Center a picker that has no trigger, instead of pinning it to the window corner. */
 function defaultAnchor(): DropdownAnchor {
   return { x: Math.max(8, (window.innerWidth - 304) / 2), y: Math.max(8, (window.innerHeight - 420) / 2) };

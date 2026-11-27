@@ -161,7 +161,10 @@ test('Windows leaves corner clipping to the compositor and fills the control edg
   await setupTauriMock(page);
   await page.goto('/');
   const root = page.locator('.application-window');
-  await root.evaluate((element) => element.setAttribute('data-platform', 'windows'));
+  await root.evaluate((element) => {
+    element.setAttribute('data-platform', 'windows');
+    document.documentElement.dataset.nativeFrame = 'active';
+  });
   await expect(root).toHaveCSS('border-top-right-radius', '0px');
   expect(await root.evaluate((element) => getComputedStyle(element, '::after').display)).toBe('none');
   await page.getByTestId('window-close').hover();

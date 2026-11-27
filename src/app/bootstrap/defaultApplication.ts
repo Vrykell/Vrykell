@@ -1,10 +1,12 @@
 import { setDefaultStream, useChatStore } from '@features/chat';
+import { flushSync } from 'react-dom';
+import { registerCloseFlush } from '@core/closeFlush';
 import { refreshAiConfig, refreshToolPolicy } from '@features/agent';
 import { agentStream } from '@features/agent/services/agentStream';
 import { initAutoTitle } from '@features/agent/services/title';
 import { useWorkspaceDirsStore } from '@features/files/services/workspaceDirs';
 import { useHistoryStore } from '@features/terminal/stores/history';
-import { initForwardedLaunch, restoreWorkspace } from '@features/workspace';
+import { initForwardedLaunch, restoreWorkspace, useSessionStore } from '@features/workspace';
 import { createApplicationBootstrap } from '@app/bootstrap/applicationBootstrap';
 import { useToastStore } from '@ui/feedback/Toast';
 import { getShellLaunchDirectory } from '@platform/contextMenu';
@@ -14,6 +16,16 @@ import { restoreWorkbench } from '@features/workspace/services/workbench';
 import { useStartupSettings } from '@features/settings/stores/startup';
 import { reportWorkbenchFailure } from '@features/workspace/stores/workbenchFeedback';
 import { createSharedStartupTask } from './sharedStartupTask';
+import {
+  detachedWorkspaceRoute,
+  discardWarmedWorkspace,
+  dismissEmptyWorkspaceWindow,
+  listenForWorkspaceDragPointer,
+  listenForWorkspaceTabMoves,
+  receiveWorkspaceHandoff,
+} from '@platform/appWindows';
+import { secondaryWorkspaceLabel } from '@platform/workspaceWindowIdentity';
+import { prepareWindowHandoff, updateWorkspaceDragPointer } from '@features/workspace/services/windowHandoff';
 
 /** Page-scope sweep: a strict-mode replay must share one close call, not race a second one. */
 let staleSessionsClosed: Promise<void> | null = null;
@@ -34,7 +46,12 @@ export function startDefaultApplication(): () => void {
     console.warn(`[application] ${message}:`, error);
     useToastStore.getState().addToast(`${message}：${String((error as Error)?.message ?? error)}`, 'error');
   };
-  return createApplicationBootstrap(
+  const stopTabMoves = listenForWorkspaceTabMoves(prepareWindowHandoff).catch(() => undefined);
+  const stopTabPointer = listenForWorkspaceDragPointer(updateWorkspaceDragPointer).catch(() => undefined);
+  const stopStandbyCleanup = registerCloseFlush('detached-workspace-standby', async () => {
+    await discardWarmedWorkspace();
+  });
+  const stop = createApplicationBootstrap(
     {
       configureAgentStream: () => {
         setDefaultStream(agentStream);
@@ -45,6 +62,28 @@ export function startDefaultApplication(): () => void {
       subscribeAutoTitle: initAutoTitle,
       restoreWorkspace: () => {
         restoreTask ??= createSharedStartupTask(async () => {
+          const detached = detachedWorkspaceRoute();
+          if (detached) {
+            await receiveWorkspaceHandoff(detached, (contents) => {
+              const root = document.getElementById('root');
+              if (root) root.inert = true;
+              const transaction = prepareWindowHandoff(contents);
+              return {
+                ...transaction,
+                present: () => flushSync(() => transaction.present?.()),
+                finish: (accepted) => {
+                  transaction.finish(accepted);
+                  if (accepted && root) root.inert = false;
+                },
+              };
+            }).catch(() => dismissEmptyWorkspaceWindow().catch(() => {}));
+            return;
+          }
+          if (secondaryWorkspaceLabel()) {
+            useSessionStore.getState().addTab();
+            await restoreWorkbench('empty', (cause) => reportFailure(t('Could not update workspace'), cause));
+            return;
+          }
           // A page reload keeps the backend and its PTY sessions alive; terminate the
           // previous page's shells before the restored tabs start their own.
           await closeStalePtySessions();
@@ -73,4 +112,10 @@ export function startDefaultApplication(): () => void {
       onError: (taskName, error) => reportFailure(t('Startup task "{{task}}" failed', { task: taskName }), error),
     },
   );
+  return () => {
+    stop();
+    stopStandbyCleanup();
+    void stopTabMoves.then((unlisten) => unlisten?.());
+    void stopTabPointer.then((unlisten) => unlisten?.());
+  };
 }

@@ -1,7 +1,6 @@
-/** Native window borders use the theme's neutral gray divider color. */
 import { invoke } from '@platform/diagnostics';
 import { Effect, getCurrentWindow } from '@tauri-apps/api/window';
-import { isMacOS, supportsNativeMaterial } from './runtime';
+import { isMacOS, isWindows, supportsNativeMaterial } from './runtime';
 import type { ThemeMode } from '@config/theme/tokens';
 
 let materialUpdate = Promise.resolve();
@@ -22,19 +21,21 @@ export function syncWindowMaterial(enabled: boolean, mode: ThemeMode): Promise<v
       await window.clearEffects();
       if (enabled) await window.setEffects({ effects: [isMacOS ? Effect.Sidebar : Effect.Acrylic] });
       if (revision === materialRevision) root.dataset.nativeMaterial = enabled ? 'active' : 'off';
-      syncWindowFrame();
     } catch {
       /* Unsupported compositors keep the CSS navigation treatment. */
     }
+    if (revision === materialRevision) await syncWindowFrame();
   });
   return materialUpdate;
 }
 
-/** Apply the shared gray border to every window; unsupported frames keep their previous color. */
-export function syncWindowFrame(): void {
-  const root = document.documentElement;
-  const variable = '--border-strong';
-  const color = root.style.getPropertyValue(variable).trim() || getComputedStyle(root).getPropertyValue(variable).trim();
-  if (!color) return;
-  void invoke('apply_window_frame', { color }).catch(() => {});
+/** Keep a single perimeter and allow the compositor to track window activation. */
+export async function syncWindowFrame(): Promise<void> {
+  if (!isWindows || document.documentElement.dataset.nativeFrame === 'active') return;
+  try {
+    await invoke('apply_window_frame');
+    document.documentElement.dataset.nativeFrame = 'active';
+  } catch {
+    delete document.documentElement.dataset.nativeFrame;
+  }
 }

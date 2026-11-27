@@ -6,11 +6,35 @@ import InlineRenameInput from '@ui/fields/InlineRenameInput';
 import ConfirmDialog from '@ui/feedback/ConfirmDialog';
 import { HistoryColorChoices } from '@ui/history/HistoryColorPalette';
 import { historyGroupColor, isHistoryGroupColor } from '@ui/history/historyGroupColor';
-import { ListReorderPlaceholder, ListReorderPreview, ListReorderZonePlaceholder, useListReorder, useListReorderDrag } from './listReorder';
+import {
+  ListReorderPlaceholder,
+  ListReorderPreview,
+  ListReorderZonePlaceholder,
+  useListReorder,
+  useListReorderDrag,
+  type ListReorderDrag,
+  type ListReorderEnd,
+} from './listReorder';
 import { useHorizontalWheel } from '../hooks/useHorizontalWheel';
 import { useActiveTabVisibility } from '../hooks/useActiveTabVisibility';
 import type { TabHandle } from './tabHandle';
 import type { TabGroupController, TabGroupHandle } from './tabGroups';
+
+const TEAR_OFF_DISTANCE = 48;
+export type TrackWindowTabDrag = (
+  id: string,
+  event:
+    | { type: 'start' }
+    | {
+        type: 'move';
+        point: { x: number; y: number };
+        grabRatio?: number;
+        grip?: { ratio: number; offsetY: number };
+        tearOffY?: number;
+        detaching: boolean;
+      }
+    | { type: 'end'; reason: ListReorderEnd },
+) => void;
 
 /** One tab/group renderer and reorder mechanic for every functional workspace. */
 export default function GroupedTabList({
@@ -26,6 +50,10 @@ export default function GroupedTabList({
   onSelect,
   onClose,
   onMove,
+  onDropOutsideWindow,
+  onTrackWindowDrag,
+  canDropOutsideWindow,
+  onDragSingleTab,
   onRename,
   render,
 }: {
@@ -40,11 +68,17 @@ export default function GroupedTabList({
   onClose: (id: string) => void;
   onMove: (id: string, over: string, after: boolean) => void;
   onRename: (item: TabHandle) => void;
-  render: (item: TabHandle, preview?: boolean) => ReactNode;
+  onDropOutsideWindow?: (id: string, point: { x: number; y: number }, client: { x: number; y: number }) => void;
+  canDropOutsideWindow?: (id: string) => boolean;
+  onDragSingleTab?: (id: string, grabRatio?: number) => boolean;
+  onTrackWindowDrag?: TrackWindowTabDrag;
+  render: (item: TabHandle, preview?: 'floating') => ReactNode;
   tabActions?: (id: string) => ContextMenuItem[];
   onBlankContext?: (anchor: MenuAnchor) => void;
 }) {
   const strip = useRef<HTMLDivElement>(null);
+  const tearOffAllowed = useRef(false);
+  const grip = useRef<{ ratio: number; offsetY: number } | undefined>(undefined);
   const [menu, setMenu] = useState<{ anchor: MenuAnchor; tab?: TabHandle; group?: TabGroupHandle } | null>(null);
   const [name, setName] = useState('');
   const [hovered, setHovered] = useState<string | null>(null);
@@ -52,6 +86,7 @@ export default function GroupedTabList({
   const [confirmation, setConfirmation] = useState<{ group: TabGroupHandle; mode: 'delete' | 'archive' } | null>(null);
   const groups = grouping?.groups ?? [];
   const drag = useListReorder((state) => (state.drag?.listId === listId ? state.drag : null));
+  const externalDragSourceId = useListReorder((state) => state.externalDragSourceId);
   const dwell = useListReorder((state) => (state.drag?.listId === listId ? state.dwellZoneId : null));
   useHorizontalWheel(strip, true);
   useActiveTabVisibility(
@@ -69,11 +104,64 @@ export default function GroupedTabList({
   ];
   const entityIds = new Set(knownEntities);
   const entities = [...new Set([...(grouping?.order ?? []).filter((id) => entityIds.has(id)), ...knownEntities])];
+  const grabRatio = (drag: ListReorderDrag) => (drag.width && drag.origin ? drag.origin.offsetX / drag.width : undefined);
+  const isDetaching = (moving: ListReorderDrag, { x, y }: { x: number; y: number }) => {
+    if (!tearOffAllowed.current) return false;
+    if (x <= 1 || x >= window.innerWidth - 1 || y <= 1 || y >= window.innerHeight - 1) return true;
+    // A maximized window still allows a tear-off by dragging far enough below the tab strip.
+    return !!moving.origin && !!moving.height && y >= moving.origin.top + moving.height + TEAR_OFF_DISTANCE;
+  };
   const start = useListReorderDrag({
     listId,
+    listRef: strip,
     axis: 'horizontal',
     grouped: groups.length > 0,
     endZoneId: 'ungrouped',
+    onStart: (moving, event) => {
+      const onlyEntry = (moving.kind === 'group' ? entities.length : items.length) === 1;
+      const row = Array.from(strip.current?.querySelectorAll<HTMLElement>('[data-reorder-item]') ?? []).find(
+        (item) => item.dataset.reorderItem === moving.id,
+      );
+      const bounds = row?.getBoundingClientRect();
+      const origin = moving.origin;
+      grip.current =
+        bounds?.width && origin && moving.width
+          ? {
+              ratio: Math.max(0, Math.min(1, origin.offsetX / bounds.width)),
+              offsetY: Math.max(0, origin.top + origin.offsetY - bounds.top),
+            }
+          : undefined;
+      if (moving.kind !== 'group' && moving.id !== selected) onSelect(moving.id);
+      const canTearOff = canDropOutsideWindow?.(moving.id);
+      tearOffAllowed.current = !!onDropOutsideWindow && canTearOff !== false;
+      if (event.pointerType !== 'touch' && (onlyEntry || canTearOff === false) && onDragSingleTab?.(moving.id, grabRatio(moving)))
+        return true;
+      onTrackWindowDrag?.(moving.id, { type: 'start' });
+    },
+    onDragMove: (moving, event) => {
+      const point = { x: event.clientX, y: event.clientY };
+      if (event.pointerType === 'touch') return;
+      const origin = moving.origin;
+      const tearOffY = origin && moving.height && origin.top + moving.height + TEAR_OFF_DISTANCE;
+      onTrackWindowDrag?.(moving.id, {
+        type: 'move',
+        point,
+        grabRatio: grabRatio(moving),
+        grip: grip.current,
+        tearOffY,
+        detaching: isDetaching(moving, point),
+      });
+    },
+    onDragEnd: (id, reason) => onTrackWindowDrag?.(id, { type: 'end', reason }),
+    onDropOutside: (moving, event) => {
+      if (
+        !document.documentElement.hasAttribute('data-workspace-drag-outside') &&
+        !isDetaching(moving, { x: event.clientX, y: event.clientY })
+      )
+        return false;
+      onDropOutsideWindow?.(moving.id, { x: event.screenX, y: event.screenY }, { x: event.clientX, y: event.clientY });
+      return true;
+    },
     accepts: () => true,
     onDrop: (moving, target) => {
       if (moving.kind === 'group') {
@@ -115,14 +203,25 @@ export default function GroupedTabList({
         {...item.dataAttributes}
         className={`folder-tab${listId === 'session-tabs' ? ' terminal-instance-tab' : ''}`}
         data-active={selected === item.id}
+        data-workspace-drag-source={externalDragSourceId === item.id ? '' : undefined}
         data-reorder-item={item.id}
         data-reorder-kind={groupFor(item.id) ? 'tab' : 'loose-tab'}
         data-reorder-dragging={drag?.id === item.id ? 'true' : undefined}
         data-tab-surface={item.surface}
         onPointerDown={(event) => {
           if (event.button !== 0 || event.isPrimary === false || (event.target as Element).closest('input, [data-no-drag]')) return;
+          event.currentTarget.querySelector('[role="tab"]:focus')?.setAttribute('data-pointer-focus', '');
+          event.preventDefault();
           start(event, { id: item.id, kind: groupFor(item.id) ? 'tab' : 'loose-tab' });
-          if (listId === 'session-tabs') event.preventDefault();
+        }}
+        onClick={(event) => {
+          if ((event.target as Element).closest('input, [data-no-drag]')) return;
+          if ((event.target as Element).closest('[role="tab"]')) return;
+          if (listId !== 'session-tabs' && event.detail > 0) {
+            const tab = event.currentTarget.querySelector<HTMLButtonElement>('[role="tab"]');
+            tab?.setAttribute('data-pointer-focus', '');
+            tab?.focus({ preventScroll: true });
+          }
           if (selected !== item.id) onSelect(item.id);
         }}
         onContextMenu={(event) => {
@@ -197,7 +296,7 @@ export default function GroupedTabList({
         }}
         onKeyDown={(event) => {
           if ((event.target as Element).closest('input') || !['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
-          const buttons = Array.from(event.currentTarget.querySelectorAll<HTMLButtonElement>('[role="tab"]'));
+          const buttons = Array.from(event.currentTarget.querySelectorAll<HTMLButtonElement>('[data-reorder-item] [role="tab"]'));
           const index = buttons.indexOf(document.activeElement as HTMLButtonElement);
           if (index < 0) return;
           event.preventDefault();
@@ -229,6 +328,7 @@ export default function GroupedTabList({
                 data-group-collapsed={collapsed ? 'true' : undefined}
                 data-group-dragging={drag?.id === group.id ? 'true' : undefined}
                 data-drop-into={dwell === group.id ? 'true' : undefined}
+                data-workspace-drag-source={externalDragSourceId === group.id ? '' : undefined}
                 onMouseEnter={() => setHovered(group.id)}
                 onMouseLeave={() => setHovered(null)}
                 style={
@@ -299,24 +399,31 @@ export default function GroupedTabList({
             </Fragment>
           );
         })}
-        {grouping && (
-          <div data-reorder-zone="ungrouped" data-reorder-kind="loose-tab" className="terminal-ungrouped-tail">
-            <ListReorderZonePlaceholder listId={listId} zoneId="ungrouped" />
-          </div>
-        )}
+        <div data-reorder-zone="ungrouped" data-reorder-kind="loose-tab" className="terminal-ungrouped-tail">
+          <ListReorderZonePlaceholder listId={listId} zoneId="ungrouped" />
+        </div>
       </div>
       {!items.length && empty && (
         <div className="folder-tab-empty" role="status">
           {empty}
         </div>
       )}
-      <ListReorderPreview listId={listId} variant="item" owner={strip} className="terminal-group-reorder-preview">
+      <ListReorderPreview
+        listId={listId}
+        variant="item"
+        owner={strip}
+        className="terminal-group-reorder-preview"
+        followsPointer={isDetaching}>
         {(moving) => {
           const item = items.find((item) => item.id === moving.id);
           if (item)
             return (
-              <div className="folder-tab folder-tab-preview" data-active={selected === item.id} data-tab-surface={item.surface}>
-                {render(item, true)}
+              <div
+                className="folder-tab folder-tab-preview"
+                data-active={selected === item.id}
+                data-tab-surface={item.surface}
+                style={{ '--folder-tab-preview-bg': item.id === selected ? undefined : moving.previewBackground } as CSSProperties}>
+                {render(item, 'floating')}
               </div>
             );
           const group = groupsById.get(moving.id);

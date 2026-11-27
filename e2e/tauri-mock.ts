@@ -39,6 +39,9 @@ export interface TauriMockOptions {
   skills?: Record<string, unknown>[];
   /** Seed the SSH workspace mode; management remains the default for existing workflows. */
   sshWorkspaceView?: 'dashboard' | 'manage';
+  /** Leave layout storage empty to exercise first launch. */
+  freshWorkspace?: boolean;
+  workspaceWindows?: boolean;
 }
 
 /**
@@ -120,7 +123,29 @@ export async function setupTauriMock(page: Page | BrowserContext, opts: TauriMoc
       mainPermissions,
       sshWorkspaceView,
       shells,
+      freshWorkspace,
+      workspaceWindows,
     }) => {
+      if (!freshWorkspace && localStorage.getItem('dock-layout-v6') === null) {
+        localStorage.setItem(
+          'dock-layout-v6',
+          JSON.stringify({
+            layoutVersion: 6,
+            widthPreset: 'compact',
+            leftZone: [],
+            leftPanels: [],
+            rightZone: ['files', 'git', 'command-history', 'chat'],
+            rightPanels: [],
+            panelWidths: {},
+          }),
+        );
+      }
+      if (!freshWorkspace && localStorage.getItem('workspace-navigation-v1') === null) {
+        localStorage.setItem(
+          'workspace-navigation-v1',
+          JSON.stringify({ sidebarWidth: 208, workspaceOrder: ['terminal', 'code', 'ai', 'ssh', 'unified'] }),
+        );
+      }
       const menu = {
         supported: true,
         available: true,
@@ -138,20 +163,56 @@ export async function setupTauriMock(page: Page | BrowserContext, opts: TauriMoc
       let cbCounter = 0;
       const eventListeners = new Map<string, number>();
       const toolListeners = new Map<string, number>();
-      let windowToken =
-        new URLSearchParams(location.search).get('toolWindow') ?? (window.name.startsWith('tool-') ? window.name.slice(5) : null);
-      let windowLabel = windowToken ? `tool-${windowToken}` : 'main';
+      const windowRoute = new URLSearchParams(location.search);
+      const windowToken = windowRoute.get('toolWindow') ?? (window.name.startsWith('tool-') ? window.name.slice(5) : null);
+      const detached = window.name.startsWith('app-');
+      const windowLabel = detached ? window.name : windowToken ? `tool-${windowToken}` : 'main';
+      if (workspaceWindows) Object.defineProperty(window, 'isTauri', { value: true });
       const toolChannel = new BroadcastChannel('mock-tool-windows');
       const toolPopups = new Map<string, Window>();
+      const hiddenWorkspaces = new Map<string, { url: string; label: string; width: number; height: number }>();
+      const windowSurface = (label: string) => localStorage.getItem(`e2e-window-surface:${label}`) ?? 'visible';
+      const setWindowSurface = (label: string, state: 'visible' | 'hidden' | 'cloaked' | 'closed') =>
+        localStorage.setItem(`e2e-window-surface:${label}`, state);
+      const openPopup = ({ url, label, width, height }: { url: string; label: string; width: number; height: number }) => {
+        const popup = window.open(url, label, `popup,width=${width},height=${height}`);
+        if (!popup) throw new Error('Popup blocked');
+        toolPopups.set(label, popup);
+      };
       const windowOps: { command: string; label?: string; value?: unknown }[] = [];
       (window as unknown as { __WINDOW_OPS__: typeof windowOps }).__WINDOW_OPS__ = windowOps;
+      type WorkspaceReply = 'peer-ready' | 'peer-verified' | 'detached-ready';
+      const heldReplies = new Map<WorkspaceReply, ((reject: boolean) => void)[]>();
+      (window as unknown as { __WORKSPACE_REPLIES__: unknown }).__WORKSPACE_REPLIES__ = {
+        hold: (reply: WorkspaceReply) => heldReplies.set(reply, []),
+        count: (reply: WorkspaceReply) => heldReplies.get(reply)?.length ?? 0,
+        release: (reply: WorkspaceReply, reject = false) => {
+          const pending = heldReplies.get(reply);
+          heldReplies.delete(reply);
+          for (const deliver of pending ?? []) deliver(reject);
+        },
+      };
       const receiveTool = (data: { event: string; label: string; payload: unknown }) => {
         windowOps.push({
           command: `received:${data.event}`,
           label: data.label,
           value: data.event === 'tauri://destroyed' ? data.payload : undefined,
         });
-        if (data.label === windowLabel) emit(data.event, data.payload);
+        if (data.label === windowLabel) {
+          const reply =
+            !workspaceWindows || !data.event.startsWith('workspace-handoff:')
+              ? undefined
+              : data.payload === true
+                ? 'peer-ready'
+                : data.payload === 'verified'
+                  ? 'peer-verified'
+                  : data.payload === 'ready' || (data.payload && typeof data.payload === 'object' && 'tabBounds' in data.payload)
+                    ? 'detached-ready'
+                    : undefined;
+          const pending = reply && heldReplies.get(reply);
+          if (pending) pending.push((reject = false) => emit(data.event, reject ? false : data.payload));
+          else emit(data.event, data.payload);
+        }
         const callback = toolListeners.get(`${data.event}:${data.label}`);
         if (callback !== undefined)
           (window as unknown as Record<string, (event: unknown) => void>)[`_${callback}`]?.({
@@ -164,7 +225,7 @@ export async function setupTauriMock(page: Page | BrowserContext, opts: TauriMoc
       (window as unknown as { __RECEIVE_TOOL__: typeof receiveTool }).__RECEIVE_TOOL__ = receiveTool;
       const sendTool = (data: { event: string; label: string; payload: unknown }) => {
         const target = data.label === 'main' ? (window.opener as Window | null) : toolPopups.get(data.label);
-        const receive = target && (target as unknown as { __RECEIVE_TOOL__?: typeof receiveTool }).__RECEIVE_TOOL__;
+        const receive = target && !target.closed && (target as unknown as { __RECEIVE_TOOL__?: typeof receiveTool }).__RECEIVE_TOOL__;
         if (receive) receive(data);
         else toolChannel.postMessage(data);
       };
@@ -772,15 +833,6 @@ export async function setupTauriMock(page: Page | BrowserContext, opts: TauriMoc
             mockConversations.push(...JSON.parse(localStorage.getItem('e2e-conversations') || '[]'));
             mockConversationMessages.push(...JSON.parse(localStorage.getItem('e2e-conversation-messages') || '[]'));
           }
-          windowToken = new URLSearchParams(location.search).get('toolWindow');
-          windowLabel = windowToken ? `tool-${windowToken}` : 'main';
-          const metadata = (
-            window as unknown as {
-              __TAURI_INTERNALS__: { metadata: { currentWindow: { label: string }; currentWebview: { label: string } } };
-            }
-          ).__TAURI_INTERNALS__.metadata;
-          metadata.currentWindow.label = windowLabel;
-          metadata.currentWebview.label = windowLabel;
           switch (cmd) {
             case 'editor_read_file': {
               const target = args.target as { path: string; connectionId?: string; encoding?: string };
@@ -1074,11 +1126,62 @@ export async function setupTauriMock(page: Page | BrowserContext, opts: TauriMoc
               return undefined;
             case 'pty_input_epoch':
               return inputEpoch;
+            case 'pty_move_to_window':
+              windowOps.push({ command: cmd, label: args.target as string, value: args.moves });
+              if (!(args.moves as { inputEpoch: number }[]).every((move) => move.inputEpoch === inputEpoch)) {
+                throw new Error('The terminal changed during the move');
+              }
+              sendTool({
+                event: 'pty-moved',
+                label: args.target as string,
+                payload: (args.moves as { id: string }[]).map((move) => move.id),
+              });
+              return undefined;
             case 'pty_close':
               closes.push({ id: args.id });
               return undefined;
             case 'pty_close_all':
               return 0;
+            case 'drag_workspace_window': {
+              const state = window as unknown as {
+                __WINDOW_DRAG_RELEASE__?: [number, number];
+                __HOLD_WINDOW_DRAG__?: boolean;
+                __WORKSPACE_DRAG__?: {
+                  sample: (point: { x: number; y: number }) => void;
+                  release: (point: { x: number; y: number }) => void;
+                };
+              };
+              if (!args.moveWindow && !state.__HOLD_WINDOW_DRAG__) return null;
+              windowOps.push({ command: cmd, label: windowLabel, value: args.moveWindow });
+              if (!state.__HOLD_WINDOW_DRAG__) return state.__WINDOW_DRAG_RELEASE__ ?? null;
+              return new Promise((resolve) => {
+                let index = 0;
+                const update = (window as unknown as Record<string, (event: unknown) => void>)[`_${args.updates.id}`];
+                type Sample = { x: number; y: number; over?: string; client?: { x: number; y: number }; dock?: number };
+                const cloakSource = (point: Sample | null) => {
+                  if (!args.moveWindow || !args.dockable) return false;
+                  const cloak = !!(point?.over && point.over !== windowLabel && point.client);
+                  setWindowSurface(windowLabel, cloak ? 'cloaked' : 'visible');
+                  return cloak;
+                };
+                state.__WORKSPACE_DRAG__ = {
+                  sample: (point) => {
+                    cloakSource(point);
+                    update?.({ message: point, index: index++ });
+                  },
+                  release: (point) => {
+                    const cloaked = cloakSource(point);
+                    update?.({ end: true, index });
+                    delete state.__WORKSPACE_DRAG__;
+                    resolve(cloaked && point ? { ...point, dock: (point as Sample).dock ?? 17 } : point);
+                  },
+                };
+              });
+            }
+            case 'restore_workspace_dock':
+              windowOps.push({ command: cmd, label: windowLabel, value: args.dock });
+              if (windowSurface(windowLabel) === 'cloaked') setWindowSurface(windowLabel, 'visible');
+              return undefined;
             case 'plugin:clipboard-manager|write_text':
               clipboardText = args.text as string;
               (window as unknown as Record<string, string>).__CLIPBOARD_TEXT__ = clipboardText;
@@ -1526,7 +1629,7 @@ export async function setupTauriMock(page: Page | BrowserContext, opts: TauriMoc
             }
             // ── Theme ──
             case 'apply_window_frame':
-              windowFrameCalls.push({ label: windowLabel, color: String(args.color) });
+              windowFrameCalls.push({ label: windowLabel, color: 'system' });
               return undefined;
             case 'get_theme_config':
               // Real IPC serializes results; hand out copies so the store never aliases the mock.
@@ -2543,11 +2646,20 @@ export async function setupTauriMock(page: Page | BrowserContext, opts: TauriMoc
               return undefined;
             }
             case 'plugin:webview|create_webview_window': {
-              const options = args.options as { url: string; label: string; width: number; height: number };
+              const options = args.options as { url: string; label: string; width: number; height: number; visible?: boolean };
               windowOps.push({ command: cmd, label: options.label, value: options });
-              const popup = window.open(options.url, options.label, `popup,width=${options.width},height=${options.height}`);
-              if (!popup) throw new Error('Popup blocked');
-              toolPopups.set(options.label, popup);
+              if (
+                options.label.startsWith('app-') &&
+                (window as unknown as { __FAIL_WORKSPACE_WINDOW__?: boolean }).__FAIL_WORKSPACE_WINDOW__
+              )
+                throw new Error('Window unavailable');
+              if (workspaceWindows && options.label.startsWith('app-') && options.visible === false) {
+                setWindowSurface(options.label, 'hidden');
+                hiddenWorkspaces.set(options.label, options);
+              } else {
+                setWindowSurface(options.label, 'visible');
+                openPopup(options);
+              }
               return undefined;
             }
             case 'plugin:window|close':
@@ -2557,12 +2669,15 @@ export async function setupTauriMock(page: Page | BrowserContext, opts: TauriMoc
               return undefined;
             case 'plugin:window|destroy':
               if (!windowToken && !mainPermissions.includes('core:window:allow-destroy')) throw new Error('Window destroy is not allowed');
+              setWindowSurface(args.label as string, 'closed');
               windowOps.push({
                 command: cmd,
                 label: args.label as string,
                 value: (window as unknown as { __LLM_ABORTED__?: Set<string> }).__LLM_ABORTED__?.size ?? 0,
               });
-              if (windowToken) {
+              if (hiddenWorkspaces.delete(args.label as string)) return undefined;
+              if (toolPopups.has(args.label as string)) toolPopups.get(args.label as string)?.close();
+              else if (windowToken || detached) {
                 sendTool({
                   label: windowLabel,
                   event: 'tauri://destroyed',
@@ -2577,6 +2692,38 @@ export async function setupTauriMock(page: Page | BrowserContext, opts: TauriMoc
               return undefined;
             case 'plugin:window|is_focused':
               return nativeFocused;
+            case 'plugin:window|get_all_windows':
+              return [
+                windowLabel,
+                ...(detached ? ['main'] : []),
+                ...[...toolPopups].filter(([, popup]) => !popup.closed).map(([label]) => label),
+                ...hiddenWorkspaces.keys(),
+              ];
+            case 'plugin:window|is_visible':
+              return !toolPopups.get(args.label as string)?.closed && ['visible', 'cloaked'].includes(windowSurface(args.label as string));
+            case 'plugin:window|inner_position':
+              return { x: 100, y: 100 };
+            case 'plugin:window|outer_position':
+              return { x: 100, y: 100 };
+            case 'plugin:window|inner_size':
+              return { width: innerWidth, height: innerHeight };
+            case 'plugin:window|outer_size':
+              return { width: innerWidth, height: innerHeight };
+            case 'plugin:window|scale_factor':
+              return 1;
+            case 'plugin:window|monitor_from_point':
+              return {
+                name: 'Test display',
+                size: { width: 1600, height: 1000 },
+                position: { x: 0, y: 0 },
+                workArea: { position: { x: 0, y: 0 }, size: { width: 1600, height: 960 } },
+                scaleFactor: 1,
+              };
+            case 'plugin:window|set_position':
+              windowOps.push({ command: cmd, label: args.label as string, value: JSON.parse(JSON.stringify(args.value)) });
+              return undefined;
+            case 'plugin:window|set_size':
+              return undefined;
             case 'plugin:window|is_minimized':
               return nativeMinimized;
             case 'plugin:window|unminimize':
@@ -2590,7 +2737,28 @@ export async function setupTauriMock(page: Page | BrowserContext, opts: TauriMoc
               toolPopups.get(args.label as string)?.dispatchEvent(new Event('focus'));
               windowOps.push({ command: cmd, label: args.label as string });
               return undefined;
-            case 'plugin:window|show':
+            case 'plugin:window|set_ignore_cursor_events': {
+              const pending = args.value === true && hiddenWorkspaces.get(args.label as string);
+              if (pending) {
+                openPopup(pending);
+                hiddenWorkspaces.delete(pending.label);
+              }
+              return undefined;
+            }
+            case 'plugin:window|show': {
+              const pending = hiddenWorkspaces.get(args.label as string);
+              if (pending) {
+                openPopup(pending);
+                hiddenWorkspaces.delete(pending.label);
+              }
+              setWindowSurface(args.label as string, 'visible');
+              windowOps.push({ command: cmd, label: args.label as string });
+              return undefined;
+            }
+            case 'plugin:window|hide':
+              setWindowSurface(args.label as string, 'hidden');
+              windowOps.push({ command: cmd, label: args.label as string });
+              return undefined;
             case 'plugin:window|start_dragging':
             case 'plugin:window|start_resize_dragging':
               windowOps.push({ command: cmd, label: args.label as string, value: args.alwaysOnTop });
@@ -2648,6 +2816,8 @@ export async function setupTauriMock(page: Page | BrowserContext, opts: TauriMoc
       mainPermissions: mainCapability.permissions.filter((permission): permission is string => typeof permission === 'string'),
       sshWorkspaceView: opts.sshWorkspaceView ?? 'manage',
       shells: opts.shells,
+      freshWorkspace: opts.freshWorkspace ?? false,
+      workspaceWindows: opts.workspaceWindows ?? false,
     },
   );
 }

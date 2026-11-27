@@ -152,6 +152,10 @@ export default function PanelTabs({ active = true }: { active?: boolean }) {
         onClose={close}
         onMove={strip.onMove}
         onRename={strip.onRename}
+        onDropOutsideWindow={strip.onDropOutsideWindow}
+        canDropOutsideWindow={strip.canDropOutsideWindow}
+        onDragSingleTab={filtered.length === handles.length ? strip.onDragSingleTab : undefined}
+        onTrackWindowDrag={strip.onTrackWindowDrag}
         empty={query.trim() && <div className="search-empty-state">{t('No matching terminal sessions')}</div>}
         menuLabel={t('More terminal actions')}
         menuItems={[
