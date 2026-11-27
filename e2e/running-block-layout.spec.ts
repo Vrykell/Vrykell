@@ -116,58 +116,34 @@ for (const density of [1, 1.25])
       await expect(async () => expect((await ptyResizes(page)).at(-1)?.cols).toBe((await grid(page)).cols)).toPass();
     });
 
-    test('running controls pin at the viewport top even with collapsed titles and remain usable', async ({ page }, info) => {
+    test('running controls stay in the command block when its header scrolls away', async ({ page }, info) => {
       await openRunning(page);
       await emitPtyOutput(page, 'log entry\r\n'.repeat(160));
-      await page.evaluate(async () => {
-        const path = '/src/config/typography.ts';
-        const { useTypographyStore } = (await import(path)) as typeof import('../src/config/typography');
-        useTypographyStore.getState().update({ commandTitleCollapsed: true });
-      });
       const scroll = page.locator('[data-testid^="terminal-scroll-"]').first();
-      const pinned = page.getByTestId('pinned-command');
+      const row = scroll.locator('[data-running="true"] .command-block-info');
       for (const width of [1240, 760]) {
         await page.setViewportSize({ width, height: 700 });
-        await expect(async () => {
-          const size = await grid(page);
-          expect((await ptyResizes(page)).at(-1)).toMatchObject({ cols: size.cols, rows: size.rows });
-          expect(size.width).toBeLessThanOrEqual(size.available + 1);
-        }).toPass();
+        await expect(row).toHaveCount(1);
         await scroll.evaluate((element) => {
           element.scrollTop = 0;
         });
-        await expect(pinned).toHaveCount(0);
+        await expect(row).toBeInViewport();
         await scroll.evaluate((element) => {
-          const row = element.querySelector<HTMLElement>('[data-running="true"] .command-block-info')!;
-          element.scrollTop += row.getBoundingClientRect().bottom - element.getBoundingClientRect().top + 1;
+          const header = element.querySelector<HTMLElement>('[data-running="true"] .command-block-info')!;
+          element.scrollTop += header.getBoundingClientRect().bottom - element.getBoundingClientRect().top + 20;
         });
-        await expect(pinned).toHaveAttribute('data-running', 'true');
-        await expect(pinned).toHaveAttribute('data-collapsed', 'true');
-        await expect(pinned.locator('.command-block-label')).toHaveCount(0);
-        await page.mouse.move(0, 0);
-        await expect(pinned.locator('.command-block-actions')).toHaveCSS('opacity', '1');
-        const viewport = (await scroll.boundingBox())!;
-        const frame = (await pinned.boundingBox())!;
-        expect(Math.abs(frame.y - viewport.y)).toBeLessThan(1);
-        for (const label of ['重绘终端', '终止命令', '结束前台应用', '进入全屏交互']) {
-          const button = pinned.getByRole('button', { name: label, exact: true });
-          await expect(button).toBeVisible();
-          const box = (await button.boundingBox())!;
-          expect(box.x).toBeGreaterThanOrEqual(viewport.x);
-          expect(box.x + box.width).toBeLessThanOrEqual(viewport.x + viewport.width + 1);
-        }
-        await page.screenshot({ path: info.outputPath(`pinned-running-${width}.png`) });
+        await expect(row).not.toBeInViewport();
+        await expect(page.getByTestId('pinned-command')).toHaveCount(0);
+        await page.screenshot({ path: info.outputPath(`unobstructed-running-${width}.png`) });
       }
-      const before = (await ptyWrites(page)).length;
-      await pinned.getByRole('button', { name: '终止命令', exact: true }).click();
-      await expect.poll(async () => (await ptyWrites(page)).slice(before)).toEqual(['\x03']);
-      await pinned.getByRole('button', { name: '进入全屏交互', exact: true }).click();
-      await expect(page.getByTestId('tui-fullscreen')).toBeVisible();
-      await page.locator('[data-tip="退出全屏"]').click();
-      await expect(page.getByTestId('running-term')).toBeVisible();
       await scroll.evaluate((element) => {
         element.scrollTop = 0;
       });
-      await expect(pinned).toHaveCount(0);
+      await row.hover();
+      const before = (await ptyWrites(page)).length;
+      await row.getByRole('button', { name: '终止命令', exact: true }).click();
+      await expect.poll(async () => (await ptyWrites(page)).slice(before)).toEqual(['\x03']);
+      await row.getByRole('button', { name: '进入全屏交互', exact: true }).click();
+      await expect(page.getByTestId('tui-fullscreen')).toBeVisible();
     });
   });

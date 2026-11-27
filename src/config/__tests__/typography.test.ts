@@ -79,7 +79,7 @@ describe('font preferences', () => {
   });
   beforeEach(() => {
     useTypographyStore.getState().reset();
-    useTypographyStore.getState().update({ commandHighlighting: false, commandTitleCollapsed: false });
+    useTypographyStore.getState().update({ commandHighlighting: false });
   });
 
   it('offers the installed CJK monospace presets in the family stack', () => {
@@ -140,17 +140,16 @@ describe('font preferences', () => {
     expect(useTypographyStore.getState().commandHighlighting).toBe(false);
   });
 
-  it('remembers the collapsed viewport title across launches and keeps it on reset', async () => {
-    expect(useTypographyStore.getState().commandTitleCollapsed).toBe(false);
-    useTypographyStore.getState().update({ commandTitleCollapsed: true });
-    expect(JSON.parse(localStorage.getItem('vrykell-typography')!).state.commandTitleCollapsed).toBe(true);
+  it('loads saved preferences without retaining the removed viewport title setting', async () => {
+    localStorage.setItem(
+      'vrykell-typography',
+      JSON.stringify({ version: 0, state: { commandTitleCollapsed: true, terminalFontSize: 18 } }),
+    );
     await useTypographyStore.persist.rehydrate();
-    expect(useTypographyStore.getState().commandTitleCollapsed).toBe(true);
-    useTypographyStore.getState().reset();
-    expect(useTypographyStore.getState().commandTitleCollapsed).toBe(true);
-    localStorage.setItem('vrykell-typography', JSON.stringify({ version: 0, state: { commandTitleCollapsed: 'yes' } }));
-    await useTypographyStore.persist.rehydrate();
-    expect(useTypographyStore.getState().commandTitleCollapsed).toBe(false);
+    expect(useTypographyStore.getState().terminalFontSize).toBe(18);
+    expect(useTypographyStore.getState()).not.toHaveProperty('commandTitleCollapsed');
+    useTypographyStore.getState().update({ terminalFontWeight: 500 });
+    expect(JSON.parse(localStorage.getItem('vrykell-typography')!).state).not.toHaveProperty('commandTitleCollapsed');
   });
 
   it('restores and validates persisted sizes without replacing store actions', async () => {
