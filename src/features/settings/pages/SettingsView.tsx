@@ -33,9 +33,8 @@ import EditorOpeningPreferences from '../components/EditorOpeningPreferences';
 import EditorPreferences from '../components/EditorPreferences';
 import { LanguagePage } from './languagePage';
 import { AboutPage } from './aboutPage';
-import ShellProfilePage from './shellProfilePage';
+import ShellProfilePage, { ShellProfileTitle } from './shellProfilePage';
 import { SHELL_TYPES, type ShellType } from '@platform/shells';
-import { TerminalProfileIcon } from '@ui/icons/shellIcons';
 
 /** Permission tool labels use the shared translation catalog. */
 const PERM_TOOL_LABEL: Record<ToolName, string> = {
@@ -73,6 +72,7 @@ function SettingsContent() {
   const navigation = useSettingsNavigation();
   const { selected, activeLabel } = navigation;
   const profileShell = selected.startsWith('profile:') ? (selected.slice(8) as ShellType) : undefined;
+  const saveHintId = 'settings-auto-save-hint';
 
   // File opening preferences are stored locally.
   const [fileCfg, setFileCfg] = useState<FileOpenConfig>(() => loadConfig());
@@ -293,14 +293,23 @@ function SettingsContent() {
           {selected !== 'ai-skill' && (
             <header className="settings-page-header">
               <div className="settings-page-heading">
-                {profileShell && SHELL_TYPES.includes(profileShell) && (
-                  <TerminalProfileIcon kind="local" shellType={profileShell} size={28} />
-                )}
-                <h1>{activeLabel}</h1>
+                <h1>
+                  {profileShell && SHELL_TYPES.includes(profileShell) ? (
+                    <ShellProfileTitle
+                      shell={profileShell}
+                      describedBy={saveHintId}
+                      onChange={(shell) => navigation.setSelected(`profile:${shell}`)}
+                    />
+                  ) : (
+                    activeLabel
+                  )}
+                </h1>
               </div>
               {selected !== 'about' && (
                 <div className="settings-save-hint">
-                  {selected !== 'ai-memory' && <span>{t('Options save immediately; text saves after you stop typing.')}</span>}
+                  {selected !== 'ai-memory' && (
+                    <span id={saveHintId}>{t('Options save immediately; text saves after you stop typing.')}</span>
+                  )}
                   <SaveStatus status={status} onRetry={retry} />
                 </div>
               )}

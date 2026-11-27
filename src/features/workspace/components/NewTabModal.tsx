@@ -198,12 +198,10 @@ export default function NewTabModal({ open, onClose, groupId, onPick, source = '
   const buildMenuItems = (state: MenuState): ContextMenuItem[] => {
     if (state.option.kind === 'shell') {
       const shell = state.option.shellType;
-      const mode = shell === 'cmd' ? 'classic' : openModeByShell[shell];
+      const mode = openModeByShell[shell];
       const modes: ContextMenuItem[] = [
         { label: t('settings.openMode.classic'), checked: mode === 'classic', onClick: () => setShellMode(shell, 'classic') },
-        ...(shell === 'cmd'
-          ? []
-          : [{ label: t('settings.openMode.block'), checked: mode === 'block', onClick: () => setShellMode(shell, 'block') }]),
+        { label: t('settings.openMode.block'), checked: mode === 'block', onClick: () => setShellMode(shell, 'block') },
       ];
       return [
         {
@@ -211,9 +209,7 @@ export default function NewTabModal({ open, onClose, groupId, onPick, source = '
           checked: shell === preferredShell(defaultShell, shells),
           onClick: () => useTerminalDefaults.getState().setShell(shell),
         },
-        ...(modes.length > 1
-          ? [{ label: t('Opening mode'), group: 'view' as const, submenu: { items: modes } }]
-          : modes.map((item) => ({ ...item, group: 'view' as const, disabled: true }))),
+        ...(shell === 'cmd' ? [] : [{ label: t('Opening mode'), group: 'view' as const, submenu: { items: modes } }]),
       ];
     }
     const conn = state.conn;

@@ -1,6 +1,6 @@
 import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import { afterEach, expect, it } from 'vitest';
-import ShellProfilePage from '../pages/shellProfilePage';
+import ShellProfilePage, { ShellProfileTitle } from '../pages/shellProfilePage';
 import { useShellProfiles } from '@config/shellProfiles';
 import { useTerminalDefaults } from '@config/terminalDefaults';
 
@@ -22,4 +22,14 @@ it('groups identity, startup and menu settings without duplicating shell heading
   expect(within(startup).getByRole('button', { name: '浏览…' })).toBeVisible();
   fireEvent.click(within(menu).getByRole('switch', { name: '在新建终端菜单中显示' }));
   expect(useShellProfiles.getState().profiles.zsh?.hidden).toBe(true);
+});
+
+it('uses the page title to switch profiles and omits the opening mode for fixed-mode shells', () => {
+  const view = render(<ShellProfileTitle shell="powershell" onChange={(shell) => view.rerender(<ShellProfilePage shell={shell} />)} />);
+  const picker = screen.getByRole('combobox', { name: 'Shell 配置文件' });
+  expect(picker).toHaveTextContent('Windows PowerShell');
+  fireEvent.click(picker);
+  fireEvent.click(screen.getByRole('option', { name: 'CMD' }));
+  expect(screen.getByRole('textbox', { name: '配置名称' })).toHaveAttribute('placeholder', 'CMD');
+  expect(screen.queryByRole('radiogroup', { name: '打开方式' })).not.toBeInTheDocument();
 });

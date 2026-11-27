@@ -1200,6 +1200,22 @@ button.chat-mode-trigger[aria-expanded='true'] {
   font-weight: var(--fw-medium);
   color: var(--text-primary);
 }
+.settings-page-heading .shell-profile-title {
+  padding-inline: 6px;
+  background: transparent;
+  font: inherit;
+  white-space: nowrap;
+}
+.settings-page-heading .shell-profile-title:is(:hover, :focus-visible, [aria-expanded='true']) {
+  background: var(--button-hover);
+}
+.shell-profile-title .ui-select-value {
+  overflow: visible;
+}
+.shell-profile-title .ui-select-icon svg {
+  width: 1em;
+  height: 1em;
+}
 @container settings-layout (max-width: 900px) {
   .settings-content {
     padding: 20px 24px;
