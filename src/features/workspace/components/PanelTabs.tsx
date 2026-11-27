@@ -12,6 +12,7 @@ import type { GroupingProposal } from '@features/agent/services/autoGrouping';
 import { regenerateTitle } from '@features/agent/services/title';
 import { useToastStore } from '@ui/feedback/Toast';
 import FolderTabs from '@ui/layout/FolderTabs';
+import { dropdownAnchorBelow, type DropdownAnchor } from '@ui/menus/AnchoredDropdown';
 import WorkspaceHeader from '@ui/layout/WorkspaceHeader';
 import { TextInput } from '@ui/fields/TextInput';
 import { IconBtn } from '@ui/actions/UiBtn';
@@ -32,7 +33,7 @@ export default function PanelTabs({ active = true }: { active?: boolean }) {
   const defaultShellType = useDefaultShellType();
   const [query, setQuery] = useState('');
   const [searchOpen, setSearchOpen] = useState(false);
-  const [modal, setModal] = useState<{ groupId?: string; anchor?: { x: number; y: number } } | null>(null);
+  const [modal, setModal] = useState<{ groupId?: string; anchor?: DropdownAnchor } | null>(null);
   const native = tabs.filter(isSessionTab);
   const containers = useWorkbenchStore((state) => state.snapshot.tabs);
   const nativeOwner = (id: string) => {
@@ -152,6 +153,10 @@ export default function PanelTabs({ active = true }: { active?: boolean }) {
         onClose={close}
         onMove={strip.onMove}
         onRename={strip.onRename}
+        onDropOutsideWindow={strip.onDropOutsideWindow}
+        canDropOutsideWindow={strip.canDropOutsideWindow}
+        onDragSingleTab={filtered.length === handles.length ? strip.onDragSingleTab : undefined}
+        onTrackWindowDrag={strip.onTrackWindowDrag}
         empty={query.trim() && <div className="search-empty-state">{t('No matching terminal sessions')}</div>}
         menuLabel={t('More terminal actions')}
         menuItems={[
@@ -198,7 +203,7 @@ export default function PanelTabs({ active = true }: { active?: boolean }) {
             </IconBtn>
             {searchOpen && (
               <TextInput
-                variant="field"
+                variant="search"
                 autoFocus
                 value={query}
                 onChange={(event) => setQuery(event.target.value)}
@@ -212,7 +217,7 @@ export default function PanelTabs({ active = true }: { active?: boolean }) {
                 <X size={iconSizes.control} />
               </IconBtn>
             )}
-            <span className="folder-action-secondary terminal-secondary-actions">
+            <span className="terminal-secondary-actions">
               <IconBtn
                 title={t('Session history')}
                 data-testid="tab-history-btn"
@@ -223,19 +228,21 @@ export default function PanelTabs({ active = true }: { active?: boolean }) {
                 <Bot size={iconSizes.control} />
               </IconBtn>
             </span>
-            <span className="terminal-new-controls">
-              <IconBtn title={t('Create terminal')} data-testid="tab-new-default" onClick={create}>
-                <Plus size={iconSizes.control} />
-              </IconBtn>
-              <IconBtn
-                title={t('New terminal options')}
-                data-testid="tab-new-btn"
-                aria-haspopup="dialog"
-                onClick={(event) => setModal({ anchor: { x: event.clientX, y: event.clientY } })}>
-                <ChevronDown size={iconSizes.control} />
-              </IconBtn>
-            </span>
           </>
+        }
+        creation={
+          <span className="terminal-new-controls">
+            <IconBtn title={t('Create terminal')} data-testid="tab-new-default" onClick={create}>
+              <Plus size={iconSizes.control} />
+            </IconBtn>
+            <IconBtn
+              title={t('New terminal options')}
+              data-testid="tab-new-btn"
+              aria-haspopup="dialog"
+              onClick={(event) => setModal({ anchor: dropdownAnchorBelow(event.currentTarget) })}>
+              <ChevronDown size={iconSizes.control} />
+            </IconBtn>
+          </span>
         }
       />
       <NewTabModal open={!!modal} groupId={modal?.groupId} anchor={modal?.anchor} onClose={() => setModal(null)} />

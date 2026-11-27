@@ -98,8 +98,11 @@ for (const [theme, width] of [
     for (const name of ['认证服务', '继续使用终端', '重试文件服务']) {
       expect((await notification.getByRole('button', { name, exact: true }).boundingBox())!.height).toBeLessThanOrEqual(32);
     }
+    await expect(notification.getByRole('button', { name: '复制技术详情' })).toHaveCount(0);
     await notification.getByRole('button', { name: '技术详情', exact: true }).click();
-    await expect(notification.getByText('SSH_AUTH_FAILED: Saved password was rejected', { exact: true })).toBeVisible();
+    const diagnostic = notification.locator('.error-details-output');
+    await expect(diagnostic.getByText('SSH_AUTH_FAILED: Saved password was rejected', { exact: true })).toBeVisible();
+    await expect(diagnostic.getByRole('button', { name: '复制技术详情' })).toBeVisible();
     await notification.screenshot({ path: info.outputPath(`service-error-${theme}.png`), animations: 'disabled' });
     await authenticate.click();
     const dialog = page.getByTestId('ssh-auth-dialog');
@@ -109,7 +112,7 @@ for (const [theme, width] of [
     await expect(secret).toHaveAttribute('type', 'password');
     await expect(secret).toHaveCSS('min-height', '28px');
     await expect(secret).toHaveCSS('padding-top', '4px');
-    await expect(secret).toHaveCSS('border-radius', '8px');
+    await expect(secret).toHaveCSS('border-radius', '10px');
     expect(await secret.evaluate((element) => getComputedStyle(element).backgroundColor)).toBe(
       await dialog.getByRole('combobox', { name: '认证方式' }).evaluate((element) => getComputedStyle(element).backgroundColor),
     );

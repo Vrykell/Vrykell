@@ -95,6 +95,7 @@ export default function TooltipLayer() {
 
     document.addEventListener('mouseover', onOver, true);
     document.addEventListener('mouseout', onOut, true);
+    document.addEventListener('pointerdown', hide, true);
     document.addEventListener('focusin', onFocusIn, true);
     document.addEventListener('focusout', hide, true);
     window.addEventListener('scroll', hide, true);
@@ -103,6 +104,7 @@ export default function TooltipLayer() {
     return () => {
       document.removeEventListener('mouseover', onOver, true);
       document.removeEventListener('mouseout', onOut, true);
+      document.removeEventListener('pointerdown', hide, true);
       document.removeEventListener('focusin', onFocusIn, true);
       document.removeEventListener('focusout', hide, true);
       window.removeEventListener('scroll', hide, true);

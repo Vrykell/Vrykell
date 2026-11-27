@@ -141,11 +141,7 @@ export const useTypographyStore = create<TypographyState>()(
     (set) => ({
       ...defaults,
       update: (patch) => set((state) => sanitize({ ...state, ...patch })),
-      reset: () =>
-        set((state) => ({
-          ...defaults,
-          commandHighlighting: state.commandHighlighting,
-        })),
+      reset: () => set((state) => ({ ...defaults, commandHighlighting: state.commandHighlighting })),
     }),
     {
       name: 'vrykell-typography',

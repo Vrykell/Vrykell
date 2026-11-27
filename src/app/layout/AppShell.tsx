@@ -7,14 +7,14 @@ import WorkspaceShell from '@app/layout/WorkspaceShell';
 import ApplicationOverlays from '@app/layout/ApplicationOverlays';
 import OverlayScrollbars from '@ui/layout/OverlayScrollbars';
 import { useTheme } from '@app/providers/ThemeProvider';
-import { syncWindowMaterial } from '@platform/windowChrome';
+import { syncWindowMaterial } from '@platform/windowFrame';
 import { requestTerminalSplit } from '@features/workspace/services/unifiedWorkspace';
 
 /** Paint the window surface, workspace, and application overlays. */
 export default function AppShell() {
   const wallpaperDataUrl = useTerminalThemeStore((state) => state.wallpaperDataUrl);
   const appOpacity = useTerminalThemeStore((state) => state.config.opacity);
-  const desktopTint = useTerminalThemeStore((state) => state.config.desktopTint ?? true);
+  const desktopTint = useTerminalThemeStore((state) => state.config.desktopTint ?? false);
   const { mode } = useTheme();
   const effectiveOpacity = wallpaperDataUrl ? appOpacity : 1;
   useEffect(() => {

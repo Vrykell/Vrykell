@@ -73,6 +73,9 @@ test.describe('Command blocks (OSC 133)', () => {
 
     await expect(page.getByText('TUI')).toBeVisible({ timeout: 5000 });
     const banner = page.getByTestId('tui-banner');
+    await expect(page.getByTestId('workspace-context-bar')).toBeHidden();
+    await expect(page.getByTestId('workspace-instance-bar')).toBeVisible();
+    await expect(page.getByTestId('workspace-instance-bar').locator('.folder-actions')).toBeHidden();
     await expect(banner.locator('[data-tip="终止命令"]')).toBeVisible();
     // Real alt-buffer apps offer no exit full screen action (output only goes to the main xterm and forcing blockList would disconnect the view);
     // only manual full screen from a block card provides one - see running-term.spec.ts
@@ -115,6 +118,7 @@ test.describe('Command blocks (OSC 133)', () => {
     await emitPtyOutput(page, '\x1b[?1049l\x1b]133;D;0\x07\x1b]133;A\x07');
 
     await expect(page.getByText('TUI')).not.toBeVisible({ timeout: 5000 });
+    await expect(page.getByTestId('workspace-context-bar')).toBeVisible();
     // The input bar reappears once the block list is back
     await expect(input).toBeVisible({ timeout: 5000 });
     await page.mouse.move(0, 0);

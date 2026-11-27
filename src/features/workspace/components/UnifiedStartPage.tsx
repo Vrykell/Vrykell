@@ -1,29 +1,22 @@
-import type { MouseEvent } from 'react';
 import { t } from '@i18n';
 import { OutlineButton } from '@ui/actions/OutlineButton';
 import { Grid } from '@ui/icons';
+import { dropdownAnchorBelow, type DropdownAnchor } from '@ui/menus/AnchoredDropdown';
 import WorkspaceStartPage from './WorkspaceStartPage';
 
-/**
- * The unified workspace starts from the same simple page as every other workspace: the
- * actions place a first resource, and the strip above already lists what is open.
- */
 export default function UnifiedStartPage({
   onNew,
+  onTerminal,
   onOpen,
   onConnect,
   onAgent,
 }: {
-  onNew: (kind: 'terminal' | 'document' | 'conversation') => void;
+  onNew: (kind: 'document' | 'conversation') => void;
+  onTerminal: (anchor: DropdownAnchor) => void;
   onOpen: () => void;
-  onConnect: (anchor: { x: number; y: number }) => void;
-  onAgent: (anchor: { x: number; y: number }) => void;
+  onConnect: (anchor: DropdownAnchor) => void;
+  onAgent: (anchor: DropdownAnchor) => void;
 }) {
-  // Both pickers open under their own trigger, matching the terminal and AI start pages.
-  const openUnderTrigger = (event: MouseEvent<HTMLElement>, open: (anchor: { x: number; y: number }) => void) => {
-    const box = event.currentTarget.getBoundingClientRect();
-    open({ x: box.left, y: box.bottom });
-  };
   return (
     <div className="workspace-launch-page" data-testid="unified-start-page">
       <WorkspaceStartPage
@@ -33,7 +26,10 @@ export default function UnifiedStartPage({
         columns={3}
         actions={
           <>
-            <OutlineButton className="primary-button" onClick={() => onNew('terminal')}>
+            <OutlineButton
+              className="primary-button"
+              aria-haspopup="dialog"
+              onClick={(event) => onTerminal(dropdownAnchorBelow(event.currentTarget))}>
               {t('New terminal')}
             </OutlineButton>
             <OutlineButton onClick={() => onNew('document')}>{t('New file')}</OutlineButton>
@@ -41,10 +37,15 @@ export default function UnifiedStartPage({
             <OutlineButton aria-label={t('New conversation')} onClick={() => onNew('conversation')}>
               {t('New chat')}
             </OutlineButton>
-            <OutlineButton aria-label={t('Connect a server')} onClick={(event) => openUnderTrigger(event, onConnect)}>
+            <OutlineButton
+              aria-label={t('Connect a server')}
+              aria-haspopup="dialog"
+              onClick={(event) => onConnect(dropdownAnchorBelow(event.currentTarget))}>
               {t('Connect')}
             </OutlineButton>
-            <OutlineButton onClick={(event) => openUnderTrigger(event, onAgent)}>{t('Agents')}</OutlineButton>
+            <OutlineButton aria-haspopup="dialog" onClick={(event) => onAgent(dropdownAnchorBelow(event.currentTarget))}>
+              {t('ACP agents')}
+            </OutlineButton>
           </>
         }
       />

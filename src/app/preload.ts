@@ -2,7 +2,7 @@ import { applyCachedWallpaper, useTerminalThemeStore } from '@features/settings/
 import { applyTheme, readThemePreference, resolveThemeMode } from '@config/theme/tokens';
 import { installGlobalErrorHandlers } from '@utils/errorHandler';
 import { initializeDiagnostics } from '@platform/diagnostics';
-import { syncWindowFrame } from '@platform/windowChrome';
+import { syncWindowFrame } from '@platform/windowFrame';
 
 /** Startup work that does not depend on the component tree, done before mount to avoid first-paint flicker. */
 export function preloadApplication(): void {

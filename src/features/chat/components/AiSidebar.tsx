@@ -6,7 +6,7 @@ import { SlidersHorizontal } from '@ui/icons';
 import AppMark from '@ui/icons/AppMark';
 import type { MenuAnchor } from '@ui/menus/ContextMenu';
 import SettingsPopover from '@ui/menus/SettingsPopover';
-import type { DropdownAnchor } from '@ui/menus/AnchoredDropdown';
+import { dropdownAnchorBelow, type DropdownAnchor } from '@ui/menus/AnchoredDropdown';
 import { ResourceContentSlot } from '@ui/layout/ResourceContent';
 import { createAgentSession } from '../services/agentDrivers';
 import AgentLauncher from '@features/workspace/components/AgentLauncher';
@@ -120,8 +120,7 @@ export default function AiSidebar({
                 aria-haspopup="dialog"
                 aria-expanded={!!launcher}
                 onClick={(event) => {
-                  const bounds = event.currentTarget.getBoundingClientRect();
-                  setLauncher({ anchor: { x: bounds.right, y: bounds.bottom + 4, aboveY: bounds.top, align: 'end' } });
+                  setLauncher({ anchor: dropdownAnchorBelow(event.currentTarget, 'end') });
                 }}>
                 <span className="ui-select-value">{connection?.harness ?? t('Built-in agent')}</span>
               </SelectTrigger>

@@ -19,7 +19,7 @@ for (const theme of ['dark', 'light'])
     await page.getByTestId('workspace-area-ai').click();
     const ai = page.getByTestId('ai-start-page');
     await expect(ai.getByTestId('ai-start-new-conversation')).toBeVisible();
-    await page.getByTestId('ai-start-agents').click();
+    await ai.getByTestId('ai-start-agents').click();
     const picker = page.getByRole('dialog', { name: '选择智能体', exact: true });
     await expect(picker).toHaveClass(/new-tab-dialog/);
     await expect(picker).toHaveAttribute('aria-modal', 'false');

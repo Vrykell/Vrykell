@@ -1,7 +1,7 @@
 import { FileOperationsPage } from './fileOperationsPage';
 import { OutlineButton } from '@ui/actions/OutlineButton';
 import { t } from '@i18n';
-import { useEffect, useState, type ReactNode } from 'react';
+import { useEffect, useId, useState, type ReactNode } from 'react';
 import { loadConfig, saveConfig, type FileOpenConfig } from '@features/files/services/fileOpen';
 import { refreshAiConfig } from '@features/agent';
 import SkillsSettings from '@features/settings/pages/SkillsSettings';
@@ -34,7 +34,6 @@ import EditorPreferences from '../components/EditorPreferences';
 import { LanguagePage } from './languagePage';
 import { AboutPage } from './aboutPage';
 import ShellProfilePage, { ShellProfileTitle } from './shellProfilePage';
-import { SHELL_TYPES, type ShellType } from '@platform/shells';
 
 /** Permission tool labels use the shared translation catalog. */
 const PERM_TOOL_LABEL: Record<ToolName, string> = {
@@ -71,8 +70,7 @@ function SettingsContent() {
   const { save, status, retry } = useSettingsSave();
   const navigation = useSettingsNavigation();
   const { selected, activeLabel } = navigation;
-  const profileShell = selected.startsWith('profile:') ? (selected.slice(8) as ShellType) : undefined;
-  const saveHintId = 'settings-auto-save-hint';
+  const saveHintId = useId();
 
   // File opening preferences are stored locally.
   const [fileCfg, setFileCfg] = useState<FileOpenConfig>(() => loadConfig());
@@ -96,10 +94,6 @@ function SettingsContent() {
   }, []);
 
   const renderPage = (): ReactNode => {
-    if (selected.startsWith('profile:')) {
-      const shell = selected.slice(8) as ShellType;
-      if (SHELL_TYPES.includes(shell)) return <ShellProfilePage key={shell} shell={shell} />;
-    }
     switch (selected) {
       case 'application-language':
         return <LanguagePage />;
@@ -194,6 +188,9 @@ function SettingsContent() {
       case 'command-history':
         return <CommandHistoryPage />;
 
+      case 'shell-profiles':
+        return <ShellProfilePage />;
+
       case 'editor-preferences':
         return <EditorPreferences />;
       case 'editor-local':
@@ -277,6 +274,7 @@ function SettingsContent() {
   return (
     <div
       className="settings-view"
+      data-field-outlines
       style={{
         flex: 1,
         minHeight: 0,
@@ -293,23 +291,17 @@ function SettingsContent() {
           {selected !== 'ai-skill' && (
             <header className="settings-page-header">
               <div className="settings-page-heading">
-                <h1>
-                  {profileShell && SHELL_TYPES.includes(profileShell) ? (
-                    <ShellProfileTitle
-                      shell={profileShell}
-                      describedBy={saveHintId}
-                      onChange={(shell) => navigation.setSelected(`profile:${shell}`)}
-                    />
-                  ) : (
-                    activeLabel
-                  )}
-                </h1>
+                {selected === 'shell-profiles' ? (
+                  <h1 className="shell-profile-heading" aria-label={activeLabel}>
+                    <ShellProfileTitle description={saveHintId} />
+                  </h1>
+                ) : (
+                  <h1>{activeLabel}</h1>
+                )}
               </div>
               {selected !== 'about' && (
-                <div className="settings-save-hint">
-                  {selected !== 'ai-memory' && (
-                    <span id={saveHintId}>{t('Options save immediately; text saves after you stop typing.')}</span>
-                  )}
+                <div className="settings-save-hint" id={saveHintId}>
+                  {selected !== 'ai-memory' && <span>{t('Options save immediately; text saves after you stop typing.')}</span>}
                   <SaveStatus status={status} onRetry={retry} />
                 </div>
               )}

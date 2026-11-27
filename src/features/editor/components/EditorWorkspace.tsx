@@ -10,7 +10,7 @@ import { IconButton } from '@ui/actions/IconButton';
 import ReloadButton from '@ui/actions/ReloadButton';
 import { TextButton } from '@ui/actions/TextButton';
 import { OutlineButton } from '@ui/actions/OutlineButton';
-import { Eye, EyeOff, Save, Plus, FileCode, FolderOpen, Search, Undo2, RotateCw, iconSizes } from '@ui/icons';
+import { Eye, EyeOff, Save, Plus, FileCode, FolderOpenSmall, Search, Undo2, RotateCw, iconSizes } from '@ui/icons';
 import { isWindows } from '@platform/runtime';
 import { normPath } from '@platform/path';
 import FolderTabs from '@ui/layout/FolderTabs';
@@ -18,6 +18,7 @@ import { tabCapabilities, type TabHandle } from '@ui/layout/tabHandle';
 import WorkspaceHeader from '@ui/layout/WorkspaceHeader';
 import ResourceContent from '@ui/layout/ResourceContent';
 import { useCodeWorkspaceTabs } from '@features/workspace/hooks/useCodeWorkspaceTabs';
+import { beginSingleTabWindowDrag } from '@features/workspace/services/windowHandoff';
 import { openWorkspaceFile } from '@features/workspace/services/workspaceActions';
 import WorkspaceStartPage from '@features/workspace/components/WorkspaceStartPage';
 import ToolDialog from '@ui/feedback/ToolDialog';
@@ -180,14 +181,16 @@ function CodeStartPane({ tab, active }: { tab: Extract<Tab, { kind: 'start-code'
           onSelect={() => useSessionStore.getState().activate(tab.id)}
           onClose={() => useSessionStore.getState().closeTab(tab.id)}
           onMove={() => {}}
+          onDragSingleTab={beginSingleTabWindowDrag}
           menuItems={[
             { label: t('New file'), onClick: newEditorFile },
             { label: t('Open file'), onClick: () => void openWorkspaceFile() },
           ]}
-          toolbar={
+          toolbar={null}
+          creation={
             <>
               <IconButton compact aria-label={t('Open file')} data-tip={t('Open file')} onClick={() => void openWorkspaceFile()}>
-                <FolderOpen size={iconSizes.control} />
+                <FolderOpenSmall size={iconSizes.compact} />
               </IconButton>
               <IconButton compact aria-label={t('New file')} data-tip={t('New file')} onClick={newEditorFile}>
                 <Plus size={iconSizes.control} />
@@ -292,6 +295,10 @@ function DocumentContent({ file, active, focused }: { file: EditorFile; active: 
           onSelect={codeTabs.onSelect}
           onClose={codeTabs.onClose}
           tabActions={codeTabs.tabActions}
+          onDropOutsideWindow={codeTabs.onDropOutsideWindow}
+          canDropOutsideWindow={codeTabs.canDropOutsideWindow}
+          onDragSingleTab={codeTabs.onDragSingleTab}
+          onTrackWindowDrag={codeTabs.onTrackWindowDrag}
           onMove={codeTabs.onMove}
           menuItems={[
             ...(codeTabs.tabActions?.(codeTabs.selected ?? '') ?? []),
@@ -354,38 +361,32 @@ function DocumentContent({ file, active, focused }: { file: EditorFile; active: 
                   {preview ? <EyeOff size={iconSizes.control} /> : <Eye size={iconSizes.control} />}
                 </IconButton>
               )}
-              <span className="folder-action-secondary">
-                <IconButton compact aria-label={t('Undo')} data-tip={t('Undo')} disabled={!canEdit} onClick={() => run('undo')}>
-                  <Undo2 size={iconSizes.control} />
-                </IconButton>
-                <IconButton compact aria-label={t('Redo')} data-tip={t('Redo')} disabled={!canEdit} onClick={() => run('redo')}>
-                  <RotateCw size={iconSizes.control} />
-                </IconButton>
-                <IconButton compact aria-label={t('Find')} data-tip={t('Find')} onClick={() => run('actions.find')}>
-                  <Search size={iconSizes.control} />
-                </IconButton>
-              </span>
+              <IconButton compact aria-label={t('Undo')} data-tip={t('Undo')} disabled={!canEdit} onClick={() => run('undo')}>
+                <Undo2 size={iconSizes.control} />
+              </IconButton>
+              <IconButton compact aria-label={t('Redo')} data-tip={t('Redo')} disabled={!canEdit} onClick={() => run('redo')}>
+                <RotateCw size={iconSizes.control} />
+              </IconButton>
+              <IconButton compact aria-label={t('Find')} data-tip={t('Find')} onClick={() => run('actions.find')}>
+                <Search size={iconSizes.control} />
+              </IconButton>
               {!file.draftId && (
-                <span className="folder-action-secondary">
-                  <ReloadButton
-                    compact
-                    label={t('Reload file')}
-                    busy={document?.loading}
-                    disabled={document?.saving}
-                    onReload={reloadFile}
-                  />
-                </span>
+                <ReloadButton compact label={t('Reload file')} busy={document?.loading} disabled={document?.saving} onReload={reloadFile} />
               )}
               <IconButton compact aria-label={t('Save file')} data-tip={t('Save file (Ctrl/Cmd+S)')} disabled={!canSave} onClick={save}>
                 <Save size={iconSizes.control} />
               </IconButton>
+            </>
+          }
+          creation={
+            <>
               <IconButton
                 compact
                 className="workspace-open-action"
                 aria-label={t('Open file')}
                 data-tip={t('Open file')}
                 onClick={() => void openWorkspaceFile()}>
-                <FolderOpen size={iconSizes.control} />
+                <FolderOpenSmall size={iconSizes.compact} />
               </IconButton>
               <IconButton
                 compact

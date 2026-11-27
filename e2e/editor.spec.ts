@@ -241,6 +241,7 @@ test('reorders connected file tabs and keeps compact actions above the text', as
   await openWorking(page);
   await openWorking(page, 'new file.ts', 'untracked');
   const strip = page.getByRole('tablist', { name: '已打开的文件与比较' });
+  const draggedBounds = (await strip.locator('.folder-tab').nth(1).boundingBox())!;
   const source = (await strip.getByRole('tab').nth(1).boundingBox())!;
   const target = (await strip.getByRole('tab').first().boundingBox())!;
   await page.mouse.move(source.x + 28, source.y + source.height / 2);
@@ -253,15 +254,15 @@ test('reorders connected file tabs and keeps compact actions above the text', as
   await expect(preview).toBeVisible();
   await expect(preview).toContainText('new file.ts');
   const previewBounds = (await preview.boundingBox())!;
-  expect(previewBounds.height).toBe(34);
-  expect(previewBounds.y).toBe(source.y - 3);
+  expect(previewBounds.height).toBe(draggedBounds.height);
+  expect(previewBounds.y).toBe(draggedBounds.y);
   await page.mouse.up();
   await expect(strip.getByRole('tab').first()).toContainText('new file.ts');
   await expect(strip.getByRole('tab').first()).toHaveAttribute('aria-selected', 'true');
   const header = page.getByTestId('workspace-instance-bar').locator('.folder-header');
   expect((await header.boundingBox())!.height).toBeLessThanOrEqual(34);
   const first = strip.locator('.folder-tab').first();
-  expect((await first.boundingBox())!.x).toBe((await strip.boundingBox())!.x + 4);
+  expect((await first.boundingBox())!.x).toBe((await strip.boundingBox())!.x + 6);
   expect(await first.evaluate((element) => getComputedStyle(element, '::before').content)).toBe('""');
   const inactive = strip.locator('.folder-tab').nth(1);
   await inactive.hover();

@@ -5,6 +5,7 @@ import { detachContainerPane, putContainer, type WorkspaceGroup } from '../model
 import { terminalResourceLayout, terminalWorkspaceLayout } from '../model/workspaceResources';
 import { useShellProfiles } from '@config/shellProfiles';
 import { create } from 'zustand';
+import { secondaryWorkspaceLabel, workspaceSessionPrefix } from '@platform/workspaceWindowIdentity';
 import { useUiStore } from './ui';
 import { useWorkspaceNavigation, workspaceAreaForKind } from './navigation';
 import { gitComparisonKey, type GitSelection, type GitComparison } from '@core/git';
@@ -158,8 +159,10 @@ function cloneLayout(layout: WindowLayout, newWindowId: string): WindowLayout {
 // Tab ids stay unique across restarts (timestamp prefix plus counter) so a restored tab cannot
 // collide with a persisted session id.
 const ID_PREFIX = Date.now().toString(36);
+const windowLabel = secondaryWorkspaceLabel();
+const windowPrefix = windowLabel ? workspaceSessionPrefix(windowLabel) : '';
 let counter = 0;
-const nextTabId = () => `t${ID_PREFIX}-${counter++}`;
+const nextTabId = () => `${windowPrefix}t${ID_PREFIX}-${counter++}`;
 const defaultTitle = () => t('Terminal');
 const HISTORY_TITLE = t('Session history');
 const AI_HISTORY_TITLE = t('AI conversation history');
@@ -192,7 +195,7 @@ interface WorkspaceState {
   activateGitComparison: (id: string) => void;
   closeGitComparison: (id: string) => void;
   configureGitDiffTabs: () => void;
-  closeTab: (id: string, force?: boolean) => void;
+  closeTab: (id: string, force?: boolean, disposition?: 'move') => void;
   activate: (id: string) => void;
   /** Every workspace that would have an empty tab strip gets its placeholder start page. */
   ensureStartPages: () => void;
@@ -561,7 +564,7 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
   openSettings: () => {
     useUiStore.getState().setSettingsOpen(true);
   },
-  closeTab: (id, force = false) => {
+  closeTab: (id, force = false, disposition) => {
     const { tabs, activeId } = get();
     const idx = tabs.findIndex((t) => t.id === id);
     if (idx === -1) return;
@@ -588,7 +591,7 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
     set({
       tabs: next,
       activeId: nextActiveId,
-      lastClosed: reopenable ? closed : null,
+      lastClosed: disposition === 'move' ? get().lastClosed : reopenable ? closed : null,
     });
     // Fall back to the new active tab when focus belonged to the closed tab.
     const fp = useTerminalStore.getState().focusedPaneId;
@@ -608,7 +611,7 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
       useChatStore.getState().dropTab(id);
     }
     // Workspace pages have no backend session to archive.
-    if (isSessionTab(closed)) {
+    if (isSessionTab(closed) && disposition !== 'move') {
       const retry = () => {
         void sessionManager.close(id).catch((error) => reportWorkbenchFailure(error, retry));
       };

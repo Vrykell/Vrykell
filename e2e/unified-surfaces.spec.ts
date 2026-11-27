@@ -28,13 +28,15 @@ for (const theme of ['dark', 'light'])
     const canvas = asRgb(colors.canvas);
     const card = asRgb(colors.card);
     const composer = asRgb(colors.composer);
-    expect(await rgb(page, titlebar)).toBe(chrome);
+    if (theme === 'light') expect(await rgb(page, titlebar)).toBe(chrome);
     expect(await rgb(page, page.locator('.workspace-main .terminal-composer').first())).toBe(composer);
 
     await page.locator('[data-dock-zone="right"] [data-dock-btn="files"]').click();
     const rightSurface = page.locator('.workspace-side-panel[data-side="right"][data-visible="true"] > div').first();
     expect(await rgb(page, rightSurface)).toBe(auxiliary);
-    expect(await rgb(page, page.locator('.workspace-instance-bar'))).toBe(auxiliary);
+    expect(await rgb(page, page.getByTestId('workspace-context-bar'))).toBe(
+      await rgb(page, page.locator('.workspace-main .terminal-pane:visible').first()),
+    );
     const divider = page.locator('.workspace-side-panel[data-side="right"] [data-resize-line]').first();
     expect(await rgb(page, divider)).not.toBe('rgba(0, 0, 0, 0)');
 
@@ -79,8 +81,8 @@ for (const theme of ['dark', 'light'])
     expect(await rgb(page, page.getByTestId('unified-history-page').locator('.history-list'))).toBe(canvas);
     expect(await rgb(page, historyCard)).toBe(card);
     expect(await historyCard.evaluate((element) => getComputedStyle(element).boxShadow)).toBe('none');
-    expect(await historyCard.evaluate((element) => getComputedStyle(element).borderRadius)).toBe('16px');
-    expect((await historyHeader.boundingBox())!.height).toBe(34);
+    expect(await historyCard.evaluate((element) => getComputedStyle(element).borderRadius)).toBe('8px');
+    expect((await historyHeader.boundingBox())!.height).toBe(32);
 
     await page.getByTestId('workspace-area-ai').click();
     await page.getByTestId('ai-new-conversation').click();

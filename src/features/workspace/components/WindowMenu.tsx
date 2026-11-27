@@ -23,7 +23,7 @@ export default function WindowMenu({ titlebar }: { titlebar: RefObject<HTMLEleme
     const element = titlebar.current;
     if (!element || !usesCustomWindowControls) return;
     const open = (event: MouseEvent) => {
-      if (!(event.target instanceof Element) || event.target.closest('button, input, textarea, a, [role="menu"]')) return;
+      if (!(event.target instanceof Element) || !event.target.hasAttribute('data-tauri-drag-region')) return;
       event.preventDefault();
       const version = ++generation.current;
       const anchor = { x: event.clientX, y: event.clientY };

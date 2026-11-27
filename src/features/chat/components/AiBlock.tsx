@@ -1,8 +1,9 @@
 import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import { t } from '@i18n';
-import { Brain, ChevronRight, Ellipsis, Pencil, RefreshCw, Sparkles, Trash2, Wrench } from '@ui/icons';
+import { Brain, ChevronRight, Ellipsis, Pencil, RefreshCw, Sparkles, Toolbox, Trash2 } from '@ui/icons';
 import { IconButton } from '@ui/actions/IconButton';
+import { TextButton } from '@ui/actions/TextButton';
 import ContextMenu, { type ContextMenuItem } from '@ui/menus/ContextMenu';
 import ErrorBox from '@ui/feedback/ErrorBox';
 import CopyButton from '@ui/actions/CopyButton';
@@ -14,11 +15,7 @@ import { hasLeakedToolCallMarkup, visibleAssistantText } from '../model/provider
 import { useChatStore } from '../stores/chat';
 import { useComposerDrafts } from '../stores/composerDrafts';
 import ThreadActions from './ThreadActions';
-import { useShallow } from 'zustand/react/shallow';
-import { useHarnessStore } from '../stores/harness';
-import { threadKey } from '../services/threadOperations';
-import { useChildTasks, type Thread } from '../stores/childTasks';
-import { SubagentRow } from './SubagentActivity';
+import type { Thread } from '../services/threadOperations';
 import SafeMarkdown from './SafeMarkdown';
 import ToolRunCard from './ToolRunCard';
 import AttachmentChips from './AttachmentChips';
@@ -31,10 +28,8 @@ function CompletedTools({ tools, renderCard }: { tools: ToolRun[]; renderCard: (
     <div className="ai-completed-tools">
       <div className="ai-tool-card">
         <button type="button" data-subtle className="ai-tool-summary" aria-expanded={open} onClick={() => setOpen(!open)}>
-          <Wrench size={15} aria-hidden="true" />
-          <span className="ai-tool-summary-text">
-            <span className="ai-tool-label">{t('{{count}} tools completed', { count: tools.length })}</span>
-          </span>
+          <Toolbox size={15} aria-hidden="true" />
+          <span className="ai-tool-summary-text">{t('{{count}} tools completed', { count: tools.length })}</span>
           <ChevronRight size={14} aria-hidden="true" style={{ transform: open ? 'rotate(90deg)' : undefined }} />
         </button>
       </div>
@@ -45,7 +40,7 @@ function CompletedTools({ tools, renderCard }: { tools: ToolRun[]; renderCard: (
 
 function renderParts(
   parts: MessagePart[],
-  groupCompleted: (tool: ToolRun) => boolean,
+  groupCompleted: boolean,
   toolCard: (tool: ToolRun) => ReactNode,
   textBlock: (text: string, index: number) => ReactNode,
 ) {
@@ -59,7 +54,7 @@ function renderParts(
   };
   parts.forEach((part, index) => {
     if (part.kind === 'text' && !part.text.trim()) return;
-    if (part.kind === 'tool' && part.tool.state === 'done' && groupCompleted(part.tool)) {
+    if (groupCompleted && part.kind === 'tool' && part.tool.state === 'done') {
       completed.push(part.tool);
       return;
     }
@@ -106,12 +101,6 @@ export default function AiBlock({
   const draft = useComposerDrafts((state) => state.byTab[conversationId ?? exchange.paneId ?? '']);
   const { question, answer } = exchange;
   const plain = presentation === 'conversation';
-  const parentKey = useHarnessStore((state) =>
-    plain && thread ? threadKey(thread, thread.driver === 'acp' ? state.byTab[thread.id] : undefined) : undefined,
-  );
-  const children = useChildTasks(
-    useShallow((state) => state.tasks.filter((task) => task.parent === parentKey && task.question === question?.id)),
-  );
   const expanded = plain || !collapsed;
   // Only the conversation that owns this exchange decides whether its actions are available.
   const ownerConversation = useChatStore(
@@ -245,22 +234,18 @@ export default function AiBlock({
           {parts ? (
             renderParts(
               parts,
-              (tool) => plain && !children.some((child) => child.toolCallId === tool.toolCallId),
-              (tool) => {
-                const child = children.find((item) => item.toolCallId === tool.toolCallId);
-                if (child && thread) return <SubagentRow key={child.id} task={child} parent={thread} />;
-                return (
-                  <ToolRunCard
-                    key={tool.toolCallId}
-                    run={tool}
-                    paneId={answer.paneId ?? exchange.paneId}
-                    framed={plain}
-                    conversationId={toolContextId ?? ownerConversation}
-                    onAskAboutTool={onAskAboutTool}
-                    environment={answer.environment ?? question?.environment ?? undefined}
-                  />
-                );
-              },
+              plain,
+              (tool) => (
+                <ToolRunCard
+                  key={tool.toolCallId}
+                  run={tool}
+                  paneId={answer.paneId ?? exchange.paneId}
+                  framed={plain}
+                  conversationId={toolContextId ?? ownerConversation}
+                  onAskAboutTool={onAskAboutTool}
+                  environment={answer.environment ?? question?.environment ?? undefined}
+                />
+              ),
               (text, index) => (
                 <div key={index} className="md">
                   <SafeMarkdown content={visibleAssistantText(text)} paneId={executionPane} />
@@ -283,9 +268,7 @@ export default function AiBlock({
               details={answer.errorText}
               actions={
                 question && !sending && (allowExchangeActions || onRetry) ? (
-                  <button type="button" onClick={onRetry ?? regenerate}>
-                    {t('Retry')}
-                  </button>
+                  <TextButton onClick={onRetry ?? regenerate}>{t('Retry')}</TextButton>
                 ) : undefined
               }>
               {answer.errorSummary}
@@ -301,10 +284,7 @@ export default function AiBlock({
           {answer.stopped && <div className="chat-environment-note">{t('Reply stopped. Terminal commands may still be running.')}</div>}
         </div>
       )}
-      {thread &&
-        children
-          .filter((child) => !parts?.some((part) => part.kind === 'tool' && part.tool.toolCallId === child.toolCallId))
-          .map((child) => <SubagentRow key={child.id} task={child} parent={thread} />)}
+      {plain && thread && question && (!answer || answer.pending) && <ThreadActions thread={thread} question={question.id} pending />}
       {plain && answer && !answer.pending && (
         <div className="chat-answer-actions">
           {thread && question && <ThreadActions thread={thread} question={question.id} answer={answer.id} />}

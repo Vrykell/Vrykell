@@ -7,7 +7,7 @@ for (const width of [900, 1440])
     await page.setViewportSize({ width, height: 800 });
     await page.goto('/');
     await waitForWorkbench(page);
-    const title = page.locator('.workspace-title > span');
+    const title = page.locator('.workspace-title-drag');
     const menu = page.getByRole('menu', { name: '窗口操作' });
     await title.click({ button: 'right' });
     await expect(menu).toHaveClass(/context-menu-surface/);

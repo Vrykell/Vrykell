@@ -2,15 +2,7 @@ import { useCallback, useContext, type FC } from 'react';
 import { iconSizes, X, ArrowLeft } from '@ui/icons';
 import { IconButton } from '@ui/actions/IconButton';
 import { moveSideConversationToMain } from '@features/chat/services/aiWorkspace';
-import {
-  useDockStore,
-  useUiStore,
-  PANEL_DEFS,
-  MIN_PANEL_WIDTH,
-  useNavigationButtonDrag,
-  useNavigationDrag,
-  type DockSide,
-} from '@features/workspace';
+import { useDockStore, useUiStore, PANEL_DEFS, useNavigationButtonDrag, useNavigationDrag, type DockSide } from '@features/workspace';
 import ResizeHandle from '@ui/layout/ResizeHandle';
 import PanelFiles from '@features/files/components/PanelFiles';
 import AiWorkspaceSurface from '@features/chat/components/AiWorkspaceSurface';
@@ -41,33 +33,14 @@ export function DockPanel({ side, panelId, visible }: { side: DockSide; panelId:
   const dragging = useNavigationDrag((state) => state.id === panelId);
   const setPanelWidth = useDockStore((s) => s.setPanelWidth);
   const commitPanelWidth = useDockStore((s) => s.commitPanelWidth);
-  const panelWidths = useDockStore((s) => s.panelWidths);
+  const panelWidth = useDockStore((s) => (s.pendingPanelWidth?.id === panelId ? s.pendingPanelWidth.width : s.panelWidths[panelId]));
   // Retain content during a held collapse so reversing the drag preserves local state.
   const collapsed = useDockStore((s) => side === 'right' && s.collapsedPanels.includes(panelId));
 
   const def = PANEL_DEFS[panelId];
   const PanelContent = def ? PANEL_COMPONENTS[panelId] : null;
-  const width = panelWidths[panelId] || def?.width || 200;
-
-  // A small recovery margin prevents collapse jitter when the pointer reverses.
-  const COLLAPSE_HYSTERESIS = 24;
-
-  const handleDelta = useCallback(
-    (d: number) => {
-      const st = useDockStore.getState();
-      const folded = st.collapsedPanels.includes(panelId) || !st.rightPanels.includes(panelId);
-      if (folded) {
-        setPanelWidth(panelId, -d);
-        const cur = useDockStore.getState().panelWidths[panelId] ?? def?.width ?? 200;
-        if (cur > MIN_PANEL_WIDTH + COLLAPSE_HYSTERESIS) {
-          useDockStore.getState().openPanel(panelId);
-        }
-        return;
-      }
-      setPanelWidth(panelId, -d);
-    },
-    [panelId, setPanelWidth, def?.width],
-  );
+  const width = panelWidth ?? def?.width ?? 200;
+  const handleDelta = useCallback((d: number) => setPanelWidth(panelId, -d), [panelId, setPanelWidth]);
 
   const handleCommit = useCallback(() => {
     // Finalize the collapsed state only after release.

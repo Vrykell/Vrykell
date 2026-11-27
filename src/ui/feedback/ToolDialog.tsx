@@ -14,6 +14,7 @@ import { useDialogKeyboard } from '@ui/hooks/useDialogKeyboard';
 export default function ToolDialog({
   label,
   children,
+  actions,
   onClose,
   onSubmit,
   initialFocus,
@@ -23,6 +24,7 @@ export default function ToolDialog({
 }: {
   label: string;
   children: ReactNode;
+  actions?: ReactNode;
   onClose: () => void;
   onSubmit?: () => void;
   initialFocus?: string;
@@ -56,11 +58,14 @@ export default function ToolDialog({
           )}
         </div>
         <div className="tool-dialog-body scroll-region">{children}</div>
-        {closePlacement === 'footer' && (
+        {(actions || closePlacement === 'footer') && (
           <footer className="tool-dialog-footer">
-            <OutlineButton disabled={busy} onClick={onClose}>
-              {t('Close')}
-            </OutlineButton>
+            {closePlacement === 'footer' && (
+              <OutlineButton disabled={busy} onClick={onClose}>
+                {t('Close')}
+              </OutlineButton>
+            )}
+            {actions}
           </footer>
         )}
       </div>

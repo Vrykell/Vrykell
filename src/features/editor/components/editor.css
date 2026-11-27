@@ -55,16 +55,3 @@ button.editor-readonly-label {
   gap: 8px;
   justify-content: flex-end;
 }
-.editor-start-actions {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-.editor-pane .folder-actions > .folder-action-secondary {
-  align-items: center;
-}
-@container (max-width: 880px) {
-  .editor-pane .folder-actions .folder-action-secondary {
-    display: none;
-  }
-}

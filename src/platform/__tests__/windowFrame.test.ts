@@ -10,11 +10,14 @@ vi.mock('@platform/runtime', () => ({
   get isMacOS() {
     return platform.mac;
   },
+  get isWindows() {
+    return platform.nativeMaterial && !platform.mac;
+  },
 }));
 vi.mock('@tauri-apps/api/window', () => ({ Effect: { Acrylic: 'acrylic', Sidebar: 'sidebar' }, getCurrentWindow: () => material }));
 vi.mock('@platform/diagnostics', () => ({ invoke: invokeMock, diagnostic: vi.fn() }));
 
-import { syncWindowFrame, syncWindowMaterial } from '../windowChrome';
+import { syncWindowFrame, syncWindowMaterial } from '../windowFrame';
 
 const root = () => document.documentElement;
 
@@ -26,55 +29,31 @@ beforeEach(() => {
   root().removeAttribute('style');
   delete root().dataset.toolWindow;
   delete root().dataset.nativeMaterial;
+  delete root().dataset.nativeFrame;
 });
 
 afterEach(() => {
   vi.clearAllMocks();
 });
 
-it('paints the main window frame with the neutral gray border', () => {
-  root().style.setProperty('--chrome-bg', '#303030');
-  root().style.setProperty('--surface', '#2B2B2B');
-  root().style.setProperty('--border-strong', '#4B4E52');
-
-  syncWindowFrame();
-
-  expect(invokeMock).toHaveBeenCalledWith('apply_window_frame', { color: '#4B4E52' });
+it('lets the native compositor choose one window outline', async () => {
+  await syncWindowFrame();
+  await syncWindowFrame();
+  expect(invokeMock).toHaveBeenCalledExactlyOnceWith('apply_window_frame');
+  expect(root().dataset.nativeFrame).toBe('active');
 });
 
-it('uses the same gray border for tool windows in the light theme', () => {
-  root().dataset.toolWindow = 'true';
-  root().style.setProperty('--chrome-bg', '#303030');
-  root().style.setProperty('--surface', '#F5F5F5');
-  root().style.setProperty('--border-strong', '#B9C2C8');
-
-  syncWindowFrame();
-
-  expect(invokeMock).toHaveBeenCalledWith('apply_window_frame', { color: '#B9C2C8' });
-});
-
-it('keeps the previous frame when the theme has no color for it', () => {
-  syncWindowFrame();
-
-  expect(invokeMock).not.toHaveBeenCalled();
-});
-
-it('ignores a rejected frame update', async () => {
-  root().style.setProperty('--border-strong', 'rgb(75, 78, 82)');
+it('keeps the web outline when native framing is unavailable', async () => {
   invokeMock.mockRejectedValue(new Error('window unavailable'));
-
-  syncWindowFrame();
-  await Promise.resolve();
-
-  expect(invokeMock).toHaveBeenCalledWith('apply_window_frame', { color: 'rgb(75, 78, 82)' });
+  await syncWindowFrame();
+  expect(root().dataset.nativeFrame).toBeUndefined();
 });
 
 it('uses the live translucent backdrop and clears it when disabled', async () => {
-  root().style.setProperty('--border-strong', '#4B4E52');
   await syncWindowMaterial(true, 'dark');
   expect(material.setTheme).toHaveBeenCalledWith('dark');
   expect(material.setEffects).toHaveBeenCalledWith({ effects: ['acrylic'] });
-  expect(invokeMock).toHaveBeenCalledWith('apply_window_frame', { color: '#4B4E52' });
+  expect(invokeMock).toHaveBeenCalledWith('apply_window_frame');
   await syncWindowMaterial(false, 'light');
   expect(material.setTheme).toHaveBeenLastCalledWith('light');
   expect(material.clearEffects).toHaveBeenCalledTimes(2);
@@ -96,6 +75,7 @@ it('uses the native sidebar material on a supported desktop', async () => {
   platform.mac = true;
   await syncWindowMaterial(true, 'light');
   expect(material.setEffects).toHaveBeenCalledWith({ effects: ['sidebar'] });
+  expect(invokeMock).not.toHaveBeenCalled();
   expect(root().dataset.nativeMaterial).toBe('active');
 });
 

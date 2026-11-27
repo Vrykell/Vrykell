@@ -6,4 +6,4 @@
 pub mod clipboard_files;
 pub mod path;
 pub mod context_menu;
-pub mod window_chrome;
+pub mod window_frame;

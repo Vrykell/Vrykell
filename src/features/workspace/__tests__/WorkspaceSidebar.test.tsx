@@ -4,7 +4,7 @@ import WorkspaceSidebar from '../components/WorkspaceSidebar';
 import { useDockStore } from '../stores/dock';
 import { useNavigationDrag } from '../stores/navigationDrag';
 import { useUiStore } from '../stores/ui';
-import { useWorkspaceNavigation } from '../stores/navigation';
+import { useWorkspaceNavigation, WORKSPACE_SIDEBAR_WIDTH } from '../stores/navigation';
 import { t } from '@i18n';
 import { useListReorder } from '@ui/layout/listReorder';
 
@@ -22,6 +22,7 @@ afterEach(() => {
 
 it('keeps history next to collapse, one footer destination, and no collapsed rail', () => {
   useWorkspaceNavigation.setState({ collapsed: false });
+  useDockStore.setState({ leftPanels: [] });
   const { container } = render(<WorkspaceSidebar />);
   expect(screen.queryByTestId('workspace-resource-switcher')).toBeNull();
   expect(screen.getByTestId('workspace-history').nextElementSibling).toBe(screen.getByTestId('workspace-sidebar-toggle'));
@@ -171,5 +172,5 @@ it('resizes through the shared separator, keeps a held collapsed drag reversible
   fireEvent.keyDown(handle, { key: 'ArrowLeft' });
   expect(useWorkspaceNavigation.getState().sidebarWidth).toBe(284);
   fireEvent.keyDown(handle, { key: 'Home' });
-  expect(useWorkspaceNavigation.getState().sidebarWidth).toBe(208);
+  expect(useWorkspaceNavigation.getState().sidebarWidth).toBe(WORKSPACE_SIDEBAR_WIDTH);
 });

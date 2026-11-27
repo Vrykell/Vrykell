@@ -16,7 +16,7 @@ import ResourceContent from '@ui/layout/ResourceContent';
 import { useCodeWorkspaceTabs } from '@features/workspace/hooks/useCodeWorkspaceTabs';
 import { openWorkspaceFile } from '@features/workspace/services/workspaceActions';
 import { IconButton } from '@ui/actions/IconButton';
-import { FolderOpen, Plus, iconSizes } from '@ui/icons';
+import { FolderOpenSmall, Plus, iconSizes } from '@ui/icons';
 import { newEditorFile } from '@features/editor/services/documentActions';
 import './git.css';
 
@@ -138,6 +138,10 @@ function GitComparisonContent({
           selected={codeTabs.selected ?? ''}
           grouping={codeTabs.grouping}
           onRename={codeTabs.onRename}
+          onDropOutsideWindow={codeTabs.onDropOutsideWindow}
+          canDropOutsideWindow={codeTabs.canDropOutsideWindow}
+          onDragSingleTab={codeTabs.onDragSingleTab}
+          onTrackWindowDrag={codeTabs.onTrackWindowDrag}
           label={t('Open files and comparisons')}
           listId="code-documents"
           className="git-review-tabs"
@@ -158,28 +162,28 @@ function GitComparisonContent({
           ]}
           toolbar={
             <>
-              <span className="folder-action-secondary">
-                <Select
-                  aria-label={t('Comparison layout')}
-                  value={layout}
-                  onChange={setLayout}
-                  options={[
-                    { value: 'split', label: t('Side by side') },
-                    { value: 'inline', label: t('Inline comparison') },
-                  ]}
-                />
-              </span>
-              <span className="git-diff-navigation folder-action-secondary">{navigation}</span>
-              <span className="folder-action-secondary">
-                <ReloadButton compact label={t('Refresh comparison')} onReload={refresh} />
-              </span>
+              <Select
+                aria-label={t('Comparison layout')}
+                value={layout}
+                onChange={setLayout}
+                options={[
+                  { value: 'split', label: t('Side by side') },
+                  { value: 'inline', label: t('Inline comparison') },
+                ]}
+              />
+              {navigation && <span className="git-diff-navigation">{navigation}</span>}
+              <ReloadButton compact label={t('Refresh comparison')} onReload={refresh} />
+            </>
+          }
+          creation={
+            <>
               <IconButton
                 compact
                 className="workspace-open-action"
                 aria-label={t('Open file')}
                 data-tip={t('Open file')}
                 onClick={() => void openWorkspaceFile()}>
-                <FolderOpen size={iconSizes.control} />
+                <FolderOpenSmall size={iconSizes.compact} />
               </IconButton>
               <IconButton
                 compact

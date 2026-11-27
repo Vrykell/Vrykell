@@ -9,6 +9,7 @@
 import { useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { t } from '@i18n';
+import { useWorkspaceWindowStaging } from '@platform/workspaceWindowIdentity';
 import HarnessQuestion from './HarnessQuestion';
 import { ArrowDown, ArrowUp, Plus, SlidersHorizontal, Sparkles, Square, iconSizes } from '@ui/icons';
 import { useListNavigationMode } from '@ui/hooks/useListNavigationMode';
@@ -229,12 +230,13 @@ export default function HarnessView({
   const [commandDismissed, setCommandDismissed] = useState(false);
   const [commandIndex, setCommandIndex] = useState(0);
   const commandNavigation = useListNavigationMode(true);
+  const windowStaged = useWorkspaceWindowStaging((state) => state.staged || state.agents.has(tabId));
   /** The store refuses a second open for a tab that is already opening, so a re-rendered effect or a
    *  double click can only ever start one agent process. */
   useEffect(() => {
-    if (session) return;
+    if (session || windowStaged) return;
     void useHarnessStore.getState().open(tabId, harness, cwd ?? '', fresh, resumeSessionId);
-  }, [tabId, harness, session, cwd, fresh, resumeSessionId]);
+  }, [tabId, harness, session, cwd, fresh, resumeSessionId, windowStaged]);
 
   const agent = session?.agent?.agentInfo;
   const exchanges = toExchanges(groupHarnessMessages(session?.messages ?? []));

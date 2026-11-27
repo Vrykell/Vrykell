@@ -8,6 +8,12 @@ export interface DropdownAnchor {
   y: number;
   aboveY?: number;
   align?: 'start' | 'end';
+  below?: boolean;
+}
+
+export function dropdownAnchorBelow(button: Element, align: 'start' | 'end' = 'start'): DropdownAnchor {
+  const bounds = button.getBoundingClientRect();
+  return { x: align === 'end' ? bounds.right : bounds.left, y: bounds.bottom + 4, align, below: true };
 }
 
 /** Center a picker that has no trigger, instead of pinning it to the window corner. */
@@ -60,7 +66,7 @@ export default function AnchoredDropdown({
     const anchorTop = preferredAnchor?.aboveY ?? (bounds && bounds.width > 0 ? bounds.top : preferredAnchor ? preferredAnchor.y - 28 : 12);
     const aboveSpace = anchorTop - 12;
     const height = Math.min(panelRef.current?.scrollHeight || 480, window.innerHeight - 16);
-    const placeAbove = aboveSpace > belowSpace && (above || belowSpace < height);
+    const placeAbove = !preferredAnchor?.below && aboveSpace > belowSpace && (above || belowSpace < height);
     setAnchor(
       preferredAnchor
         ? { ...preferredAnchor, aboveY: placeAbove ? anchorTop : undefined }

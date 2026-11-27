@@ -20,23 +20,14 @@ test.beforeEach(async ({ page }) => {
   await expect(page.getByPlaceholder(/输入命令/)).toBeVisible();
 });
 
-test('global search stays centered without covering actions or the title in both page types', async ({ page }) => {
+test('global search stays clear of the tabs, title and actions in both page types', async ({ page }) => {
   for (const width of [600, 720, 900, 1240, 1550]) {
     await page.setViewportSize({ width, height: 800 });
-    await expect
-      .poll(async () => {
-        const search = (await page.getByTestId('global-search-trigger').boundingBox())!;
-        const bar = (await page.locator('.workspace-titlebar').boundingBox())!;
-        return Math.abs(search.x + search.width / 2 - bar.x - bar.width / 2);
-      })
-      .toBeLessThan(1);
-    const search = await page.getByTestId('global-search-trigger').boundingBox();
-    const actions = await page.locator('.workspace-title-actions').boundingBox();
-    const title = await page.locator('.workspace-title').boundingBox();
-    const bar = (await page.locator('.workspace-titlebar').boundingBox())!;
-    expect(Math.abs(search!.x + search!.width / 2 - (bar.x + bar.width / 2))).toBeLessThan(1);
-    expect(search!.x).toBeGreaterThanOrEqual(title!.x + title!.width);
-    expect(search!.x + search!.width).toBeLessThanOrEqual(actions!.x);
+    const search = (await page.getByTestId('global-search-trigger').boundingBox())!;
+    const actions = (await page.locator('[data-dock-zone="right"]').boundingBox())!;
+    const strip = (await page.getByTestId('workspace-instance-bar').boundingBox())!;
+    expect(search.x).toBeGreaterThan(strip.x + strip.width);
+    expect(search.x + search.width).toBeLessThan(actions.x);
     if (await page.evaluate(() => /Mac/.test(navigator.userAgent))) {
       await expect(page.getByTestId('window-controls')).toHaveCount(0);
     } else {
@@ -44,9 +35,12 @@ test('global search stays centered without covering actions or the title in both
     }
   }
   await page.keyboard.press('Control+,');
-  const search = await page.getByTestId('global-search-trigger').boundingBox();
-  const bar = (await page.locator('.workspace-titlebar').boundingBox())!;
-  expect(Math.abs(search!.x + search!.width / 2 - (bar.x + bar.width / 2))).toBeLessThan(1);
+  await expect(page.locator('.settings-screen')).toBeVisible();
+  const search = (await page.getByTestId('global-search-trigger').boundingBox())!;
+  const title = (await page.locator('.workspace-title').boundingBox())!;
+  const actions = (await page.locator('[data-dock-zone="right"]').boundingBox())!;
+  expect(search.x).toBeGreaterThan(title.x + title.width);
+  expect(search.x + search.width).toBeLessThan(actions.x);
 });
 
 test('Windows working directories show their drive prefix without the URI slash', async ({ page }) => {
@@ -305,7 +299,7 @@ test('narrow layouts preserve command space and fit the toolbar', async ({ page 
   await expect(page.getByTestId('workspace-sidebar-expand')).toBeInViewport();
   const overlap = await page.evaluate(() => {
     const search = document.querySelector('[data-testid="global-search-trigger"]')!.getBoundingClientRect();
-    const ai = document.querySelector('.workspace-title-actions')!.getBoundingClientRect();
+    const ai = document.querySelector('[data-dock-zone="right"]')!.getBoundingClientRect();
     return search.right > ai.left;
   });
   expect(overlap).toBe(false);

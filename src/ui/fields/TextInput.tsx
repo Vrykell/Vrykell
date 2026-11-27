@@ -10,8 +10,9 @@ export const literalInputProps = {
   autoComplete: 'off',
 } as const;
 
-export const TextInput = forwardRef<HTMLInputElement, ComponentPropsWithoutRef<'input'> & { variant?: 'plain' | 'field' }>(
+export const TextInput = forwardRef<HTMLInputElement, ComponentPropsWithoutRef<'input'> & { variant?: 'plain' | 'field' | 'search' }>(
   function TextInput({ variant = 'plain', className, ...props }, ref) {
+    const fieldClass = variant === 'search' ? 'text-input-field text-input-search' : 'text-input-field';
     return (
       <input
         {...props}
@@ -19,7 +20,7 @@ export const TextInput = forwardRef<HTMLInputElement, ComponentPropsWithoutRef<'
         aria-label={localizeLabel(props['aria-label'])}
         {...literalInputProps}
         ref={ref}
-        className={variant === 'field' ? `text-input-field ${className ?? ''}` : className}
+        className={variant === 'plain' ? className : `${fieldClass} ${className ?? ''}`}
       />
     );
   },

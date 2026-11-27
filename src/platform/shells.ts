@@ -8,6 +8,10 @@ export type ShellType = 'zsh' | 'bash' | 'powershell' | 'pwsh' | 'cmd';
 /** Every configurable shell type, in the order settings lists them. */
 export const SHELL_TYPES: ShellType[] = ['zsh', 'bash', 'powershell', 'pwsh', 'cmd'];
 
+export function shellSupportsBlockMode(shellType?: string): boolean {
+  return shellType !== 'cmd';
+}
+
 /** Map a shell type to its display name, used for default tab titles. */
 export function shellTypeLabel(shell: string): string {
   switch (shell) {

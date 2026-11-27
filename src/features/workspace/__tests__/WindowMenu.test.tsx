@@ -34,8 +34,9 @@ function mount() {
   const ref = createRef<HTMLElement>();
   render(
     <>
-      <header ref={ref}>
-        <span>Title</span>
+      <header ref={ref} data-tauri-drag-region>
+        <span data-tauri-drag-region>Title</span>
+        <div role="tablist" aria-label="Resources" />
         <button onClick={vi.fn()}>Search</button>
       </header>
       <WindowMenu titlebar={ref} />
@@ -66,6 +67,8 @@ it('disables unavailable actions, reads pin state and preserves interactive titl
   win.isAlwaysOnTop.mockResolvedValue(true);
   const open = mount();
   fireEvent.contextMenu(screen.getByRole('button', { name: 'Search' }));
+  fireEvent.contextMenu(screen.getByRole('tablist', { name: 'Resources' }));
+  expect(win.isMaximized).not.toHaveBeenCalled();
   expect(screen.queryByRole('menu')).toBeNull();
   open();
   const restore = await screen.findByRole('menuitem', { name: '还原窗口' });

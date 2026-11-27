@@ -6,9 +6,10 @@ import { X, iconSizes } from '@ui/icons';
 import { t } from '@i18n';
 import '@ui/layout/FolderTabs.css';
 import { TextInput } from '@ui/fields/TextInput';
+import { useHorizontalWheel } from '@ui/hooks/useHorizontalWheel';
 import type { TabHandle } from './tabHandle';
 import type { TabGroupController } from './tabGroups';
-import GroupedTabList from './GroupedTabList';
+import GroupedTabList, { type TrackWindowTabDrag } from './GroupedTabList';
 
 /** All tab strips share grouping, menus, keyboard navigation and reserved toolbar space. */
 export default function FolderTabs({
@@ -19,6 +20,7 @@ export default function FolderTabs({
   className = '',
   headerClassName = '',
   toolbar,
+  creation,
   leading,
   empty,
   menuItems,
@@ -28,6 +30,10 @@ export default function FolderTabs({
   onSelect,
   onClose,
   onMove,
+  onDropOutsideWindow,
+  onTrackWindowDrag,
+  canDropOutsideWindow,
+  onDragSingleTab,
   onRename,
   grouping,
 }: {
@@ -43,11 +49,16 @@ export default function FolderTabs({
   menuItems?: ContextMenuItem[];
   menuLabel?: string;
   leading?: ReactNode;
+  creation?: ReactNode;
   tabActions?: (id: string) => ContextMenuItem[];
   onBlankContext?: (anchor: import('@ui/menus/ContextMenu').MenuAnchor) => void;
   onSelect: (id: string) => void;
   onClose: (id: string) => void;
   onMove: (id: string, over: string, after: boolean) => void;
+  onDropOutsideWindow?: (id: string, point: { x: number; y: number }, client: { x: number; y: number }) => void;
+  canDropOutsideWindow?: (id: string) => boolean;
+  onDragSingleTab?: (id: string, grabRatio?: number) => boolean;
+  onTrackWindowDrag?: TrackWindowTabDrag;
   onRename?: (id: string, title: string) => void;
 }) {
   const instanceId = useId();
@@ -55,6 +66,8 @@ export default function FolderTabs({
   const [editTitle, setEditTitle] = useState('');
   const [blankMenu, setBlankMenu] = useState<MenuAnchor | null>(null);
   const renameFinished = useRef(false);
+  const toolbarRef = useRef<HTMLDivElement>(null);
+  useHorizontalWheel(toolbarRef, true);
   const beginRename = (item: TabHandle) => {
     if (!onRename || !item.capabilities.renameable) return;
     renameFinished.current = false;
@@ -95,6 +108,10 @@ export default function FolderTabs({
         className={className}
         grouping={grouping}
         empty={empty}
+        onDropOutsideWindow={onDropOutsideWindow}
+        canDropOutsideWindow={canDropOutsideWindow}
+        onDragSingleTab={onDragSingleTab}
+        onTrackWindowDrag={onTrackWindowDrag}
         onSelect={onSelect}
         onClose={onClose}
         onMove={onMove}
@@ -105,7 +122,6 @@ export default function FolderTabs({
           <FolderTabContent
             item={item}
             selected={selected === item.id}
-            onSelect={preview ? undefined : onSelect}
             onClose={preview ? undefined : onClose}
             editing={!preview && editingId === item.id}
             editTitle={editTitle}
@@ -116,7 +132,10 @@ export default function FolderTabs({
           />
         )}
       />
-      <div className="folder-actions">{toolbar}</div>
+      <div ref={toolbarRef} className="folder-actions">
+        {toolbar}
+      </div>
+      {creation && <div className="folder-create">{creation}</div>}
       {blankMenu && (
         <ContextMenu
           anchor={blankMenu}
@@ -130,10 +149,9 @@ export default function FolderTabs({
   );
 }
 
-export function FolderTabContent({
+function FolderTabContent({
   item,
   selected,
-  onSelect,
   onClose,
   editing = false,
   editTitle = '',
@@ -144,7 +162,6 @@ export function FolderTabContent({
 }: {
   item: TabHandle;
   selected: boolean;
-  onSelect?: (id: string) => void;
   onClose?: (id: string) => void;
   editing?: boolean;
   editTitle?: string;
@@ -177,24 +194,27 @@ export function FolderTabContent({
       ) : (
         <>
           <button
+            type="button"
             role="tab"
+            data-subtle
             data-reorder-handle
             aria-selected={selected}
             data-tip={item.tip}
+            onBlur={(event) => event.currentTarget.removeAttribute('data-pointer-focus')}
+            onKeyDown={(event) => event.currentTarget.removeAttribute('data-pointer-focus')}
             onDoubleClick={(event) => {
               if (!onStartRename) return;
               event.stopPropagation();
               onStartRename();
-            }}
-            onClick={() => {
-              if (!selected) onSelect?.(item.id);
             }}>
             {item.icon}
             <span>{item.label}</span>
           </button>
-          <IconButton compact data-no-drag data-testid={item.closeTestId} aria-label={item.closeLabel} onClick={() => onClose?.(item.id)}>
-            <X size={14} />
-          </IconButton>
+          {onClose && (
+            <IconButton compact data-no-drag data-testid={item.closeTestId} aria-label={item.closeLabel} onClick={() => onClose(item.id)}>
+              <X size={14} />
+            </IconButton>
+          )}
         </>
       )}
     </div>

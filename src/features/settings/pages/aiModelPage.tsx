@@ -136,10 +136,11 @@ export function AiModelPage() {
       <div ref={detailRef} style={{ minWidth: 0 }}>
         {selected ? (
           <>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12, minWidth: 0 }}>
+            <div className="settings-switcher-row">
               <button
                 type="button"
-                className="provider-switch"
+                className="selection-switcher"
+                data-subtle
                 data-testid="provider-switch"
                 aria-haspopup="dialog"
                 aria-expanded={providerOpen}

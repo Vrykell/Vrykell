@@ -280,7 +280,7 @@ export default function ProviderModelList({ row, toast }: { row: ProviderRow<Mod
             <div className="settings-model-search">
               <Search size={iconSizes.compact} aria-hidden="true" />
               <TextInput
-                variant="field"
+                variant="search"
                 type="search"
                 value={query}
                 data-testid="model-search"

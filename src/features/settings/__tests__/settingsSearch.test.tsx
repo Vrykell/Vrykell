@@ -91,6 +91,9 @@ it('routes opening-mode settings to their owning shell profile', () => {
       .find((setting) => setting.id === 'open-mode-bash')!
       .onSelect(),
   );
-  expect(useSettingsNavigationStore.getState().selected).toBe('profile:bash');
-  expect(useSettingsNavigationStore.getState().targetField).toBe('打开方式');
+  expect(useSettingsNavigationStore.getState()).toMatchObject({
+    selected: 'shell-profiles',
+    shellProfile: 'bash',
+    targetField: '打开方式',
+  });
 });

@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import { Folder, Sparkles, Settings, Terminal, GitBranch, type AppIcon } from '@ui/icons';
 import { t } from '@i18n';
 import { safeJsonParse, safeLocalStorageGet, safeLocalStorageSet } from '@utils/errorHandler';
+import { secondaryWorkspaceLabel } from '@platform/workspaceWindowIdentity';
 import { useWorkspaceStore, isSessionTab } from './workspace';
 import { minTerminalWidth, MIN_PANE_SIZE } from '../model/windowLayout';
 import { useAuxiliarySidebarStore } from './auxiliarySidebar';
@@ -36,6 +37,9 @@ export const NAVIGATION_DEFS: Record<string, Pick<PanelDef, 'id' | 'icon' | 'lab
 const STORAGE_KEY = 'dock-layout-v6';
 const PANEL_IDS = Object.keys(PANEL_DEFS);
 export const MIN_PANEL_WIDTH = 160;
+const PANEL_UNFOLD_WIDTH = MIN_PANEL_WIDTH + 24;
+const PANEL_WIDTH_VERSION = 1;
+const independentLayout = secondaryWorkspaceLabel() !== null;
 export const WORKSPACE_GAP = 0;
 
 interface PersistedLayout {
@@ -48,6 +52,7 @@ interface PersistedLayout {
 
 interface DockState extends PersistedLayout {
   collapsedPanels: string[];
+  pendingPanelWidth: { id: string; width: number } | null;
   moveButton: (id: string, to: DockSide, atIndex?: number) => void;
   togglePanel: (side: DockSide, id: string) => void;
   openPanel: (id: string) => void;
@@ -57,7 +62,13 @@ interface DockState extends PersistedLayout {
   reconcilePanelSpace: () => void;
 }
 
-const defaults = (): PersistedLayout => ({ leftZone: [], rightZone: [...PANEL_IDS], leftPanels: [], rightPanels: [], panelWidths: {} });
+const defaults = (): PersistedLayout => ({
+  leftZone: ['command-history'],
+  leftPanels: ['command-history'],
+  rightZone: ['files', 'chat', 'git'],
+  rightPanels: ['chat'],
+  panelWidths: {},
+});
 
 /** Keep independent sides in the current layout. */
 export function normalizeDockLayout(value: unknown): PersistedLayout | null {
@@ -79,24 +90,28 @@ export function normalizeDockLayout(value: unknown): PersistedLayout | null {
   const rightOpen = valid(data.rightPanels).find((id) => rightZone.includes(id));
   const panelWidths: Record<string, number> = {};
   for (const [id, width] of Object.entries(data.panelWidths)) {
-    if (!PANEL_DEFS[id] || typeof width !== 'number' || !Number.isFinite(width)) continue;
-    panelWidths[id] = Math.max(MIN_PANEL_WIDTH, data.widthPreset === 'compact' ? width : Math.min(width, PANEL_DEFS[id]!.width));
+    if (!PANEL_DEFS[id] || typeof width !== 'number' || !Number.isFinite(width) || width <= MIN_PANEL_WIDTH) continue;
+    // Older layouts could save a slight reversal of a collapsed drag as the preferred width.
+    if (data.panelWidthVersion !== PANEL_WIDTH_VERSION && width < PANEL_UNFOLD_WIDTH) continue;
+    panelWidths[id] = data.widthPreset === 'compact' ? width : Math.min(width, PANEL_DEFS[id]!.width);
   }
   return { leftZone, rightZone, leftPanels: leftOpen ? [leftOpen] : [], rightPanels: rightOpen ? [rightOpen] : [], panelWidths };
 }
 
 function saveLayout(layout: PersistedLayout) {
-  safeLocalStorageSet(STORAGE_KEY, JSON.stringify({ ...layout, widthPreset: 'compact', layoutVersion: 6 }));
+  if (!independentLayout)
+    safeLocalStorageSet(
+      STORAGE_KEY,
+      JSON.stringify({ ...layout, widthPreset: 'compact', layoutVersion: 6, panelWidthVersion: PANEL_WIDTH_VERSION }),
+    );
 }
 
 function loadLayout(): PersistedLayout {
   const raw = safeLocalStorageGet(STORAGE_KEY);
-  if (!raw) return defaults();
-  const layout = normalizeDockLayout(safeJsonParse<unknown>(raw));
-  if (!layout) {
-    console.warn('[dock] Invalid layout; restoring defaults');
-    return defaults();
-  }
+  const saved = raw ? normalizeDockLayout(safeJsonParse<unknown>(raw)) : null;
+  if (raw && !saved) console.warn('[dock] Invalid layout; restoring defaults');
+  const layout = saved ?? defaults();
+  if (independentLayout) return { ...layout, leftPanels: [], rightPanels: [] };
   if ([...layout.leftPanels, ...layout.rightPanels].includes('chat')) useWorkspaceNavigation.getState().setAiPlacement('side');
   saveLayout(layout);
   return layout;
@@ -134,6 +149,7 @@ function persisted(state: DockState): PersistedLayout {
 export const useDockStore = create<DockState>((set) => ({
   ...loadLayout(),
   collapsedPanels: [],
+  pendingPanelWidth: null,
   moveButton: (id, to, atIndex) =>
     set((state) => {
       if (!PANEL_DEFS[id]) return state;
@@ -147,6 +163,7 @@ export const useDockStore = create<DockState>((set) => ({
           rightZone: [...state.rightZone.filter((item) => item !== id && !displaced.includes(item)), ...displaced],
           leftPanels: wasOpen ? [id] : state.leftPanels.filter((item) => item !== id),
           rightPanels: state.rightPanels.filter((item) => item !== id),
+          pendingPanelWidth: state.pendingPanelWidth?.id === id ? null : state.pendingPanelWidth,
           collapsedPanels: state.collapsedPanels.filter((item) => item !== id),
         };
         saveLayout(persisted({ ...state, ...patch }));
@@ -157,12 +174,15 @@ export const useDockStore = create<DockState>((set) => ({
       let index = atIndex ?? state.rightZone.length;
       if (from >= 0 && from < index) index -= 1;
       zone.splice(Math.max(0, Math.min(index, zone.length)), 0, id);
+      const rightPanels = wasOpen ? visiblePanels(state, [id]) : state.rightPanels.filter((item) => item !== id);
+      const pending = state.pendingPanelWidth;
       const patch = {
         rightZone: zone,
         leftZone: state.leftZone.filter((item) => item !== id),
         leftPanels: state.leftPanels.filter((item) => item !== id),
-        rightPanels: wasOpen ? visiblePanels(state, [id]) : state.rightPanels.filter((item) => item !== id),
-        collapsedPanels: state.collapsedPanels.filter((item) => item !== id),
+        rightPanels,
+        pendingPanelWidth: pending && pending.id !== id && rightPanels.includes(pending.id) ? pending : null,
+        collapsedPanels: state.collapsedPanels.filter((item) => item !== id && rightPanels.includes(item)),
       };
       saveLayout(persisted({ ...state, ...patch }));
       return patch;
@@ -180,11 +200,12 @@ export const useDockStore = create<DockState>((set) => ({
     }
     set((state) => {
       if (!PANEL_DEFS[id]) return state;
-      const collapsedPanels = state.collapsedPanels.filter((item) => item !== id);
+      const collapsedPanels = left ? state.collapsedPanels.filter((item) => item !== id) : [];
       const leftPanels = left ? [id] : state.leftPanels.filter((item) => item !== id);
       const rightPanels = left ? state.rightPanels.filter((item) => item !== id) : visiblePanels(state, [id]);
       if (id === 'chat' && (leftPanels.includes(id) || rightPanels.includes(id))) useWorkspaceNavigation.getState().setAiPlacement('side');
-      const patch = { leftPanels, rightPanels, collapsedPanels };
+      const pendingPanelWidth = left && state.pendingPanelWidth?.id !== id ? state.pendingPanelWidth : null;
+      const patch = { leftPanels, rightPanels, collapsedPanels, pendingPanelWidth };
       saveLayout(persisted({ ...state, ...patch }));
       return patch;
     });
@@ -198,6 +219,7 @@ export const useDockStore = create<DockState>((set) => ({
         rightPanels: state.rightPanels.filter((item) => item !== id),
         leftZone: state.leftZone.filter((item) => item !== id),
         rightZone: wasLeft && !state.rightZone.includes(id) ? [...state.rightZone, id] : state.rightZone,
+        pendingPanelWidth: state.pendingPanelWidth?.id === id ? null : state.pendingPanelWidth,
         collapsedPanels: state.collapsedPanels.filter((item) => item !== id),
       };
       saveLayout(persisted({ ...state, ...patch }));
@@ -205,26 +227,27 @@ export const useDockStore = create<DockState>((set) => ({
     }),
   setPanelWidth: (id, delta) =>
     set((state) => {
-      if (!PANEL_DEFS[id] || !Number.isFinite(delta)) return state;
-      const current = state.panelWidths[id] ?? PANEL_DEFS[id]!.width;
-      const next = Math.round(current + delta);
-      const folded = next <= MIN_PANEL_WIDTH;
-      const width = folded ? MIN_PANEL_WIDTH : Math.max(MIN_PANEL_WIDTH, Math.min(Math.round(availablePanelWidth(state)), next));
+      if (!PANEL_DEFS[id] || !state.rightPanels.includes(id) || !Number.isFinite(delta) || delta === 0) return state;
+      const maximum = Math.max(MIN_PANEL_WIDTH, Math.round(availablePanelWidth(state)));
+      const current =
+        state.pendingPanelWidth?.id === id
+          ? state.pendingPanelWidth.width
+          : Math.min(maximum, state.panelWidths[id] ?? PANEL_DEFS[id]!.width);
+      const width = Math.max(MIN_PANEL_WIDTH, Math.min(maximum, Math.round(current + delta)));
+      const folded = width <= MIN_PANEL_WIDTH || (state.collapsedPanels.includes(id) && width < Math.min(PANEL_UNFOLD_WIDTH, maximum));
       const collapsedPanels = folded ? [...new Set([...state.collapsedPanels, id])] : state.collapsedPanels.filter((item) => item !== id);
       if (width === current && collapsedPanels.length === state.collapsedPanels.length) return state;
-      const patch = { panelWidths: { ...state.panelWidths, [id]: width }, collapsedPanels };
-      saveLayout(persisted({ ...state, ...patch }));
-      return patch;
+      return { pendingPanelWidth: { id, width }, collapsedPanels };
     }),
   commitPanelWidth: (id) =>
     set((state) => {
-      if (!PANEL_DEFS[id]) return state;
+      const pending = state.pendingPanelWidth;
+      if (!pending || pending.id !== id) return state;
       const collapsedPanels = state.collapsedPanels.filter((item) => item !== id);
-      const rightPanels =
-        (state.panelWidths[id] ?? PANEL_DEFS[id]!.width) <= MIN_PANEL_WIDTH
-          ? state.rightPanels.filter((item) => item !== id)
-          : state.rightPanels;
-      const patch = { collapsedPanels, rightPanels };
+      const folded = state.collapsedPanels.includes(id);
+      const rightPanels = folded ? state.rightPanels.filter((item) => item !== id) : state.rightPanels;
+      const panelWidths = folded ? state.panelWidths : { ...state.panelWidths, [id]: pending.width };
+      const patch = { collapsedPanels, rightPanels, panelWidths, pendingPanelWidth: null };
       saveLayout(persisted({ ...state, ...patch }));
       return patch;
     }),
@@ -232,7 +255,7 @@ export const useDockStore = create<DockState>((set) => ({
     set((state) => {
       const rightPanels = visiblePanels(state, state.rightPanels);
       if (rightPanels === state.rightPanels) return state;
-      const patch = { rightPanels };
+      const patch = { rightPanels, collapsedPanels: [], pendingPanelWidth: null };
       saveLayout(persisted({ ...state, ...patch }));
       return patch;
     }),

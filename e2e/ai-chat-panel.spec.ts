@@ -155,7 +155,7 @@ test.describe('AI chat panel', () => {
     await expect(page.locator('[data-chat-composer]:visible')).toHaveValue('');
   });
 
-  test('model picker: search filtering, capability badge filtering and click to select', async ({ page }) => {
+  test('model picker: search filtering, capability badge filtering and click to select', async ({ page }, info) => {
     await boot(page, '好的');
     await page.locator('[data-dock-btn="chat"]').click();
     await expect(page.locator('[data-chat-composer]:visible')).toBeVisible();
@@ -169,9 +169,15 @@ test.describe('AI chat panel', () => {
     await expect(page.getByTestId('model-pick-m-local')).toBeVisible();
     await expect(page.getByText('推理', { exact: true }).first()).toBeVisible();
     const localRow = page.getByTestId('model-pick-m-local');
-    await expect(localRow.locator('.model-cap-chip')).toHaveCount(1);
+    await expect(localRow.locator('[data-testid^="model-cap-"]')).toHaveCount(1);
     await expect(localRow.getByTestId('model-cap-tools')).toHaveAttribute('data-supported', 'true');
     await expect(localRow.getByTestId('model-cap-vision')).toHaveCount(0);
+    const picker = page.getByRole('dialog', { name: '选择模型' });
+    await expect(picker.getByRole('button', { name: '搜索', exact: true })).toBeVisible();
+    const capabilityIcons = picker.locator('.model-capability-toggle svg');
+    await expect(capabilityIcons).toHaveCount(4);
+    for (const icon of await capabilityIcons.all()) await expect(icon).toHaveAttribute('viewBox', '0 0 16 16');
+    await picker.screenshot({ path: info.outputPath('compact-capability-icons.png'), animations: 'disabled' });
 
     // Capability filter: clicking "Reasoning" leaves only the main model
     await page.getByRole('button', { name: /推理/ }).click();
@@ -191,7 +197,10 @@ test.describe('AI chat panel', () => {
     await page.getByTestId('model-pick-m-main').click();
     const calls = await aiModelCalls(page);
     expect(calls.some((c) => c.kind === 'set_active' && c.id === 'm-main')).toBe(true);
-    await expect(page.getByText('已切换到 主力模型')).toBeVisible();
+    const notice = page.getByRole('status').filter({ hasText: '已切换到 主力模型' });
+    await expect(notice).toHaveAttribute('data-tone', 'success');
+    await expect(notice.locator('.notification-card-heading > svg')).toHaveAttribute('viewBox', '0 0 16 16');
+    await notice.screenshot({ path: info.outputPath('compact-success-icon.png'), animations: 'disabled' });
     // The picker closes after a selection
     await expect(page.getByText('选择模型', { exact: true })).toHaveCount(0);
   });

@@ -1,6 +1,7 @@
 import type { TabHandle } from '@ui/layout/tabHandle';
 import type { TabGroupController } from '@ui/layout/tabGroups';
 import type { ContextMenuItem } from '@ui/menus/ContextMenu';
+import type { TrackWindowTabDrag } from '@ui/layout/GroupedTabList';
 
 /** Uniform shape returned by every strip provider. */
 export interface WorkspaceTabStrip {
@@ -9,6 +10,10 @@ export interface WorkspaceTabStrip {
   grouping?: TabGroupController;
   onRename?: (id: string, title: string) => void;
   tabActions?: (id: string) => ContextMenuItem[];
+  onDropOutsideWindow?: (id: string, point: { x: number; y: number }, client: { x: number; y: number }) => void;
+  canDropOutsideWindow?: (id: string) => boolean;
+  onDragSingleTab?: (id: string, grabRatio?: number) => boolean;
+  onTrackWindowDrag?: TrackWindowTabDrag;
   onSelect: (id: string) => void;
   onClose: (id: string) => void;
   onMove: (id: string, over: string, after: boolean) => void;

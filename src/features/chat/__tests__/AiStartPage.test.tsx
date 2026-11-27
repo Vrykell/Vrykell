@@ -1,35 +1,20 @@
-/**
- * AiStartPage tests — the agent picker belongs to the AI start page, so leaving the
- * workspace must close it instead of leaving a floating dialog over the next page.
- */
-import { cleanup, fireEvent, render, screen } from '@testing-library/react';
-import { afterEach, beforeEach, expect, it, vi } from 'vitest';
+import { fireEvent, render, screen } from '@testing-library/react';
+import { expect, it, vi } from 'vitest';
 import AiStartPage from '../components/AiStartPage';
 
-const invokeMock = vi.hoisted(() => vi.fn());
+vi.mock('@features/workspace/components/AgentLauncher', () => ({
+  default: ({ open }: { open: boolean }) => (open ? <div role="dialog" /> : null),
+}));
 
-vi.mock('@platform/diagnostics', () => ({ invoke: invokeMock, diagnostic: vi.fn() }));
-
-beforeEach(() => {
-  invokeMock.mockReset();
-  invokeMock.mockImplementation((command: string) => {
-    if (command === 'acp_harnesses')
-      return Promise.resolve([{ name: 'Agent', command: 'agent', args: [], env: {}, cwd: '', enabled: true }]);
-    if (command === 'acp_workspace_root') return Promise.resolve('C:/work');
-    if (command === 'which_cmd') return Promise.resolve(true);
-    return Promise.resolve(undefined);
-  });
-});
-afterEach(cleanup);
-
-it('closes the agent picker when the workspace becomes inactive and does not reopen it', () => {
-  const view = render(<AiStartPage open active onNewConversation={vi.fn()} onPick={vi.fn()} />);
+it('closes the start page picker when switching away and keeps the new conversation action', () => {
+  const onNewConversation = vi.fn();
+  const onPick = vi.fn();
+  const view = render(<AiStartPage active onNewConversation={onNewConversation} onPick={onPick} />);
+  fireEvent.click(screen.getByTestId('ai-start-new-conversation'));
+  expect(onNewConversation).toHaveBeenCalledOnce();
   fireEvent.click(screen.getByTestId('ai-start-agents'));
-  expect(screen.getByTestId('acp-launcher')).toBeInTheDocument();
-
-  view.rerender(<AiStartPage open active={false} onNewConversation={vi.fn()} onPick={vi.fn()} />);
-  expect(screen.queryByTestId('acp-launcher')).toBeNull();
-
-  view.rerender(<AiStartPage open active onNewConversation={vi.fn()} onPick={vi.fn()} />);
-  expect(screen.queryByTestId('acp-launcher')).toBeNull();
+  expect(screen.getByRole('dialog')).toBeVisible();
+  view.rerender(<AiStartPage active={false} onNewConversation={onNewConversation} onPick={onPick} />);
+  view.rerender(<AiStartPage active onNewConversation={onNewConversation} onPick={onPick} />);
+  expect(screen.queryByRole('dialog')).toBeNull();
 });

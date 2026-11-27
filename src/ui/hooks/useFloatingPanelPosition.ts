@@ -4,7 +4,7 @@ import { clampMenuPosition } from '@ui/menus/menuPosition';
 /** Measure floating content so font changes and narrow windows keep it on screen. */
 export function useFloatingPanelPosition(
   ref: RefObject<HTMLElement | null>,
-  anchor: { x: number; y: number; above?: HTMLElement; aboveY?: number; trigger?: HTMLElement; align?: 'start' | 'end' },
+  anchor: { x: number; y: number; above?: HTMLElement; aboveY?: number; trigger?: HTMLElement; align?: 'start' | 'end'; below?: boolean },
   submenuOf?: HTMLElement,
   enabled = true,
 ) {
@@ -26,11 +26,12 @@ export function useFloatingPanelPosition(
           : anchor.x;
       const aboveY = anchor.above?.isConnected ? anchor.above.getBoundingClientRect().top : anchor.aboveY;
       const bottom = aboveY !== undefined ? Math.max(8, aboveY - 6) : window.innerHeight - 8;
-      const maxHeight = aboveY !== undefined ? Math.max(0, bottom - 8) : undefined;
+      const belowY = trigger ? trigger.bottom + 4 : anchor.y;
+      const maxHeight = aboveY !== undefined ? Math.max(0, bottom - 8) : anchor.below && !row ? Math.max(0, bottom - belowY) : undefined;
       const height = Math.min(bounds.height, maxHeight ?? bounds.height);
       const next = {
         ...clampMenuPosition(
-          { left, top: row ? row.top - 4 : aboveY !== undefined ? bottom - height : trigger ? trigger.bottom + 4 : anchor.y },
+          { left, top: row ? row.top - 4 : aboveY !== undefined ? bottom - height : belowY },
           { ...bounds, width: bounds.width, height },
           { width: window.innerWidth, height: bottom + 8 },
         ),
@@ -56,6 +57,6 @@ export function useFloatingPanelPosition(
       window.removeEventListener('resize', resize);
       window.removeEventListener('scroll', update, true);
     };
-  }, [ref, anchor.x, anchor.y, anchor.above, anchor.aboveY, anchor.trigger, anchor.align, submenuOf, enabled]);
+  }, [ref, anchor.x, anchor.y, anchor.above, anchor.aboveY, anchor.trigger, anchor.align, anchor.below, submenuOf, enabled]);
   return position;
 }

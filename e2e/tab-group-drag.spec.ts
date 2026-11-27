@@ -41,7 +41,12 @@ test('groups and loose tabs share one drag order and a dragged group folds only 
   const restBackground = await groupHeader.evaluate((element) => getComputedStyle(element).backgroundColor);
   await groupCard.hover();
   expect(await groupHeader.evaluate((element) => getComputedStyle(element).backgroundColor)).toBe(restBackground);
-  expect(await groupHeader.evaluate((element) => getComputedStyle(element).borderTopLeftRadius)).toBe('8px');
+  expect(
+    await groupHeader.evaluate((element) => {
+      const style = getComputedStyle(element);
+      return style.borderTopLeftRadius === style.getPropertyValue('--radius-inner').trim();
+    }),
+  ).toBe(true);
   expect(await groupHeader.evaluate((element) => getComputedStyle(element, '::before').content)).toBe('none');
   await page.screenshot({ path: info.outputPath('group-hover-dark.png'), animations: 'disabled' });
   const groupedId = (await page.locator('[data-group-id] [data-tab-row-id]').first().getAttribute('data-tab-row-id'))!;
@@ -145,8 +150,9 @@ test('dragging a loose tab across a leading group never absorbs it', async ({ pa
   const beforeGroup = page.locator(`[data-reorder-placeholder="${groupId}"]`);
   await expect(beforeGroup).toHaveCount(1);
   expect((await beforeGroup.boundingBox())!.x).toBeLessThan((await group.boundingBox())!.x);
-  // Past the group's right edge: the placeholder moves to the empty tail instead of staying inside.
-  await moveTo((boxes) => boxes.member.x + boxes.member.width + 40);
+  // The ungrouped tail is the drop target beside the group.
+  const tail = (await page.getByTestId('workspace-instance-bar').locator('[data-reorder-zone="ungrouped"]').boundingBox())!;
+  await page.mouse.move(tail.x + tail.width / 2, y, { steps: 8 });
   await expect(page.locator('[data-reorder-zone="ungrouped"] [data-reorder-placeholder]')).toHaveCount(1);
   await page.mouse.up();
   await expect(page.getByTestId(`tab-row-${looseId}`)).toHaveAttribute('data-tab-group', '');

@@ -13,6 +13,10 @@ describe('literal text input', () => {
     render(<Component variant="field" aria-label="Field" />);
     expect(screen.getByRole('textbox')).toHaveClass('text-input-field');
   });
+  it('uses the shared field geometry for a search input and preserves its control type', () => {
+    render(<TextInput variant="search" type="search" aria-label="Search" className="toolbar-query" />);
+    expect(screen.getByRole('searchbox')).toHaveClass('text-input-field', 'text-input-search', 'toolbar-query');
+  });
   it.each([TextInput, TextArea])('disables native substitutions while retaining composition and changes', (Component) => {
     const change = vi.fn();
     const compose = vi.fn();

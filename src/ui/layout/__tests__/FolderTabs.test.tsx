@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from '@testing-library/react';
+import { act, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, expect, it, vi } from 'vitest';
 import FolderTabs from '@ui/layout/FolderTabs';
 import { tabCapabilities, type TabHandle } from '@ui/layout/tabHandle';
@@ -13,7 +13,7 @@ const items: TabHandle[] = ['first', 'second'].map((id) => ({
   capabilities: tabCapabilities({ renameable: true }),
 }));
 
-function setup() {
+function setup(onDropOutsideWindow?: (id: string, point: { x: number; y: number }) => void) {
   const onSelect = vi.fn();
   const onClose = vi.fn();
   const onMove = vi.fn();
@@ -26,6 +26,7 @@ function setup() {
       onSelect={onSelect}
       onClose={onClose}
       onMove={onMove}
+      onDropOutsideWindow={onDropOutsideWindow}
     />,
   );
   const tabs = screen.getAllByRole('tab');
@@ -148,6 +149,34 @@ it('retains a captured gesture when selection transfers its logical strip to ano
   replacement.remove();
 });
 
+it('keeps the external drag source on a replacement strip after capture loss', () => {
+  const { tabs, onSelect, onClose, onMove, view } = setup();
+  dragFirst(tabs[0]!);
+  act(() => useListReorder.setState({ externalDragSourceId: 'first' }));
+  try {
+    fireEvent.blur(window);
+    expect(useListReorder.getState().drag).toBeNull();
+    view.rerender(
+      <FolderTabs
+        key="replacement"
+        items={items}
+        selected="first"
+        label="Open documents"
+        toolbar={null}
+        onSelect={onSelect}
+        onClose={onClose}
+        onMove={onMove}
+      />,
+    );
+    const transferred = screen.getByRole('tab', { name: 'first' }).closest('.folder-tab');
+    expect(transferred).toHaveAttribute('data-workspace-drag-source');
+    expect(screen.getByRole('tab', { name: 'second' }).closest('.folder-tab')).not.toHaveAttribute('data-workspace-drag-source');
+  } finally {
+    act(() => useListReorder.setState({ externalDragSourceId: null }));
+  }
+  expect(screen.getByRole('tab', { name: 'first' }).closest('.folder-tab')).not.toHaveAttribute('data-workspace-drag-source');
+});
+
 it('keeps close buttons independent of document dragging', () => {
   const { onClose, onMove } = setup();
   const close = screen.getByRole('button', { name: 'Close first' });
@@ -160,12 +189,49 @@ it('keeps close buttons independent of document dragging', () => {
   expect(useListReorder.getState().drag).toBeNull();
 });
 
-it('selects a document on primary pointer press before movement or release', () => {
+it('selects a document on click after releasing the primary pointer', () => {
   const { tabs, onSelect } = setup();
   fireEvent.pointerDown(tabs[1]!, { pointerId: 1, button: 0, isPrimary: true, clientX: 140, clientY: 14 });
-  expect(onSelect).toHaveBeenCalledWith('second');
+  expect(onSelect).not.toHaveBeenCalled();
   expect(useListReorder.getState().drag).toBeNull();
   fireEvent.pointerUp(window, { pointerId: 1, clientX: 140, clientY: 14 });
+  fireEvent.click(tabs[1]!, { detail: 1 });
+  expect(onSelect).toHaveBeenCalledExactlyOnceWith('second');
+});
+
+it('selects an inactive document as soon as its drag starts', () => {
+  const { tabs, onSelect, onMove } = setup();
+  fireEvent.pointerDown(tabs[1]!, { pointerId: 1, button: 0, isPrimary: true, clientX: 140, clientY: 14 });
+  expect(onSelect).not.toHaveBeenCalled();
+  fireEvent.pointerMove(window, { pointerId: 1, clientX: 14, clientY: 14 });
+  expect(onSelect).toHaveBeenCalledExactlyOnceWith('second');
+  expect(useListReorder.getState().drag?.id).toBe('second');
+  fireEvent.pointerUp(window, { pointerId: 1, clientX: 14, clientY: 14 });
+  fireEvent.click(tabs[1]!, { detail: 1 });
+  expect(onMove).toHaveBeenCalledWith('second', 'first', false);
+  expect(onSelect).toHaveBeenCalledTimes(1);
+
+  fireEvent.pointerDown(tabs[1]!, { pointerId: 2, button: 0, isPrimary: true, clientX: 140, clientY: 14 });
+  fireEvent.keyDown(window, { key: 'Escape' });
+  fireEvent.pointerUp(window, { pointerId: 2, clientX: 140, clientY: 14 });
+  fireEvent.click(tabs[1]!, { detail: 1 });
+  expect(onMove).toHaveBeenCalledTimes(1);
+  expect(onSelect).toHaveBeenCalledTimes(1);
+});
+
+it('hands the tab off only when released outside the window and honors Escape', () => {
+  const detach = vi.fn();
+  const { tabs, onMove } = setup(detach);
+  dragFirst(tabs[0]!);
+  fireEvent.pointerMove(window, { pointerId: 1, clientX: 150, clientY: -10 });
+  expect(detach).not.toHaveBeenCalled();
+  fireEvent.keyDown(window, { key: 'Escape' });
+  fireEvent.pointerUp(window, { pointerId: 1, clientX: 150, clientY: -10 });
+  expect(detach).not.toHaveBeenCalled();
+  dragFirst(tabs[0]!);
+  fireEvent.pointerUp(window, { pointerId: 1, clientX: 150, clientY: -10, screenX: 300, screenY: 40 });
+  expect(detach).toHaveBeenCalledExactlyOnceWith('first', { x: 300, y: 40 }, { x: 150, y: -10 });
+  expect(onMove).not.toHaveBeenCalled();
 });
 
 it('does not switch documents for secondary presses or close buttons', () => {

@@ -2,7 +2,7 @@ import { isWindows } from '@platform/runtime';
 import type { ShellType } from '@platform/shells';
 
 export type PageId =
-  | `profile:${ShellType}`
+  | 'shell-profiles'
   | 'about'
   | 'application-language'
   | 'ai-model'
@@ -26,6 +26,8 @@ export type PageId =
   | 'logs'
   | 'context-menu'
   | 'file-operations';
+
+export type SettingsDestination = PageId | { page: 'shell-profiles'; shell: ShellType };
 
 /** Platform-specific destinations stay out of navigation, search and restored selections. */
 export function isSettingsPageAvailable(page: PageId | undefined, windows = isWindows): boolean {

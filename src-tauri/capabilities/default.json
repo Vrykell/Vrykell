@@ -1,8 +1,8 @@
 {
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "default",
-  "description": "Capability for the main window",
-  "windows": ["main"],
+  "description": "Capability for workspace windows",
+  "windows": ["main", "app-*"],
   "permissions": [
     "core:default",
     "dialog:default",
@@ -34,6 +34,10 @@
     "core:webview:allow-create-webview-window",
     "core:window:allow-unminimize",
     "core:window:allow-show",
+    "core:window:allow-hide",
+    "core:window:allow-set-ignore-cursor-events",
+    "core:window:allow-set-position",
+    "core:window:allow-set-size",
     "core:window:allow-set-focus",
     "core:window:allow-set-effects",
     "core:window:allow-set-theme"

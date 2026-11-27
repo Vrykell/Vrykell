@@ -33,7 +33,14 @@ test('all text surfaces retain literal input and settings search focuses an indi
   await page.getByTestId('global-search-trigger').click();
   await search.fill('Zsh 打开模式');
   await dialog.locator('[data-search-result]').filter({ hasText: 'Zsh 打开模式' }).first().click();
+  const profile = page.getByRole('combobox', { name: 'Shell 配置文件' });
+  await expect(profile).toHaveText('Zsh');
   await expect(page.getByRole('radiogroup', { name: '打开方式', exact: true }).locator('[aria-checked="true"]')).toBeFocused();
+  await page.getByTestId('global-search-trigger').click();
+  await search.fill('Bash 启动目录');
+  await dialog.locator('[data-search-result]').filter({ hasText: '启动目录' }).first().click();
+  await expect(profile).toHaveText('Bash');
+  await expect(page.getByRole('textbox', { name: '启动目录' })).toBeFocused();
 });
 
 test('classic terminal input helpers remain invisible and selected cells have no ruler seam after resizing', async ({ page }) => {

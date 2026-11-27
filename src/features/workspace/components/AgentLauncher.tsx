@@ -13,12 +13,15 @@ import { invoke } from '@platform/diagnostics';
 import { agentCatalog, type AgentEntry, type AgentInstance } from '@features/chat/model/agentCatalog';
 import { createAgentSession } from '@features/chat/services/agentDrivers';
 import type { HarnessConfig } from '@platform/api/acp';
-import { useAiConfigStore } from '@features/agent';
+import { useAiConfigStore, useUsageStore } from '@features/agent';
+import { formatCompact } from '@features/agent/model/usageStats';
+import LaunchStats from './LaunchStats';
 import { pickPath } from '@platform/api/fs';
 
 export default function AgentLauncher({
   open,
   onClose,
+  embedded = false,
   suspended = false,
   onPick,
   cwd,
@@ -26,6 +29,7 @@ export default function AgentLauncher({
 }: {
   open: boolean;
   onClose: () => void;
+  embedded?: boolean;
   suspended?: boolean;
   onPick?: (instance: AgentInstance, cwd?: string) => void;
   cwd?: string;
@@ -46,10 +50,17 @@ export default function AgentLauncher({
   const close = useRef(onClose);
   close.current = onClose;
   useEffect(() => {
-    if (open && settingsOpen) close.current();
-  }, [open, settingsOpen]);
+    if (open && !embedded && settingsOpen) close.current();
+  }, [open, embedded, settingsOpen]);
+  const records = useUsageStore((state) => state.records);
+  const usage = useUsageStore((state) => state.acp);
   const models = useAiConfigStore((state) => state.models);
   const activeModel = useAiConfigStore((state) => state.activeModel);
+  const today = useMemo(() => {
+    const since = new Date().setHours(0, 0, 0, 0);
+    const current = records.filter((record) => record.at >= since);
+    return { turns: current.length, tokens: current.reduce((sum, record) => sum + record.inputTokens + record.outputTokens, 0) };
+  }, [records]);
 
   useEffect(() => {
     if (!open) return;
@@ -110,7 +121,7 @@ export default function AgentLauncher({
 
   const handleKey = (event: React.KeyboardEvent) => {
     if (event.key === 'Enter' && event.target instanceof HTMLButtonElement) return;
-    if (event.key === 'Escape') onClose();
+    if (event.key === 'Escape' && !embedded) onClose();
     else if (event.key === 'ArrowDown') {
       event.preventDefault();
       setKeyboardNavigation(true);
@@ -139,8 +150,8 @@ export default function AgentLauncher({
         value={directory}
         aria-label={t('Project folder')}
         data-testid="acp-launcher-directory"
-        data-tip={workspaceRoot ? t('New folder in {{path}}', { path: workspaceRoot }) : t('Project folder')}
-        placeholder={t('Project folder (optional)')}
+        data-tip={t('Project folder')}
+        placeholder={workspaceRoot ? t('New folder in {{path}}', { path: workspaceRoot }) : t('Default project folder')}
         onChange={(event) => setDirectory(event.target.value)}
       />
       <OutlineButton
@@ -157,88 +168,195 @@ export default function AgentLauncher({
     </div>
   );
 
-  return (
-    <AnchoredDropdown
-      open={open}
-      onClose={onClose}
-      panelRef={dialogRef}
-      anchor={anchor}
-      aria-label={t('Choose agent')}
-      className="acp-profile-dropdown"
+  if (!embedded)
+    return (
+      <AnchoredDropdown
+        open={open}
+        onClose={onClose}
+        panelRef={dialogRef}
+        anchor={anchor}
+        aria-label={t('Choose agent')}
+        className="acp-profile-dropdown"
+        data-testid="acp-launcher"
+        data-embedded="false"
+        data-keyboard-navigation={keyboardNavigation}
+        onPointerMove={() => setKeyboardNavigation(false)}
+        onKeyDown={handleKey}>
+        <section className="new-tab-section">
+          <h2>
+            {t('Agents')}
+            {list ? ` · ${catalog.length}` : ''}
+          </h2>
+          {folder}
+          <button type="button" className="new-tab-row workspace-floating-row" onClick={configure}>
+            <Settings size={20} />
+            <span>{t('Configure servers')}</span>
+            <ChevronRight size={16} />
+          </button>
+          <div className="workspace-sidebar-search acp-profile-search">
+            <Search size={iconSizes.compact} />
+            <TextInput
+              ref={inputRef}
+              value={query}
+              data-testid="acp-launcher-search"
+              onChange={(event) => setQuery(event.target.value)}
+              placeholder={t('Search agents…')}
+              aria-label={t('Search agents…')}
+            />
+          </div>
+          {error && (
+            <ErrorBox
+              title={t('Could not load servers')}
+              details={error}
+              actions={<OutlineButton onClick={() => setRevision((value) => value + 1)}>{t('Retry')}</OutlineButton>}
+            />
+          )}
+          {!list && !error && (
+            <div className="new-tab-empty" role="status">
+              {t('Loading…')}
+            </div>
+          )}
+          {list && !ready.length && (
+            <div className="new-tab-empty" data-testid="acp-launcher-none">
+              {t('No matching agents')}
+            </div>
+          )}
+          <div className="new-tab-option-list acp-profile-list">
+            {ready.map((entry, index) => {
+              const missing = !!entry.command && installed[entry.command] === false;
+              const usable = entry.enabled && !missing;
+              const Mark = harnessMark(entry.label);
+              const status = t(missing ? 'Not installed on PATH' : entry.enabled ? 'Ready' : 'Disabled');
+              return (
+                <button
+                  type="button"
+                  key={entry.id}
+                  className="new-tab-row workspace-floating-row"
+                  data-testid={entry.instance.driver === 'builtin' ? 'ai-start-new-conversation' : `acp-launcher-${entry.label}`}
+                  data-keyboard-active={keyboardNavigation && selected === index}
+                  disabled={!usable}
+                  data-tip={`${entry.label} · ${entry.detail} · ${status}`}
+                  onMouseEnter={() => {
+                    setSelected(index);
+                    setKeyboardNavigation(false);
+                  }}
+                  onClick={() => start(entry)}>
+                  <span className="identity-icon" data-colored="true">
+                    <Mark size={20} />
+                  </span>
+                  <span>{entry.label}</span>
+                  <small className="acp-profile-status">{status}</small>
+                </button>
+              );
+            })}
+          </div>
+        </section>
+      </AnchoredDropdown>
+    );
+
+  const content = (
+    <div
+      ref={dialogRef}
       data-testid="acp-launcher"
-      data-embedded="false"
+      data-embedded={embedded}
       data-keyboard-navigation={keyboardNavigation}
       onPointerMove={() => setKeyboardNavigation(false)}
+      className={embedded ? 'ai-launchpad' : 'workspace-floating workspace-floating-dialog ai-launchpad'}
+      role={embedded ? 'region' : 'dialog'}
+      aria-modal={embedded ? undefined : true}
+      aria-label={t('Choose agent')}
+      onClick={(event) => event.stopPropagation()}
       onKeyDown={handleKey}>
-      <section className="new-tab-section">
-        <h2>
-          {t('Agents')}
-          {list ? ` · ${catalog.length}` : ''}
-        </h2>
-        {folder}
-        <button type="button" className="new-tab-row workspace-floating-row" onClick={configure}>
-          <Settings size={20} />
-          <span>{t('Configure servers')}</span>
-          <ChevronRight size={16} />
-        </button>
-        <div className="workspace-sidebar-search acp-profile-search">
-          <Search size={iconSizes.compact} />
-          <TextInput
-            ref={inputRef}
-            value={query}
-            data-testid="acp-launcher-search"
-            onChange={(event) => setQuery(event.target.value)}
-            placeholder={t('Search agents…')}
-            aria-label={t('Search agents…')}
-          />
-        </div>
-        {error && (
-          <ErrorBox
-            title={t('Could not load servers')}
-            details={error}
-            actions={<OutlineButton onClick={() => setRevision((value) => value + 1)}>{t('Retry')}</OutlineButton>}
+      <header className="ai-launch-header">
+        <h2 className="ai-launch-title">{t('Start a conversation')}</h2>
+        {embedded && <p className="ai-launch-description">{t('Choose an agent for this conversation.')}</p>}
+      </header>
+      <div className="ai-launch-body">
+        {embedded && (
+          <LaunchStats
+            items={[
+              { label: t('Requests today'), value: formatCompact(today.turns) },
+              { label: t('Tokens today'), value: formatCompact(today.tokens) },
+              { label: t('Configured models'), value: models.length },
+            ]}
           />
         )}
-        {!list && !error && (
-          <div className="new-tab-empty" role="status">
-            {t('Loading…')}
+        <section className="ai-launch-agents" aria-label={t('Agents')}>
+          {folder}
+          <div className="ai-launch-section-heading">
+            <h3>
+              {t('Agents')}
+              {list && <span>{catalog.length}</span>}
+            </h3>
+            <OutlineButton onClick={configure}>{t('Configure servers')}</OutlineButton>
           </div>
-        )}
-        {list && !ready.length && (
-          <div className="new-tab-empty" data-testid="acp-launcher-none">
-            {t('No matching agents')}
+          <div className="workspace-sidebar-search ai-launch-search">
+            <Search size={iconSizes.compact} />
+            <TextInput
+              ref={inputRef}
+              value={query}
+              data-testid="acp-launcher-search"
+              onChange={(event) => setQuery(event.target.value)}
+              placeholder={t('Search agents…')}
+              aria-label={t('Search agents…')}
+            />
           </div>
-        )}
-        <div className="new-tab-option-list acp-profile-list">
-          {ready.map((entry, index) => {
-            const missing = !!entry.command && installed[entry.command] === false;
-            const usable = entry.enabled && !missing;
-            const Mark = harnessMark(entry.label);
-            const status = t(missing ? 'Not installed on PATH' : entry.enabled ? 'Ready' : 'Disabled');
-            return (
-              <button
-                type="button"
-                key={entry.id}
-                className="new-tab-row workspace-floating-row"
-                data-testid={entry.instance.driver === 'builtin' ? 'agent-launcher-builtin' : `acp-launcher-${entry.label}`}
-                data-keyboard-active={keyboardNavigation && selected === index}
-                disabled={!usable}
-                data-tip={`${entry.label} · ${entry.detail} · ${status}`}
-                onMouseEnter={() => {
-                  setSelected(index);
-                  setKeyboardNavigation(false);
-                }}
-                onClick={() => start(entry)}>
-                <span className="identity-icon" data-colored="true">
-                  <Mark size={20} />
-                </span>
-                <span>{entry.label}</span>
-                <small className="acp-profile-status">{status}</small>
-              </button>
-            );
-          })}
-        </div>
-      </section>
-    </AnchoredDropdown>
+          {error && (
+            <ErrorBox
+              title={t('Could not load servers')}
+              details={error}
+              actions={<OutlineButton onClick={() => setRevision((value) => value + 1)}>{t('Retry')}</OutlineButton>}
+            />
+          )}
+          {!list && !error && (
+            <div className="ai-launch-empty" role="status">
+              {t('Loading…')}
+            </div>
+          )}
+          {list && ready.length === 0 && (
+            <div className="ai-launch-empty" data-testid="acp-launcher-none">
+              {t('No matching agents')}
+            </div>
+          )}
+          <div className="ai-launch-grid">
+            {ready.map((entry, index) => {
+              const missing = !!entry.command && installed[entry.command] === false;
+              const usable = entry.enabled && !missing;
+              const Mark = harnessMark(entry.label);
+              return (
+                <button
+                  key={entry.id}
+                  type="button"
+                  className="ai-launch-option"
+                  data-keyboard-active={keyboardNavigation && index === selected}
+                  data-testid={entry.instance.driver === 'builtin' ? 'ai-start-new-conversation' : `acp-launcher-${entry.label}`}
+                  disabled={!usable}
+                  onClick={() => start(entry)}
+                  onMouseEnter={() => {
+                    setSelected(index);
+                    setKeyboardNavigation(false);
+                  }}>
+                  <span className="identity-icon" data-colored="true">
+                    <Mark size={28} />
+                  </span>
+                  <span className="ai-launch-copy">
+                    <strong>{entry.label}</strong>
+                    <small>{entry.detail}</small>
+                  </span>
+                  <ChevronRight size={iconSizes.compact} />
+                  <span className="ai-launch-availability" data-ready={usable} data-missing={missing}>
+                    {missing ? t('Not installed on PATH') : entry.enabled ? t('Ready') : t('Disabled')}
+                    {entry.instance.driver === 'acp' && (
+                      <span className="ai-launch-usage">{t('{{count}} turns', { count: usage[entry.label]?.turns ?? 0 })}</span>
+                    )}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+        </section>
+      </div>
+    </div>
   );
+  return content;
 }

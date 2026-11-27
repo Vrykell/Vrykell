@@ -124,7 +124,11 @@ describe('ErrorBox', () => {
     expect(container.querySelector('[role="alert"]')).not.toBeNull();
     expect(document.querySelector('#app-notifications [role="alert"]')).toBeNull();
     expect(screen.queryByRole('button', { name: '关闭错误提示' })).toBeNull();
-    expect(screen.getByRole('button', { name: 'Retry tool' })).toBeVisible();
+    const retry = screen.getByRole('button', { name: 'Retry tool' });
+    expect(retry.closest('.inline-error-heading')).toHaveTextContent('Tool failed');
+    expect(screen.queryByText('Diagnostic output')).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: '技术详情' }));
+    expect(screen.getByText('Diagnostic output')).toBeVisible();
   });
   it('includes the owning notification in modal keyboard navigation and dismisses it without closing the dialog', () => {
     const close = vi.fn();
@@ -240,10 +244,14 @@ describe('ErrorBox', () => {
     expect(document.querySelector('pre[data-selectable]')?.textContent).toBe('SFTP_UNAVAILABLE: no subsystem');
   });
 
-  it('copies the raw details from the shared icon button', async () => {
+  it('copies raw details from inside the expanded diagnostic panel', async () => {
     render(<ErrorBox details="raw diagnostic">出错了</ErrorBox>);
 
-    fireEvent.click(screen.getByLabelText('复制技术详情'));
+    expect(screen.queryByLabelText('复制技术详情')).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: '技术详情' }));
+    const copy = screen.getByLabelText('复制技术详情');
+    expect(copy.closest('.error-details-output')).toHaveTextContent('raw diagnostic');
+    fireEvent.click(copy);
 
     await waitFor(() => expect(writeClipboardTextMock).toHaveBeenCalledWith('raw diagnostic'));
   });

@@ -5,9 +5,9 @@ import WorkspaceHeader from '@ui/layout/WorkspaceHeader';
 import { IconButton } from '@ui/actions/IconButton';
 import type { PaneTarget } from '@core/paneLayout';
 import ContextMenu, { type ContextMenuItem, type MenuAnchor } from '@ui/menus/ContextMenu';
-import type { DropdownAnchor } from '@ui/menus/AnchoredDropdown';
+import { dropdownAnchorBelow, type DropdownAnchor } from '@ui/menus/AnchoredDropdown';
 import { flattenSingleSubmenu } from '@ui/menus/menuGroups';
-import { FolderOpen, History, PanelRight, Plus } from '@ui/icons';
+import { FolderOpenSmall, History, PanelRight, Plus, iconSizes } from '@ui/icons';
 import { useWorkspaceResources } from '../hooks/useWorkspaceResources';
 import { detachCompositionPane, mergeCompositionTab, useUnifiedWorkspace } from '../stores/unifiedWorkspace';
 import { useWorkspaceNavigation } from '../stores/navigation';
@@ -80,8 +80,7 @@ export default function UnifiedWorkspace({ active }: { active: boolean }) {
   const focused = cells.find((cell) => cell.id === state.focused) ?? cells[0];
   const placed = new Set(cells.map((cell) => cell.resourceId));
   const anchor = (trigger: HTMLButtonElement, split: boolean) => {
-    const box = trigger.getBoundingClientRect();
-    setMenu({ anchor: { x: box.right, y: box.bottom + 4, trigger, align: 'end' }, split });
+    setMenu({ anchor: { ...dropdownAnchorBelow(trigger), trigger }, split });
   };
   useEffect(() => {
     if (!state.choosingSplit || !visible || !newButton.current) return;
@@ -146,6 +145,7 @@ export default function UnifiedWorkspace({ active }: { active: boolean }) {
   const pickerAnchor = (rowAnchor?: MenuAnchor, menuAnchor?: MenuAnchor): DropdownAnchor | undefined => {
     const toolbar = newButton.current?.getBoundingClientRect();
     const trigger = menuAnchor?.trigger;
+    if (trigger === newButton.current) return dropdownAnchorBelow(trigger);
     // A menu on the tab strip's empty area opens under the toolbar; a menu on a tab row
     // keeps the picker beside the action that was selected.
     if (toolbar && menuAnchor && trigger && trigger.closest('.folder-header') && !trigger.closest('.folder-tab')) {
@@ -192,6 +192,10 @@ export default function UnifiedWorkspace({ active }: { active: boolean }) {
           onSelect={strip.onSelect}
           onClose={strip.onClose}
           onMove={strip.onMove}
+          onDropOutsideWindow={strip.onDropOutsideWindow}
+          canDropOutsideWindow={strip.canDropOutsideWindow}
+          onDragSingleTab={strip.onDragSingleTab}
+          onTrackWindowDrag={strip.onTrackWindowDrag}
           grouping={strip.grouping}
           onRename={strip.onRename}
           tabActions={strip.tabActions}
@@ -217,8 +221,12 @@ export default function UnifiedWorkspace({ active }: { active: boolean }) {
                   <PanelRight size={16} />
                 </IconButton>
               )}
+            </>
+          }
+          creation={
+            <>
               <IconButton compact aria-label={t('Open file')} data-tip={t('Open file')} onClick={() => void openWorkspaceFile()}>
-                <FolderOpen size={16} />
+                <FolderOpenSmall size={iconSizes.compact} />
               </IconButton>
               <IconButton
                 ref={newButton}
@@ -234,8 +242,9 @@ export default function UnifiedWorkspace({ active }: { active: boolean }) {
       </WorkspaceHeader>
       {state.startActive && (
         <UnifiedStartPage
-          onNew={(kind) => (kind === 'terminal' ? setTerminalPicker({ source: 'shell', split: false }) : newItem(kind))}
+          onNew={newItem}
           onOpen={() => void openWorkspaceFile()}
+          onTerminal={(anchor) => setTerminalPicker({ source: 'shell', split: false, anchor })}
           onConnect={(anchor) => setTerminalPicker({ source: 'ssh', split: false, anchor })}
           onAgent={(anchor) => setLauncher({ split: false, anchor })}
         />

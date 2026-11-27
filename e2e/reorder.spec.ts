@@ -36,26 +36,28 @@ test.describe('sidebar list drag reordering', () => {
       await setupTauriMock(page);
       await page.goto('/');
       await expect(page.getByPlaceholder(/输入命令/)).toBeVisible();
-      await ensureTabsOpen(page);
-      const { first, groupId } = await page.evaluate(async (withSingleton) => {
-        const path = '/src/features/workspace/stores/workspace.ts';
-        const { useWorkspaceStore } = (await import(path)) as typeof import('../src/features/workspace/stores/workspace');
-        const store = useWorkspaceStore.getState();
-        const first = store.tabs.find((tab) => tab.kind === 'session')!.id;
-        const second = store.addTab({ title: 'Grouped second' });
-        const workbenchPath = '/src/features/workspace/services/workbench.ts';
-        const { synchronizeWorkbench, createContainerGroup, assignWorkspaceGroup } = (await import(
-          workbenchPath
-        )) as typeof import('../src/features/workspace/services/workbench');
-        synchronizeWorkbench();
-        const groupId = await createContainerGroup(first, 'Regression group');
-        await assignWorkspaceGroup(second, groupId);
-        if (withSingleton) store.openHistoryTab();
-        return { first, groupId };
-      }, singleton);
-      const source = page.getByTestId(`tab-row-${first}`);
-      const from = (await source.boundingBox())!;
       const list = page.locator('[data-reorder-list="session-tabs"]');
+      await expect(list).toBeVisible();
+      const sessions = list.locator('[data-tab-kind="session"]');
+      if (!(await sessions.count())) await page.getByTestId('tab-new-default').click();
+      await expect(sessions.first()).toBeVisible();
+      const first = (await sessions.first().getAttribute('data-tab-row-id'))!;
+      const before = await sessions.count();
+      await page.getByTestId('tab-new-default').click();
+      await expect(sessions).toHaveCount(before + 1);
+      const second = list.getByRole('tab', { selected: true });
+      const secondId = (await second.locator('xpath=../..').getAttribute('data-tab-row-id'))!;
+      const source = page.getByTestId(`tab-row-${first}`);
+      await source.getByRole('tab').click({ button: 'right' });
+      await page.getByRole('button', { name: '新建分组', exact: true }).click();
+      await page.getByRole('textbox', { name: '分组名称' }).fill('Regression group');
+      await page.getByRole('textbox', { name: '分组名称' }).press('Enter');
+      await page.getByTestId(`tab-row-${secondId}`).getByRole('tab').click({ button: 'right' });
+      await page.getByRole('menuitem', { name: '移至标签组', exact: true }).press('ArrowRight');
+      await page.getByRole('button', { name: 'Regression group', exact: true }).last().click();
+      const groupId = await source.getAttribute('data-tab-group');
+      if (singleton) await page.getByTestId('tab-history-btn').click();
+      const from = (await source.boundingBox())!;
       const viewport = (await list.boundingBox())!;
       const loose = list.locator('[data-reorder-zone="ungrouped"]');
       const heading = (await loose.boundingBox())!;

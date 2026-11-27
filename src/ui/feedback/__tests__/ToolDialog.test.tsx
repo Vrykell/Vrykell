@@ -33,6 +33,30 @@ it('replaces the heading close icon with one labeled footer button when asked', 
   expect(close).toHaveBeenCalledOnce();
 });
 
+it('places dialog actions after the scrollable body and keeps them keyboard accessible', async () => {
+  const submit = vi.fn();
+  render(
+    <ToolDialog
+      label="Edit root"
+      onClose={vi.fn()}
+      onSubmit={submit}
+      initialFocus="input"
+      actions={
+        <button type="button" onClick={submit}>
+          Save
+        </button>
+      }>
+      <input aria-label="Root" />
+    </ToolDialog>,
+  );
+  const field = screen.getByRole('textbox', { name: 'Root' });
+  await waitFor(() => expect(field).toHaveFocus());
+  const save = screen.getByRole('button', { name: 'Save' });
+  expect(save.closest('footer')?.previousElementSibling).toContainElement(field);
+  fireEvent.keyDown(save, { key: 'Enter', ctrlKey: true });
+  expect(submit).toHaveBeenCalledOnce();
+});
+
 it('prevents dismissal while a save is pending', () => {
   const close = vi.fn();
   render(

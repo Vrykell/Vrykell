@@ -58,6 +58,7 @@ export default function SettingsDialog({
         ref={dialog}
         tabIndex={-1}
         className="workspace-floating workspace-floating-dialog"
+        data-field-outlines
         role="dialog"
         aria-modal="true"
         aria-label={title}

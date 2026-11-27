@@ -2,9 +2,8 @@ import { afterEach, beforeEach, expect, it } from 'vitest';
 import {
   normalizeSidebarWidth,
   orderedWorkspaceIds,
-  runWithoutAreaHistory,
   useWorkspaceNavigation,
-  WORKSPACE_AREA_HISTORY_LIMIT,
+  WORKSPACE_SIDEBAR_WIDTH,
   workspaceAreaForKind,
   workspaceSidebarWidth,
 } from '../stores/navigation';
@@ -20,8 +19,6 @@ beforeEach(() =>
     lastTabs: {},
     groupColors: {},
     aiPlacement: 'main',
-    areaHistory: ['terminal'],
-    areaHistoryIndex: 0,
   }),
 );
 afterEach(() => useWorkspaceNavigation.setState(snapshot, true));
@@ -45,33 +42,6 @@ it('retains the last instance in each area and the return area for side docking'
   useWorkspaceNavigation.getState().selectArea('ai');
   expect(useWorkspaceNavigation.getState().previousArea).toBe('code');
   expect(useWorkspaceNavigation.getState().lastTabs).toEqual({ terminal: 'terminal-a', code: 'editor-a' });
-});
-it('records visits once, drops the forward branch on a new visit and steps through the trail', () => {
-  const navigation = useWorkspaceNavigation.getState();
-  navigation.selectArea('code');
-  navigation.selectArea('ai');
-  // Re-selecting the current area is not a new destination.
-  navigation.selectArea('ai');
-  expect(useWorkspaceNavigation.getState().areaHistory).toEqual(['terminal', 'code', 'ai']);
-  expect(useWorkspaceNavigation.getState().stepAreaHistory(-1)).toBe('code');
-  expect(useWorkspaceNavigation.getState().areaHistoryIndex).toBe(1);
-  expect(useWorkspaceNavigation.getState().stepAreaHistory(-1)).toBe('terminal');
-  expect(useWorkspaceNavigation.getState().stepAreaHistory(-1)).toBeNull();
-  // Stepping back never rewrites the trail, so forward stays available.
-  expect(useWorkspaceNavigation.getState().stepAreaHistory(1)).toBe('code');
-  // A fresh visit replaces the abandoned forward branch.
-  useWorkspaceNavigation.getState().selectArea('ssh');
-  expect(useWorkspaceNavigation.getState().areaHistory).toEqual(['terminal', 'code', 'ssh']);
-  expect(useWorkspaceNavigation.getState().stepAreaHistory(1)).toBeNull();
-});
-it('bounds the visited trail and keeps silent re-entry from recording', () => {
-  const navigation = useWorkspaceNavigation.getState();
-  for (let step = 0; step < WORKSPACE_AREA_HISTORY_LIMIT + 20; step++) navigation.selectArea(step % 2 ? 'terminal' : 'code');
-  expect(useWorkspaceNavigation.getState().areaHistory).toHaveLength(WORKSPACE_AREA_HISTORY_LIMIT);
-  const index = useWorkspaceNavigation.getState().areaHistoryIndex;
-  runWithoutAreaHistory(() => useWorkspaceNavigation.getState().selectArea('ai'));
-  expect(useWorkspaceNavigation.getState().areaHistory).toHaveLength(WORKSPACE_AREA_HISTORY_LIMIT);
-  expect(useWorkspaceNavigation.getState().areaHistoryIndex).toBe(index);
 });
 it('removes all sidebar space when collapsed and permits expansion at any width', () => {
   expect(workspaceSidebarWidth(760)).toBe(208);
@@ -106,7 +76,7 @@ it('bounds expansion, preserves the remembered size across viewport constraints 
   expect(workspaceSidebarWidth(760, 726)).toBe(0);
   expect(workspaceSidebarWidth(1240)).toBe(400);
   navigation.resetSidebarWidth();
-  expect(workspaceSidebarWidth()).toBe(208);
+  expect(workspaceSidebarWidth()).toBe(WORKSPACE_SIDEBAR_WIDTH);
 });
 it('keeps the exact collapse boundary and rejects invalid resize values', () => {
   const navigation = useWorkspaceNavigation.getState();
@@ -130,10 +100,10 @@ it('temporarily overlays without reserving terminal space or persisting an expan
   expect(workspaceSidebarWidth(1240)).toBe(208);
 });
 it.each([
-  [null, 208],
-  [Number.NaN, 208],
-  [Infinity, 208],
-  ['300', 208],
+  [null, WORKSPACE_SIDEBAR_WIDTH],
+  [Number.NaN, WORKSPACE_SIDEBAR_WIDTH],
+  [Infinity, WORKSPACE_SIDEBAR_WIDTH],
+  ['300', WORKSPACE_SIDEBAR_WIDTH],
   [159, 160],
   [800, 400],
   [240.8, 241],

@@ -61,13 +61,30 @@ function applySessionCwd(layout: WindowLayout, cwd: string): WindowLayout {
 // ═══════════════════════════════════════════════════════════════
 
 /** Create a session (called when a tab is opened), carrying its kind discriminator and kind-specific JSON. */
-export async function create(tabId: string, title: string, cwd?: string, kind = 'session', payload = '{}'): Promise<void> {
-  pendingSessions.set(tabId, { title, timestamp: Date.now(), cwd, kind, payload });
+export async function create(
+  tabId: string,
+  title: string,
+  cwd?: string,
+  kind = 'session',
+  payload = '{}',
+  timestamp = Date.now(),
+): Promise<void> {
+  pendingSessions.set(tabId, { title, timestamp, cwd, kind, payload });
 }
 
 const pendingSessions = new Map<string, { title: string; timestamp: number; cwd?: string; kind: string; payload: string }>();
 const sessionWrites = new Map<string, Promise<void>>();
 const paneTransfers = new Map<string, Promise<void>>();
+
+export async function sessionDraftTimestamp(tabId: string): Promise<number | undefined> {
+  await paneTransfers.get(tabId);
+  await sessionWrites.get(tabId);
+  return pendingSessions.get(tabId)?.timestamp;
+}
+
+export function forgetSessionDraft(tabId: string) {
+  pendingSessions.delete(tabId);
+}
 
 /** Serialize ownership changes with subsequent history writes and session closure. */
 export function transferPanes(sourceId: string, targetId: string, paneIds: string[]): Promise<void> {

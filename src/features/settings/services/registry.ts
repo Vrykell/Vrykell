@@ -5,14 +5,14 @@ import { useEditorPreferences } from '@config/editor';
 import { t, localizeLabel, useLanguagePreferences } from '@i18n';
 import { TOOL_NAMES, usePermissions, useAgentSettings, useUsageStore, type ToolName, type AgentSettings } from '@features/agent';
 import { summarize, totalTokens, formatTokens } from '@features/agent/model/usageStats';
-import { SHELL_TYPES, shellTypeLabel } from '@platform/shells';
+import { SHELL_TYPES, shellSupportsBlockMode, shellTypeLabel } from '@platform/shells';
 import { useStartupSettings } from '../stores/startup';
 import { isApiKeyConfigured, getModel } from '@features/agent/stores/aiConfig';
 import { loadConfig } from '@features/files/services/fileOpen';
 import { useSessionStore } from '@features/workspace';
 import { useTypographyStore } from '@config/typography';
 import { useSettingsNavigationStore } from '../stores/navigation';
-import type { PageId } from '../model/navigation';
+import type { PageId, SettingsDestination } from '../model/navigation';
 import { isSettingsPageAvailable } from '../model/navigation';
 import { terminalDebug } from '@features/terminal/services/terminalDebug';
 
@@ -44,7 +44,7 @@ export function searchSettings(query: string): SettingDef[] {
 
 function registerField(
   id: string,
-  page: PageId,
+  destination: SettingsDestination,
   label: string,
   description: string,
   value: () => string = () => '',
@@ -52,6 +52,7 @@ function registerField(
   control?: string | (() => string),
   aliases: string[] = [],
 ): void {
+  const page = typeof destination === 'string' ? destination : destination.page;
   registerSetting({
     id,
     page,
@@ -64,7 +65,7 @@ function registerField(
     keywords: [label, description, ...aliases, ...aliases.map((alias) => t(alias))],
     getValue: value,
     onSelect: () => {
-      useSettingsNavigationStore.getState().openField(page, t(target), typeof control === 'function' ? control() : control);
+      useSettingsNavigationStore.getState().openField(destination, t(target), typeof control === 'function' ? control() : control);
       useSessionStore.getState().openSettings();
       terminalDebug('settings-navigation', { page, settingId: id });
     },
@@ -271,32 +272,35 @@ function globalValue(key: keyof AgentSettings): string {
   return typeof value === 'boolean' ? t(value ? 'Enabled' : 'Disabled') : String(value ?? '');
 }
 for (const shell of SHELL_TYPES) {
-  registerField(`default-profile-${shell}`, `profile:${shell}`, 'Default profile', shellTypeLabel(shell), () =>
+  const destination = { page: 'shell-profiles', shell } as const;
+  registerField(`default-profile-${shell}`, destination, 'Default profile', shellTypeLabel(shell), () =>
     String(useTerminalDefaults.getState().shell === shell),
   );
   registerField(
     `profile-name-${shell}`,
-    `profile:${shell}`,
+    destination,
     'Profile name',
     shellTypeLabel(shell),
     () => useShellProfiles.getState().profiles[shell]?.name ?? '',
   );
   registerField(
     `profile-directory-${shell}`,
-    `profile:${shell}`,
+    destination,
     'Starting directory',
     shellTypeLabel(shell),
     () => useShellProfiles.getState().profiles[shell]?.cwd ?? '',
   );
-  registerField(
-    `open-mode-${shell}`,
-    `profile:${shell}`,
-    t('Open mode for {{shell}}', { shell: shellTypeLabel(shell) }),
-    'settings.openMode.description',
-    () => useAgentSettings.getState().global.openModeByShell[shell],
-    'Opening mode',
-    'Opening mode',
-  );
+  if (shellSupportsBlockMode(shell)) {
+    registerField(
+      `open-mode-${shell}`,
+      destination,
+      t('Open mode for {{shell}}', { shell: shellTypeLabel(shell) }),
+      'settings.openMode.description',
+      () => useAgentSettings.getState().global.openModeByShell[shell],
+      'Opening mode',
+      'Opening mode',
+    );
+  }
 }
 
 const permissionLabels: Record<ToolName, string> = {

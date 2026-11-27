@@ -30,7 +30,7 @@ pub struct ThemeConfig {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub light_preset: Option<String>,
     /// Blend desktop color into the outer navigation frame.
-    #[serde(default = "default_desktop_tint")]
+    #[serde(default)]
     pub desktop_tint: bool,
     /// Application opacity, 0.5..=1.0.
     #[serde(default = "default_opacity")]
@@ -47,16 +47,12 @@ fn default_opacity() -> f32 {
     DEFAULT_OPACITY
 }
 
-fn default_desktop_tint() -> bool {
-    true
-}
-
 impl Default for ThemeConfig {
     fn default() -> Self {
         Self {
             dark_preset: None,
             light_preset: None,
-            desktop_tint: default_desktop_tint(),
+            desktop_tint: false,
             opacity: default_opacity(),
             background_image: None,
             vars: HashMap::new(),
@@ -275,9 +271,12 @@ mod tests {
     }
 
     #[test]
-    fn older_themes_enable_desktop_color_by_default() {
+    fn desktop_color_requires_an_explicit_preference() {
         let cfg: ThemeConfig = serde_json::from_str(r#"{"opacity":1.0,"vars":{}}"#).unwrap();
-        assert!(cfg.desktop_tint);
+        assert!(!cfg.desktop_tint);
+        assert!(!ThemeConfig::default().desktop_tint);
+        let enabled: ThemeConfig = serde_json::from_str(r#"{"desktopTint":true}"#).unwrap();
+        assert!(enabled.desktop_tint);
     }
 
     #[test]

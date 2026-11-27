@@ -1,15 +1,41 @@
 import { expect, test, type Locator, type Page } from '@playwright/test';
 import { setupTauriMock } from './tauri-mock';
 
+test('a mouse click on the start tab does not inherit a text field focus ring', async ({ page }) => {
+  await setupTauriMock(page.context());
+  await page.goto('/');
+  await page.getByTestId('workspace-area-code').click();
+  const tab = page.getByTestId('workspace-instance-bar').getByRole('tab', { name: '开始', exact: true });
+  await expect(tab).toBeVisible();
+  await page.evaluate(() => {
+    const field = document.createElement('input');
+    field.dataset.testid = 'focus-probe';
+    document.body.append(field);
+    field.focus();
+  });
+  await expect(page.getByTestId('focus-probe')).toBeFocused();
+  await tab.click();
+  await expect(tab).toBeFocused();
+  await expect(tab).toHaveCSS('outline-style', 'none');
+  await expect(page.locator('[data-reorder-preview="item"], [data-incoming-tab-preview]')).toHaveCount(0);
+  await tab.press('ArrowRight');
+  await expect(tab).toHaveCSS('outline-style', 'solid');
+});
+
 async function expectJoinedCorners(page: Page, pane: Locator, path: string) {
   await expect(pane).toBeVisible();
   const header = page.getByTestId('workspace-instance-bar').locator('.folder-header');
   const active = header.locator('.folder-tab[data-active="true"]');
   await expect(active).toBeVisible();
   await page.mouse.move(0, 0);
+  const toolbar = page.getByTestId('workspace-context-bar');
+  const content = await pane.evaluate((element) => getComputedStyle(element).backgroundColor);
+  await expect(toolbar).toHaveCSS('background-color', content);
+  await expect(active).toHaveCSS('background-color', content);
+  await expect(toolbar).toHaveCSS('box-shadow', 'none');
   const bounds = (await active.boundingBox())!;
   const colors = await header.evaluate((element) => ({
-    surface: getComputedStyle(element).backgroundColor,
+    surface: getComputedStyle(element.closest('.workspace-titlebar')!).backgroundColor,
     canvas: getComputedStyle(element.querySelector('.folder-tab[data-active="true"]')!).backgroundColor,
   }));
   const screenshot = await page.screenshot({ path, animations: 'disabled' });
@@ -28,19 +54,21 @@ async function expectJoinedCorners(page: Page, pane: Locator, path: string) {
       const bottom = bounds.y + bounds.height;
       const joins = [bounds.x - 1, bounds.x + bounds.width].map((x) => colorAt(x, bottom - 1));
       const cutouts = [bounds.x - 4, bounds.x + bounds.width + 3].map((x) => colorAt(x, bottom - 8));
+      const beneath = colorAt(bounds.x + bounds.width / 2, bottom + 1);
       const normalize = (color: string) => {
         context.clearRect(0, 0, 1, 1);
         context.fillStyle = color;
         context.fillRect(0, 0, 1, 1);
         return Array.from(context.getImageData(0, 0, 1, 1).data);
       };
-      return { joins, cutouts, canvas: normalize(colors.canvas), surface: normalize(colors.surface) };
+      return { joins, cutouts, beneath, canvas: normalize(colors.canvas), surface: normalize(colors.surface) };
     },
     { png: screenshot.toString('base64'), bounds, colors },
   );
   expect(pixels.canvas).not.toEqual(pixels.surface);
   expect(pixels.joins).toEqual([pixels.canvas, pixels.canvas]);
   expect(pixels.cutouts).toEqual([pixels.surface, pixels.surface]);
+  expect(pixels.beneath).toEqual(pixels.canvas);
 }
 
 for (const density of [1, 1.25, 2]) {
@@ -48,7 +76,7 @@ for (const density of [1, 1.25, 2]) {
     test.describe(`folder tab corners in ${mode} mode at ${density}x density`, () => {
       test.use({ deviceScaleFactor: density });
 
-      test('file and comparison tabs join the content without gaps or square protrusions', async ({ page }, info) => {
+      test('file and comparison tabs meet the toolbar without gaps or square protrusions', async ({ page }, info) => {
         test.setTimeout(60_000);
         await setupTauriMock(page.context(), { launchDirectory: '/home/e2e/project', terminalDirectories: true });
         await page.addInitScript((mode) => localStorage.setItem('vrykell-theme-mode', mode), mode);
@@ -95,6 +123,16 @@ for (const density of [1, 1.25, 2]) {
         const secondFile = page.getByTestId('git-untracked-new file.ts');
         await secondFile.hover();
         await secondFile.getByRole('button', { name: '打开工作文件' }).click();
+        const inactive = strip.locator('.folder-tab[data-active="false"]').first();
+        const active = strip.locator('.folder-tab[data-active="true"]');
+        await inactive.hover();
+        const hover = await inactive.evaluate((element) => {
+          const style = getComputedStyle(element);
+          return { top: style.borderTopRightRadius, bottom: style.borderBottomRightRadius, layer: Number(style.zIndex) };
+        });
+        expect(parseFloat(hover.bottom)).toBeGreaterThan(0);
+        expect(hover.bottom).toBe(hover.top);
+        expect(hover.layer).toBeGreaterThan(await active.evaluate((element) => Number(getComputedStyle(element).zIndex)));
         for (const width of [1240, 760]) {
           await page.setViewportSize({ width, height: 800 });
           await expectJoinedCorners(page, editor, info.outputPath(`editor-corners-${width}.png`));

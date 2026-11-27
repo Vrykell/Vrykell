@@ -5,7 +5,7 @@ import { useWorkspaceNavigation } from '../stores/navigation';
 const originalWidth = window.innerWidth;
 const snapshot = useDockStore.getState();
 beforeEach(() => {
-  useWorkspaceNavigation.setState({ collapsed: false, area: 'code' });
+  useWorkspaceNavigation.setState({ collapsed: false, sidebarWidth: 208, area: 'code' });
   useDockStore.setState({
     leftZone: [],
     rightZone: ['files', 'chat'],

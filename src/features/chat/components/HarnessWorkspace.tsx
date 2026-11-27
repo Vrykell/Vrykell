@@ -2,16 +2,17 @@ import { useCallback, useContext, useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { t } from '@i18n';
 import FolderTabs from '@ui/layout/FolderTabs';
+import { dropdownAnchorBelow, type DropdownAnchor } from '@ui/menus/AnchoredDropdown';
 import { IconButton } from '@ui/actions/IconButton';
 import ConfirmDialog from '@ui/feedback/ConfirmDialog';
-import { Plus, DataUsage, PanelRight, History, Sparkles } from '@ui/icons';
+import { Plus, DataUsage, PanelRight, History, SparklesSmall, iconSizes } from '@ui/icons';
 import WorkspaceHeader from '@ui/layout/WorkspaceHeader';
 import ResourceContent from '@ui/layout/ResourceContent';
 import { registerHarnessCloseGuard } from '@core/harness';
 import { pickPath } from '@platform/api/fs';
 import { useToastStore } from '@ui/feedback/Toast';
+import { builtInAgent, type AgentInstance } from '../model/agentCatalog';
 import { createAgentSession } from '../services/agentDrivers';
-import type { AgentInstance } from '../model/agentCatalog';
 import AgentLauncher from '@features/workspace/components/AgentLauncher';
 import AiStartPage from './AiStartPage';
 import { useSessionStore, useUiStore, ScopedPaneWorkspace, useScopedPaneActive, WorkspaceResourceSwitcher } from '@features/workspace';
@@ -64,11 +65,11 @@ export default function HarnessWorkspace({ active, headerActive = active }: { ac
   const visible = active && !settingsOpen;
   const paneActive = useScopedPaneActive('ai');
   const [directory, setDirectory] = useState<string | undefined>(undefined);
-  const [launcherOpen, setLauncherOpen] = useState<{ x: number; y: number } | null>(null);
+  const [launcherOpen, setLauncherOpen] = useState<DropdownAnchor | null>(null);
   const [closing, setClosing] = useState<(() => void) | null>(null);
   const newConversation = () => {
     useSessionStore.getState().openHarnessTab();
-    createAgentSession({ driver: 'builtin' }, 'main');
+    createAgentSession(builtInAgent, 'main');
   };
   const relocate = () => {
     if (!moveMainConversationToSide(selected)) return;
@@ -119,6 +120,10 @@ export default function HarnessWorkspace({ active, headerActive = active }: { ac
       tabActions={strip.tabActions}
       onMove={strip.onMove}
       onClose={strip.onClose}
+      onDragSingleTab={strip.onDragSingleTab}
+      onDropOutsideWindow={strip.onDropOutsideWindow}
+      canDropOutsideWindow={strip.canDropOutsideWindow}
+      onTrackWindowDrag={strip.onTrackWindowDrag}
       onRename={strip.onRename}
       menuLabel={t('Conversation actions')}
       menuItems={[
@@ -141,7 +146,7 @@ export default function HarnessWorkspace({ active, headerActive = active }: { ac
             className="ai-conversation-toolbar"
             style={{ display: selected && activePage?.kind === 'harness' ? 'flex' : 'none' }}
           />
-          <span className="folder-action-secondary ai-secondary-actions">
+          <span className="ai-secondary-actions">
             <IconButton
               compact
               aria-label={t('Usage statistics')}
@@ -160,13 +165,17 @@ export default function HarnessWorkspace({ active, headerActive = active }: { ac
               </IconButton>
             )}
           </span>
+        </>
+      }
+      creation={
+        <>
           <IconButton
             compact
             data-testid="ai-new-conversation"
             aria-label={t('New conversation')}
             data-tip={t('New conversation')}
             onClick={() => void newConversation()}>
-            <Sparkles size={16} />
+            <SparklesSmall size={iconSizes.compact} />
           </IconButton>
           <IconButton
             compact
@@ -175,7 +184,7 @@ export default function HarnessWorkspace({ active, headerActive = active }: { ac
             data-tip={t('Connect a server')}
             onClick={(event) => {
               setDirectory(undefined);
-              setLauncherOpen({ x: event.clientX, y: event.clientY });
+              setLauncherOpen(dropdownAnchorBelow(event.currentTarget));
             }}>
             <Plus size={16} />
           </IconButton>
@@ -201,7 +210,7 @@ export default function HarnessWorkspace({ active, headerActive = active }: { ac
           {activeSystemPage.kind === 'usage' ? (
             <UsageView />
           ) : activeSystemPage.kind === 'start-ai' ? (
-            <AiStartPage open suspended={!!launcherOpen} active={visible} onPick={pick} onNewConversation={newConversation} />
+            <AiStartPage suspended={!!launcherOpen} active={visible} onPick={pick} onNewConversation={newConversation} />
           ) : (
             <UnifiedHistoryView preset="conversation" destination="native" />
           )}
@@ -239,7 +248,9 @@ export default function HarnessWorkspace({ active, headerActive = active }: { ac
           )}
         </ResourceContent>
       ))}
-      {!activeSystemPage && !selected && <AiStartPage open active={visible} onPick={pick} onNewConversation={newConversation} />}
+      {!activeSystemPage && !selected && (
+        <AiStartPage suspended={!!launcherOpen} active={visible} onPick={pick} onNewConversation={newConversation} />
+      )}
       {closing &&
         createPortal(
           <ConfirmDialog

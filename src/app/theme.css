@@ -2,6 +2,7 @@
 
 :root {
   --ui-font-scale: 1;
+  --embedded-toolbar-icon-color: color-mix(in srgb, var(--icon-color), var(--icon-hover-color) 55%);
   --terminal-font-size: calc(14px * var(--ui-font-scale));
   --chat-font-size: 14px;
   --chat-font-scale: 1;
@@ -21,9 +22,9 @@
     'Maple Mono NF CN', 'Cascadia Mono', 'Cascadia Code', Menlo, Monaco, 'JetBrains Mono', 'Sarasa Mono SC', 'Noto Sans Mono CJK SC',
     'Noto Sans Mono', 'DejaVu Sans Mono', monospace, 'Apple Color Emoji', 'Segoe UI Emoji', 'Noto Color Emoji';
 
-  --radius-sm: 8px;
-  --radius-md: 12px;
-  --radius-lg: 16px;
+  --radius-sm: 10px;
+  --radius-md: 10px;
+  --radius-lg: 14px;
   --radius-card: var(--radius-md);
   --radius-block: var(--radius-lg);
   --radius-inner: var(--radius-sm);
@@ -74,10 +75,6 @@
   --placement-hover: color-mix(in srgb, var(--surface) 96%, transparent);
   --control-size: 32px;
   --control-size-compact: 28px;
-  /* Titlebar and sidebar heading share one row height. The search field is sized from the same
-     row so the two stay in proportion when the height changes. */
-  --workspace-titlebar-height: 40px;
-  --workspace-search-height: calc(var(--workspace-titlebar-height) - 12px);
   --control-hover-bg: var(--hover);
   --action-button-bg: color-mix(in srgb, var(--text-primary) 10%, var(--surface));
   --action-button-hover-bg: color-mix(in srgb, var(--text-primary) 16%, var(--surface));
@@ -667,33 +664,32 @@ input.range-input:disabled {
   overflow-y: auto;
   padding: 12px 16px 16px;
 }
-.subagent-row {
+.thread-child-row {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 8px;
+  padding-block: 6px;
 }
-.subagent-row .ai-tool-summary {
-  flex: 1;
+.thread-child-title {
+  display: grid;
+  flex: 1 1 140px;
+  min-width: 0;
 }
-.subagent-row > .icon-button {
-  margin-inline-end: 4px;
+.thread-child-title strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
-.pane-status-footer {
-  display: flex;
-  align-items: center;
-  flex-shrink: 0;
-  gap: 8px;
-  min-height: 28px;
-  padding: 5px 16px;
-  border-top: 1px solid var(--block-divider);
-  color: var(--text-secondary);
-  font-size: calc(12px * var(--ui-font-scale));
+.thread-child-title small {
+  color: var(--text-muted);
 }
-.subagent-footer .text-control {
-  margin-inline-start: auto;
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
+.thread-task-form {
+  display: grid;
+  gap: 10px;
+}
+.thread-task-form textarea {
+  width: 100%;
 }
 .tool-dialog-footer {
   display: flex;
@@ -1200,22 +1196,6 @@ button.chat-mode-trigger[aria-expanded='true'] {
   font-weight: var(--fw-medium);
   color: var(--text-primary);
 }
-.settings-page-heading .shell-profile-title {
-  padding-inline: 6px;
-  background: transparent;
-  font: inherit;
-  white-space: nowrap;
-}
-.settings-page-heading .shell-profile-title:is(:hover, :focus-visible, [aria-expanded='true']) {
-  background: var(--button-hover);
-}
-.shell-profile-title .ui-select-value {
-  overflow: visible;
-}
-.shell-profile-title .ui-select-icon svg {
-  width: 1em;
-  height: 1em;
-}
 @container settings-layout (max-width: 900px) {
   .settings-content {
     padding: 20px 24px;
@@ -1531,24 +1511,14 @@ button.state-icon-button[aria-pressed='true']:hover {
 
 /* Use spacing and subtle surfaces to keep the workspace visually continuous. */
 .workspace-titlebar {
-  --workspace-title-gap: 12px;
-  --workspace-title-inset: 20px;
+  --workspace-title-inset: 8px;
   --workspace-actions-inset: 0px;
-  /* How far the history pair leans toward the search field, capped by the actual column gap
-     so a tight bar never overlaps the two. */
-  --workspace-history-pull: 6px;
-  display: grid;
-  /* The action cluster keeps its intrinsic width so it can never overflow onto the search
-     field (a narrow window squeezes the title instead, which truncates). */
-  grid-template-columns: minmax(0, var(--workspace-title-space, 1fr)) var(--workspace-search-width, 32px) minmax(
-      var(--workspace-actions-width, 220px),
-      1fr
-    );
+  position: relative;
+  display: flex;
   align-items: center;
   flex-shrink: 0;
   height: var(--workspace-titlebar-height);
-  background: var(--chrome-bg);
-  gap: var(--workspace-search-gap, var(--workspace-title-gap));
+  background: var(--workspace-titlebar-bg, var(--chrome-bg));
   user-select: none;
 }
 .workspace-titlebar[data-platform='macos'] {
@@ -1560,19 +1530,15 @@ button.state-icon-button[aria-pressed='true']:hover {
 .workspace-titlebar[data-platform='macos'] .workspace-right-actions {
   gap: 8px;
 }
-/* The label truncates on its own span, so the column itself must not clip: the history pair
-   leans into the shared gap and would otherwise lose its trailing edge. */
 .workspace-title {
   min-width: 0;
   height: 100%;
   display: flex;
   align-items: center;
+  overflow: hidden;
   padding-left: var(--workspace-title-inset);
 }
-/* The label yields its content width so it truncates instead of pushing the actions out. */
 .workspace-title span {
-  flex: 1 1 auto;
-  min-width: 0;
   font-size: calc(13px * var(--ui-font-scale));
   font-weight: var(--fw-medium);
   color: var(--text-secondary);
@@ -1580,80 +1546,37 @@ button.state-icon-button[aria-pressed='true']:hover {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-/* Back and forward sit at the right edge of the title column: they re-enter the previous
-   workspace without competing with the navigation or window controls. The column yields part
-   of the shared gap so the pair reads as attached to the search field it sits beside. Below
-   the folding threshold they are removed entirely instead of overlapping the search field. */
-.workspace-title-history {
-  display: none;
-  align-items: center;
-  gap: 2px;
+.workspace-titlebar[data-has-tabs] .workspace-title {
   flex-shrink: 0;
-  margin-left: auto;
-  margin-right: calc(-1 * min(var(--workspace-history-pull), var(--workspace-search-gap, var(--workspace-title-gap))));
 }
-.workspace-titlebar[data-history='true'] .workspace-title-history {
-  display: flex;
-}
-.workspace-title-history > button.icon-button {
-  color: var(--text-muted);
-}
-.workspace-title-history > button.icon-button:not(:disabled):is(:hover, :focus-visible) {
-  background: var(--control-hover-bg);
-  color: var(--text-primary);
+.workspace-title-drag {
+  min-width: clamp(44px, 5vw, 72px);
+  flex: 1 0 auto;
+  align-self: stretch;
 }
 .workspace-title-actions {
   display: flex;
   align-items: center;
-  justify-content: flex-end;
-  justify-self: end;
-  width: max-content;
-  gap: 12px;
+  flex-shrink: 0;
+  gap: 6px;
   height: 100%;
-  min-width: 0;
   padding-right: var(--workspace-actions-inset);
 }
-.workspace-search {
-  width: 100%;
-  min-width: 0;
-  height: var(--workspace-search-height);
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 0 10px;
-  background: var(--field-bg);
-  color: var(--text-secondary);
-  border: none;
-  border-radius: var(--radius-inner);
-  cursor: pointer;
-  font: calc(13px * var(--ui-font-scale)) var(--font-ui);
-}
-.workspace-search span {
-  flex: 1;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  text-align: left;
-}
-.workspace-search:is(:hover, :focus-visible) {
-  background: var(--button-hover);
-}
-.workspace-search kbd {
-  color: var(--text-muted);
-  font: calc(10px * var(--ui-font-scale)) var(--font-ui);
-  white-space: nowrap;
-}
-.workspace-search > svg {
+button.workspace-global-search.text-control {
   flex-shrink: 0;
+  height: 28px;
+  margin-inline-end: 4px;
+  color: var(--text-secondary);
+  white-space: nowrap;
 }
-.workspace-titlebar[data-search-compact='true'] .workspace-search {
-  padding: 0;
-  gap: 0;
-  justify-content: center;
-}
-.workspace-titlebar[data-search-compact='true'] .workspace-search > :not(svg) {
-  display: none;
+@media (max-width: 820px) {
+  button.workspace-global-search.text-control {
+    width: 28px;
+    padding-inline: 0;
+  }
+  button.workspace-global-search span {
+    display: none;
+  }
 }
 .workspace-settings,
 .workspace-panel-close {
@@ -1689,6 +1612,22 @@ button.state-icon-button[aria-pressed='true']:hover {
   border-radius: 0;
   overflow: hidden;
   z-index: 0;
+}
+:is(.workspace-context-bar, .history-header) {
+  position: relative;
+}
+:is(.workspace-context-bar, .history-header)::after {
+  content: '';
+  position: absolute;
+  inset: 100% 0 auto;
+  height: 6px;
+  z-index: 1;
+  pointer-events: none;
+  background: linear-gradient(color-mix(in srgb, var(--embedded-toolbar-surface) 35%, transparent), transparent);
+  -webkit-backdrop-filter: blur(1px);
+  backdrop-filter: blur(1px);
+  -webkit-mask-image: linear-gradient(var(--text-primary), transparent);
+  mask-image: linear-gradient(var(--text-primary), transparent);
 }
 .workspace-body:has(> .workspace-ssh-status-slot:not(:empty)) .workspace-side-panel[data-side='right'] {
   display: none !important;
@@ -1810,10 +1749,6 @@ button.state-icon-button[aria-pressed='true']:hover {
   z-index: 2000;
   pointer-events: none;
 }
-/* Custom right-side layouts reserve enough space for every navigation action. */
-.workspace-title-actions:has(.workspace-right-navigation[data-compact='true']) {
-  gap: 4px;
-}
 button.activity-button {
   width: 32px !important;
   height: 32px !important;
@@ -1840,7 +1775,6 @@ button.activity-button[aria-pressed='true'] {
   background: var(--control-active-bg) !important;
   color: var(--text-primary) !important;
 }
-.workspace-search:focus-visible,
 .activity-button:focus-visible,
 .workspace-settings:focus-visible,
 .workspace-panel-close:focus-visible {
@@ -1909,18 +1843,13 @@ button.activity-button[aria-pressed='true'] {
   background: var(--composer-bg);
   transition: background var(--dur) var(--ease);
 }
-.terminal-composer:focus-within {
-  box-shadow: none;
-}
-/* Light composers share the terminal's white surface; a hairline keeps the primary input
-   visible without adding a shadow or changing the surface color. */
+/* A white composer disappears on the light canvas; keep the field edge visible like other fields. */
 :root[data-theme='light'] .terminal-composer {
   outline: 1px solid var(--border);
   outline-offset: -1px;
 }
-/* Prompt text is prose: the terminal font spaces CJK glyphs at fixed cell width. */
-.terminal-composer textarea::placeholder {
-  font-family: var(--font-ui);
+.terminal-composer:focus-within {
+  box-shadow: none;
 }
 /* SSH connection page: spinner and thin progress bar while connecting. */
 .ssh-connect-spinner {
@@ -1981,7 +1910,7 @@ input.ssh-auth-response::placeholder {
   display: flex;
   justify-content: space-between;
   gap: 12px;
-  color: var(--text-muted);
+  color: var(--text-secondary);
   font-size: calc(11px * var(--ui-font-scale));
   margin-bottom: 6px;
 }
@@ -1993,14 +1922,6 @@ input.ssh-auth-response::placeholder {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  color: var(--text-muted);
-}
-/* Composer hints are reference text, not controls: no chip fill, so they read the same on
-   every theme and leave the input as the focal point. */
-.terminal-composer-heading .key-hint {
-  min-height: 16px;
-  padding: 0 2px;
-  background: transparent;
   color: var(--text-secondary);
 }
 /* The heading may carry a working-directory chip instead of plain text; it truncates inside the row
@@ -2161,24 +2082,7 @@ input.ssh-auth-response::placeholder {
     max-width: 30%;
   }
 }
-@media (max-width: 900px) {
-  .workspace-titlebar {
-    --workspace-title-gap: 8px;
-  }
-  .workspace-title-actions {
-    gap: 8px;
-  }
-  .workspace-search kbd {
-    display: none;
-  }
-}
 @media (max-width: 640px) {
-  .workspace-titlebar {
-    --workspace-title-gap: 4px;
-  }
-  .workspace-title-actions {
-    gap: 4px;
-  }
   .workspace-title-actions .window-control-button {
     width: 40px !important;
   }
@@ -2913,14 +2817,15 @@ button.user-primary-action.text-control:is(:hover, :focus):not(:disabled) {
   user-select: none;
 }
 .history-header {
+  --embedded-toolbar-surface: var(--canvas);
   display: flex;
   align-items: center;
   flex-wrap: wrap;
   gap: 8px;
-  min-height: 34px;
+  min-height: 32px;
   box-sizing: border-box;
-  padding: 2px 12px;
-  background: var(--canvas);
+  padding: 1px 12px;
+  background: var(--embedded-toolbar-surface);
   color: var(--text-secondary);
   font-size: calc(12px * var(--ui-font-scale));
 }
@@ -2963,6 +2868,7 @@ button.user-primary-action.text-control:is(:hover, :focus):not(:disabled) {
   background: var(--canvas);
 }
 .history-toolbar {
+  --icon-color: var(--embedded-toolbar-icon-color);
   display: flex;
   align-items: center;
   gap: 8px;
@@ -2988,14 +2894,12 @@ button.user-primary-action.text-control:is(:hover, :focus):not(:disabled) {
   background: var(--chrome-field);
   color: var(--text-muted);
 }
-.history-search:focus-within {
-  border-color: var(--border-strong);
-}
 .history-search > svg {
   position: absolute;
   left: 10px;
   top: 50%;
   transform: translateY(-50%);
+  color: var(--icon-color);
   pointer-events: none;
 }
 .history-search-input {
@@ -3450,11 +3354,6 @@ button.history-option-row[aria-pressed='true'] {
   flex: 1;
   min-width: 0;
 }
-/* On the start page the folder belongs to the agent section: it follows the heading at the
-   same rhythm as the search field below it. */
-.ai-launch-agents > .acp-launch-directory {
-  margin: 0 0 8px;
-}
 .ai-question-options button {
   justify-content: flex-start;
   min-height: 32px;
@@ -3732,21 +3631,17 @@ section.usage-card {
 .chat-exchange > .ai-block-answer {
   margin: 0;
 }
-/* The padding keeps the cards' outer shadow inside the scroll box instead of clipped by it;
-   the insets and width keep the visual card position at 16px from the window edges. */
 .notification-region {
   position: fixed;
   z-index: 11000;
-  right: 0;
-  bottom: 0;
+  right: 16px;
+  bottom: 16px;
   display: flex;
   flex-direction: column;
   align-items: stretch;
   gap: 8px;
-  box-sizing: border-box;
-  width: min(412px, 100vw);
-  max-height: 100vh;
-  padding: 16px;
+  width: min(380px, calc(100vw - 32px));
+  max-height: calc(100vh - 32px);
   overflow: auto;
   pointer-events: none;
 }
@@ -3811,7 +3706,10 @@ body:has([role='dialog'][aria-modal='true']:not([hidden])) .notification-slot[da
   gap: 8px;
   margin-top: 8px;
 }
-.notification-card button.notification-card-close {
+.notification-card-content:has(> [hidden]:only-child) {
+  display: none;
+}
+.notification-card button:is(.notification-card-close, .notification-card-disclosure) {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -3824,9 +3722,12 @@ body:has([role='dialog'][aria-modal='true']:not([hidden])) .notification-slot[da
   background: transparent;
   color: var(--text-muted);
 }
-.notification-card button.notification-card-close:is(:hover, :focus-visible) {
+.notification-card button:is(.notification-card-close, .notification-card-disclosure):is(:hover, :focus-visible) {
   background: var(--hover);
   color: var(--text-primary);
+}
+.notification-card-disclosure {
+  margin-inline-end: -4px;
 }
 .error-notification-message {
   color: var(--text-secondary);
@@ -3838,6 +3739,109 @@ body:has([role='dialog'][aria-modal='true']:not([hidden])) .notification-slot[da
   justify-content: flex-end;
   flex-wrap: wrap;
   gap: 8px;
+}
+button.error-details-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+  padding: 3px 6px;
+  border: 0;
+  border-radius: var(--radius-inner);
+  background: transparent;
+  color: var(--text-muted);
+  font-family: var(--font-ui);
+  font-size: var(--fs-micro);
+  cursor: pointer;
+}
+button.error-details-toggle:hover {
+  background: var(--hover);
+  color: var(--text-secondary);
+}
+button.error-details-toggle:focus-visible {
+  outline: 1px solid var(--focus-ring);
+  outline-offset: -1px;
+}
+.error-details-quiet > div > button.error-details-toggle {
+  gap: 8px;
+  min-height: 24px;
+  padding-inline-start: 0;
+}
+.error-details-quiet button.error-details-toggle:hover {
+  background: transparent;
+  color: var(--text-primary);
+}
+.error-details-output {
+  display: flex;
+  align-items: flex-start;
+  min-width: 0;
+  margin-top: 4px;
+  padding-inline-end: 6px;
+  border-radius: var(--radius-inner);
+  background: var(--canvas);
+}
+.error-details-output > pre {
+  flex: 1;
+  min-width: 0;
+}
+.error-details-output > button.error-details-copy {
+  margin-block-start: 6px;
+}
+.notification-card .error-details-output {
+  align-items: flex-start;
+  background: transparent;
+  margin-top: 0;
+  padding-inline: 23px 0;
+  gap: 6px;
+}
+.notification-card .error-details-output > button.error-details-copy {
+  margin-block-start: 0;
+}
+.notification-card .error-notification-message {
+  padding-inline-start: 23px;
+}
+.inline-error-card {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+  padding: 8px 12px;
+  border-radius: var(--radius-block);
+  background: var(--card-bg);
+  color: var(--text-primary);
+  font-size: var(--fs-label);
+}
+.inline-error-heading {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+  min-height: 28px;
+}
+.inline-error-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1 1 160px;
+  min-width: 0;
+  overflow-wrap: anywhere;
+  font-weight: var(--fw-semibold);
+}
+.inline-error-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-inline-start: auto;
+}
+.inline-error-content {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
 }
 /* Sent messages carry their time and a copy target, revealed while the bubble is hovered. */
 .chat-question-meta {
@@ -3859,10 +3863,9 @@ body:has([role='dialog'][aria-modal='true']:not([hidden])) .notification-slot[da
   display: flex;
   align-items: center;
   justify-content: flex-start;
-  flex-wrap: wrap;
-  gap: 6px;
+  gap: 2px;
   min-width: 0;
-  margin-top: 4px;
+  margin-top: 2px;
 }
 .chat-answer-actions > button.icon-button {
   color: var(--text-muted);
@@ -3894,10 +3897,10 @@ body:has([role='dialog'][aria-modal='true']:not([hidden])) .notification-slot[da
   margin: 6px 0;
   border: 0;
   border-radius: var(--radius-inner);
-  background: var(--field-bg);
+  background: var(--card-bg);
 }
 .ai-tool-card:not(.ai-thinking):hover {
-  background: color-mix(in srgb, var(--field-bg) 96%, var(--text-primary));
+  background: var(--card-hover-bg);
 }
 /* A shared compact header keeps tool cards consistent across conversation surfaces. */
 .ai-tool-summary {
@@ -3944,9 +3947,6 @@ button.ai-tool-summary:enabled:is(:hover, :focus-visible, :active) {
   white-space: nowrap;
   text-overflow: ellipsis;
   color: var(--text-primary);
-}
-.ai-tool-label:only-child {
-  max-width: 100%;
 }
 .ai-tool-description {
   flex: 1;
@@ -4142,11 +4142,6 @@ button.ai-tool-run-menu {
   color: var(--text-muted);
   font-size: var(--fs-micro);
   line-height: 1.5;
-}
-/* Long unbroken reasons and multi-line stored errors stay inside the card. */
-.ai-tool-card .ai-tool-verdict {
-  white-space: pre-wrap;
-  overflow-wrap: anywhere;
 }
 .ai-tool-card[data-tool-state='error'] .ai-tool-verdict {
   color: var(--error-light);
@@ -4358,13 +4353,17 @@ input::placeholder,
 textarea::placeholder {
   color: var(--text-muted);
 }
+[data-field-outlines] {
+  --field-outline: var(--border-strong);
+  --field-outline-focus: color-mix(in srgb, var(--field-outline) 80%, var(--text-muted));
+}
 :is(input, textarea).text-input-field {
   box-sizing: border-box;
   width: 100%;
   min-width: 0;
   min-height: 32px;
   padding: 6px 8px;
-  border: 1px solid var(--border);
+  border: 1px solid var(--field-outline, var(--border));
   border-radius: var(--radius-inner);
   background: var(--field-bg);
   color: var(--text-primary);
@@ -4377,7 +4376,10 @@ input.text-input-field {
   padding: 4px 8px;
 }
 :is(input, textarea).text-input-field:focus {
-  border-color: var(--border-strong);
+  border-color: var(--field-outline-focus, var(--border-strong));
+}
+input.text-input-field.text-input-search {
+  border: 0;
 }
 :is(input, textarea).text-input-field:disabled {
   opacity: 0.55;
@@ -4710,7 +4712,7 @@ button.md-code-block-action.text-control {
 .application-window:has(.workspace-titlebar[data-fullscreen='true'], [data-window-maximized='true']) {
   border-radius: 0;
 }
-.application-window::after {
+.application-window:not([data-platform='macos'])::after {
   content: '';
   position: absolute;
   inset: 0;
@@ -4719,7 +4721,8 @@ button.md-code-block-action.text-control {
   pointer-events: none;
   z-index: 20000;
 }
-.application-window[data-platform='windows']::after {
+:root[data-native-frame='active'] .application-window[data-platform='windows']::after,
+.application-window:has(.workspace-titlebar[data-fullscreen='true'], [data-window-maximized='true'])::after {
   display: none;
 }
 .overlay-scroll-container {
@@ -4855,21 +4858,21 @@ button.md-code-block-action.text-control {
 @keyframes toastIn {
   from {
     opacity: 0;
-    transform: translateX(12px);
+    transform: translateY(8px);
   }
   to {
     opacity: 1;
-    transform: translateX(0);
+    transform: translateY(0);
   }
 }
 @keyframes toastOut {
   from {
     opacity: 1;
-    transform: translateX(0);
+    transform: translateY(0);
   }
   to {
     opacity: 0;
-    transform: translateX(12px);
+    transform: translateY(8px);
   }
 }
 @keyframes modalIn {
@@ -5015,12 +5018,6 @@ button.global-search-source {
 }
 .global-search-source > span {
   flex: 1;
-}
-.ssh-form-dialog :is(input, textarea):focus,
-.ssh-form-dialog :is(input, textarea):focus-visible {
-  outline: none;
-  box-shadow: none;
-  border-color: var(--border);
 }
 
 /* Shared flat controls and key badges inherit the active palette. */
@@ -5569,12 +5566,19 @@ html[data-native-material='fallback'] .application-window[data-desktop-tint='tru
   color: var(--text-muted);
   font-size: var(--fs-caption);
 }
-/* Provider switcher: a grey button that brightens on hover and opens the centred provider menu. */
-.provider-switch {
+.settings-switcher-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+  min-width: 0;
+}
+button.selection-switcher {
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  max-width: 340px;
+  min-width: 0;
+  max-width: min(340px, 100%);
   min-height: 32px;
   padding: 6px 10px;
   border: 0;
@@ -5585,8 +5589,7 @@ html[data-native-material='fallback'] .application-window[data-desktop-tint='tru
   cursor: pointer;
   transition: background var(--dur-fast) var(--ease);
 }
-.provider-switch:hover,
-.provider-switch[aria-expanded='true'] {
+button.selection-switcher:is(:hover, :focus-visible, [aria-expanded='true']):not(:disabled) {
   background: color-mix(in srgb, var(--field-bg) 84%, var(--text-primary));
 }
 .provider-switch-name {
@@ -5696,10 +5699,7 @@ button.provider-option-add:hover {
 }
 
 /* Model list: the vendor groups, the toolbar and their rows (ProviderModelList.tsx). */
-/* The list owns one content inset: the first control and the last group clear the panel edge by the
-   same amount. A filled control reads tighter than a text label at the same inset, so the block
-   sits 4px below the description instead of the stacked field's 10px. The stacked rule is more
-   specific, so this selector repeats its context to keep the tighter inset. */
+/* The model list starts 4px below its description and shares the panel's content inset. */
 .settings-model-list {
   min-width: 0;
 }
@@ -5819,10 +5819,9 @@ button.provider-option-add:hover {
   display: inline-flex;
   align-items: center;
   justify-content: flex-end;
-  gap: 2px;
-  min-width: 104px;
+  gap: 3px;
+  min-width: 89px;
   flex-shrink: 0;
-  color: var(--text-muted);
 }
 .settings-row-actions {
   display: inline-flex;
@@ -5957,26 +5956,14 @@ button.provider-option-add:hover {
   border-top: 1px solid var(--border);
 }
 /* Capability marks share the same supported state in model lists and pickers. */
-.model-cap-chip {
-  --model-capability-color: var(--group-blue);
+.model-capability-mark {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 26px;
+  width: 20px;
   height: 20px;
   flex-shrink: 0;
-  border-radius: 999px;
-  color: var(--model-capability-color);
-  background: color-mix(in srgb, var(--model-capability-color) 12%, transparent);
-}
-.model-cap-chip[data-capability='vision'] {
-  --model-capability-color: var(--group-green);
-}
-.model-cap-chip[data-capability='reasoning'] {
-  --model-capability-color: var(--group-violet);
-}
-.model-cap-chip[data-capability='tools'] {
-  --model-capability-color: var(--group-orange);
+  color: var(--icon-color);
 }
 .model-dialog-form {
   display: flex;
@@ -6205,7 +6192,7 @@ input.themed-checkbox:disabled {
   position: relative;
   min-width: 0;
   overflow: hidden;
-  border: 1px solid var(--border);
+  border: 1px solid var(--field-outline, var(--border));
   border-radius: var(--radius-inner);
   background: var(--field-bg);
 }
@@ -6236,7 +6223,7 @@ textarea.config-text-input[data-font='ui'] {
   font-family: var(--font-ui) !important;
 }
 .config-text-area:focus-within {
-  border-color: var(--border-strong);
+  border-color: var(--field-outline-focus, var(--border-strong));
 }
 .identity-icon {
   display: inline-flex;
@@ -6246,19 +6233,6 @@ textarea.config-text-input[data-font='ui'] {
 }
 .identity-icon:not([data-colored='true']) {
   filter: grayscale(1);
-}
-.settings-navigation .identity-icon,
-.settings-navigation [data-shell-mark] {
-  filter: none;
-}
-.ai-start-page {
-  flex: 1;
-  min-height: 0;
-  overflow: auto;
-  padding: 20px 24px;
-  background: var(--canvas);
-  display: flex;
-  flex-direction: column;
 }
 .ai-launchpad {
   container: ai-launchpad / inline-size;
@@ -6337,9 +6311,6 @@ textarea.config-text-input[data-font='ui'] {
 .ai-launch-copy strong {
   font-size: var(--fs-label);
   font-weight: var(--fw-semibold);
-}
-.ai-launch-resource .ai-launch-copy strong {
-  font-weight: var(--fw-regular);
 }
 .ai-launch-native strong {
   font-size: var(--fs-subtitle);
@@ -6421,13 +6392,13 @@ textarea.config-text-input[data-font='ui'] {
   text-align: center;
 }
 .workspace-launch-page {
+  display: flex;
+  flex-direction: column;
   flex: 1;
   min-height: 0;
   overflow: auto;
   padding: 20px 24px;
   background: var(--canvas);
-  display: flex;
-  flex-direction: column;
 }
 .ai-launch-native > .ai-launch-copy {
   flex: 1;
@@ -6466,10 +6437,6 @@ textarea.config-text-input[data-font='ui'] {
 .ai-launch-body > .ai-launch-grid + .ai-launch-agents {
   margin-top: 18px;
 }
-.terminal-launchpad button.ai-launch-option:not(.ai-launch-native) {
-  min-height: 88px;
-  padding: 14px 16px;
-}
 .ai-launch-section-actions {
   display: flex;
   align-items: center;
@@ -6482,6 +6449,31 @@ textarea.config-text-input[data-font='ui'] {
 }
 .shell-profile-page .settings-group {
   margin-bottom: 24px;
+}
+.shell-profile-heading {
+  flex: none;
+  width: max-content;
+}
+button.shell-profile-title {
+  display: flex;
+  gap: 10px;
+  width: max-content;
+  margin-inline-start: -8px;
+  padding: 0 8px;
+  background: transparent;
+  font: inherit;
+}
+button.shell-profile-title:is(:hover, :focus-visible, [aria-expanded='true']) {
+  background: var(--hover);
+}
+.shell-profile-title .ui-select-value {
+  flex: none;
+  overflow: visible;
+  white-space: nowrap;
+}
+.shell-profile-title .ui-select-icon svg {
+  width: calc(34px * var(--ui-font-scale));
+  height: calc(34px * var(--ui-font-scale));
 }
 .shell-profile-directory {
   display: flex;

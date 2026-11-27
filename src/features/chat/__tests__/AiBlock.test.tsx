@@ -531,6 +531,7 @@ it('keeps a refusal inside the expanded card without a footer error', () => {
   );
   // The result retains its state; explicit review expands its reason in the transcript.
   expect(container.querySelector('.ai-tool-summary')).toHaveTextContent('已拒绝');
+  expect(screen.queryByTestId('tool-denied-reason')).toBeNull();
   expect(document.querySelector('#app-notifications [role="alert"]')).toBeNull();
   fireEvent.click(container.querySelector<HTMLButtonElement>('.ai-tool-summary')!);
   expect(container.querySelector('.ai-tool-verdict')).toHaveTextContent('已自动拒绝本次操作');

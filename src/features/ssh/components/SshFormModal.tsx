@@ -581,6 +581,7 @@ export default function SshFormModal({ open, initial, onClose, onConnect, onSave
             ? 'ssh-host-editor'
             : `workspace-floating workspace-floating-dialog ssh-form-dialog${onConnect ? ' ssh-host-editor ssh-quick-connect' : ''}`
         }
+        data-field-outlines={!initial || onConnect ? true : undefined}
         data-testid={page ? 'ssh-host-editor' : undefined}
         role={page ? 'region' : 'dialog'}
         aria-modal={page ? undefined : true}

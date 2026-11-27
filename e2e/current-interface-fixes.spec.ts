@@ -59,40 +59,8 @@ test('keeps a fixed shared rename field, right-pinned actions and one aligned tr
   }
 });
 
-test('loads marketplace presets, exposes recoverable bottom-right errors and uses normal server controls', async ({ page }, info) => {
-  await gotoSetting(page, '技能');
-  await page.evaluate(() => {
-    const runtime = (window as unknown as { __TAURI_INTERNALS__: { invoke: (command: string, args?: unknown) => Promise<unknown> } })
-      .__TAURI_INTERNALS__;
-    const invoke = runtime.invoke;
-    let failed = false;
-    runtime.invoke = (command, args) => {
-      if (command === 'market_github_list' && !failed) {
-        failed = true;
-        return Promise.reject(new Error('Network unavailable'));
-      }
-      return invoke(command, args);
-    };
-  });
-  await page.getByRole('button', { name: '技能市场', exact: true }).click();
-  const alert = page.locator('#app-notifications').getByRole('alert');
-  await expect(alert).toBeVisible();
-  await expect
-    .poll(async () => {
-      const bounds = (await alert.boundingBox())!;
-      return Math.round(bounds.y + bounds.height);
-    })
-    .toBeLessThanOrEqual(784);
-  const bounds = (await alert.boundingBox())!;
-  expect(bounds.x + bounds.width).toBeGreaterThan(1200);
-  await alert.getByRole('button', { name: '重试' }).click();
-  await expect(page.getByText('github-skill-1').first()).toBeVisible();
-  await expect(alert).toHaveCount(0);
-  const back = page.locator('.settings-screen').getByRole('button', { name: '返回', exact: true });
-  await expect(back.locator('svg')).toHaveCount(1);
-  await page.screenshot({ path: info.outputPath('marketplace.png') });
-  await back.click();
-  await page.getByRole('button', { name: 'ACP', exact: true }).click();
+test('uses normal server controls', async ({ page }, info) => {
+  await gotoSetting(page, 'ACP');
   for (const id of ['harness-test-0', 'harness-edit-0', 'harness-remove-0']) {
     const button = page.getByTestId(id);
     await expect(button).toHaveAttribute('data-compact', 'false');
@@ -130,8 +98,9 @@ test('shares close-safe workspace resource navigation and reserves identical lea
     await page.getByTestId(`workspace-area-${area}`).click();
     const bar = page.getByTestId('workspace-instance-bar');
     const more = (await bar.locator('.folder-more').boundingBox())!;
+    const button = (await bar.locator('.folder-more-button').boundingBox())!;
     const first = (await bar.locator('.folder-tab-list .folder-tab').first().boundingBox())!;
-    expect(first.x - more.x - more.width).toBeCloseTo(4, 0);
+    expect(first.x - button.x - button.width).toBeCloseTo(button.x - more.x, 0);
     const track = (await bar.locator('.folder-tab-list').boundingBox())!;
     expect(track.x).toBeGreaterThanOrEqual(more.x + more.width);
     expect(

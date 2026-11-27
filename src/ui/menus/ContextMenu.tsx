@@ -13,6 +13,7 @@ export interface MenuAnchor {
   trigger?: HTMLElement;
   above?: HTMLElement;
   align?: 'start' | 'end';
+  below?: boolean;
 }
 export interface ContextMenuItem {
   label: string;

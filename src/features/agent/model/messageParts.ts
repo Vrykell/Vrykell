@@ -32,23 +32,6 @@ export interface ToolRun {
 
 export type MessagePart = { kind: 'text'; text: string } | { kind: 'tool'; tool: ToolRun };
 
-/** Character cap for the one-line argument preview kept in discussion history. */
-const DISCUSSION_TARGET_CAP = 160;
-
-/** Collapse a tool's command/path/query argument to one bounded line. */
-function discussionTarget(run: ToolRun): string {
-  const value =
-    typeof run.input.command === 'string'
-      ? run.input.command
-      : typeof run.input.path === 'string'
-        ? run.input.path
-        : typeof run.input.query === 'string'
-          ? run.input.query
-          : '';
-  const oneLine = value.replace(/\s+/g, ' ').trim();
-  return oneLine.length > DISCUSSION_TARGET_CAP ? `${oneLine.slice(0, DISCUSSION_TARGET_CAP)}…` : oneLine;
-}
-
 /**
  * Recreate earlier Agent-mode results as plain text for chat mode. Sending structured
  * `tool_calls` while no tools are registered invites the model to call them again and some
@@ -66,10 +49,9 @@ export function partsToDiscussionText(content: string, parts?: MessagePart[]): s
       continue;
     }
     const run = part.tool;
-    const target = discussionTarget(run);
-    blocks.push(`[Earlier tool call in Agent mode: ${run.toolName} (${run.state})${target ? `: ${target}` : ''}]`);
+    blocks.push(`[Earlier tool call in Agent mode: ${run.toolName} (${run.state})]`);
     const result = run.modelOutput ?? run.output ?? run.error;
-    if (result) blocks.push(`[Untrusted tool output]\n${result}`);
+    if (result) blocks.push(result);
   }
   if (!hasText && content) blocks.push(content);
   return blocks.join('\n\n');

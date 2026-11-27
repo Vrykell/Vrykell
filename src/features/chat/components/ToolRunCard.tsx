@@ -1,8 +1,21 @@
 import { useState } from 'react';
 import { t, type I18nKey } from '@i18n';
-import { AskQuestion, Brain, ChevronRight, FileText, Folder, Globe, Pencil, Search, TerminalPrompt, Wrench } from '@ui/icons';
+import {
+  AskQuestion,
+  Brain,
+  Check,
+  ChevronRight,
+  FileText,
+  Folder,
+  Globe,
+  Pencil,
+  RefreshCw,
+  Search,
+  TerminalPrompt,
+  Toolbox,
+  X,
+} from '@ui/icons';
 import ToolOutput from './ToolOutput';
-import ToolStateBadge from './ToolStateBadge';
 import BlockOutput from '@features/terminal/components/BlockOutput';
 import { useBlockStore } from '@features/terminal';
 import { agentControl } from '@features/agent/services/agentControl';
@@ -57,7 +70,7 @@ function summarize(run: ToolRun): { icon: React.ReactNode; label: string; text: 
       return { icon: <Brain {...size} />, label: t('Thinking process'), text: '' };
     default:
       return {
-        icon: <Wrench {...size} />,
+        icon: <Toolbox {...size} />,
         label: run.toolName,
         text: str(input.command) || str(input.path) || str(input.query) || str(input.url) || str(input.title),
       };
@@ -177,7 +190,16 @@ export default function ToolRunCard({
             {summaryText}
           </span>
         </span>
-        <ToolStateBadge state={run.state} label={status} />
+        <span className="ai-tool-state" data-state={run.state}>
+          {run.state === 'done' ? (
+            <Check size={12} />
+          ) : run.state === 'running' ? (
+            <RefreshCw size={12} className="reload-spin" />
+          ) : problem || run.state === 'cancelled' ? (
+            <X size={12} />
+          ) : null}
+          {status}
+        </span>
         {expandable && !pending && <ChevronRight size={14} style={{ transform: open ? 'rotate(90deg)' : undefined }} />}
       </button>
       {run.toolName === 'ask_user' && <ToolQuestion run={run} conversationId={conversationId} />}
