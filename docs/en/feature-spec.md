@@ -301,6 +301,10 @@ History commands default to the current terminal when no execution target was sa
 
 ## Workspace Navigation and Space Allocation
 
+Dragging a tab or group outside its strip detaches it to a window. A single-tab window follows the pointer and can merge into another strip. Entering a destination selects the moved tab and continues the same reorder gesture without a second press. Returning to the source, closing a detached window and cancelling a gesture preserve resource ownership and draft content.
+
+Verify repeated detach and merge gestures, groups, single-tab source windows, mixed resource types, edge clamping, preview visibility and recovery after a failed handoff. Run browser coverage for the gesture and mocked window lifecycle, then check native window movement and visibility on the supported desktop platforms.
+
 External sessions receive the internal application tool adapter on creation and history loading. The composer offers an initially unbound execution target. `application-mcp.spec.ts` covers explicit binding, shared refusal, questions and cancellation; native transport and adapter unit tests cover isolation, schemas, framing and stale results. See `application-tools.md`.
 
 | ID | Feature | Expected behavior | Test method |

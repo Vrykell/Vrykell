@@ -48,7 +48,7 @@ import { useWorkbenchFeedback } from '../stores/workbenchFeedback';
 import { useUiStore } from '../stores/ui';
 import { parseWorkbench } from '../model/workbench';
 import { captureContainerHistory, createWorkspaceHistoryWriter, persistContainerHistory } from '../services/workspaceHistory';
-import { currentWorkspaceResources } from '../services/workspaceResources';
+import { currentWorkspaceResources, hasWorkspaceWindowContent } from '../services/workspaceResources';
 import { t } from '@i18n';
 
 vi.mock('@platform/diagnostics', () => ({ invoke: vi.fn(async () => undefined), diagnostic: vi.fn() }));
@@ -132,6 +132,31 @@ beforeEach(() => {
   useTerminalStore.setState({ sessions: {}, focusedPaneId: null });
   useUiStore.setState({ settingsOpen: false });
   useWorkbenchFeedback.setState({ failure: null });
+});
+
+it('ignores a blank sidebar chat when deciding whether a window has work left', () => {
+  const resource = terminal();
+  const id = 'sidebar-chat';
+  const createdAt = Date.now();
+  useChatStore.setState({
+    conversations: [{ id, title: t('New conversation'), createdAt, updatedAt: createdAt, environment: null }],
+    byTab: { [id]: [] },
+  });
+  useAiWorkspace.getState().selectSide(`chat:${id}`);
+  synchronizeWorkbench();
+  const excluding = new Set([resource]);
+  expect(hasWorkspaceWindowContent()).toBe(true);
+  expect(hasWorkspaceWindowContent(excluding)).toBe(false);
+
+  useComposerDrafts.getState().setText(id, 'Unsent text');
+  expect(hasWorkspaceWindowContent(excluding)).toBe(true);
+  useComposerDrafts.getState().dropTab(id);
+  useChatStore.setState({ byTab: { [id]: [{ id: 'message', role: 'user', content: 'Saved message', createdAt }] } });
+  expect(hasWorkspaceWindowContent(excluding)).toBe(true);
+  useChatStore.setState({ byTab: { [id]: [] } });
+  useAiWorkspace.getState().openNative(id);
+  expect(hasWorkspaceWindowContent(excluding)).toBe(true);
+  expect(useChatStore.getState().conversations).toHaveLength(1);
 });
 
 it('adopts every native resource once, retains multi-pane terminal containers and prunes closed owners', () => {

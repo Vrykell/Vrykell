@@ -18,6 +18,7 @@ import { tabCapabilities, type TabHandle } from '@ui/layout/tabHandle';
 import WorkspaceHeader from '@ui/layout/WorkspaceHeader';
 import ResourceContent from '@ui/layout/ResourceContent';
 import { useCodeWorkspaceTabs } from '@features/workspace/hooks/useCodeWorkspaceTabs';
+import { beginSingleTabWindowDrag } from '@features/workspace/services/windowHandoff';
 import { openWorkspaceFile } from '@features/workspace/services/workspaceActions';
 import WorkspaceStartPage from '@features/workspace/components/WorkspaceStartPage';
 import ToolDialog from '@ui/feedback/ToolDialog';
@@ -180,6 +181,7 @@ function CodeStartPane({ tab, active }: { tab: Extract<Tab, { kind: 'start-code'
           onSelect={() => useSessionStore.getState().activate(tab.id)}
           onClose={() => useSessionStore.getState().closeTab(tab.id)}
           onMove={() => {}}
+          onDragSingleTab={beginSingleTabWindowDrag}
           menuItems={[
             { label: t('New file'), onClick: newEditorFile },
             { label: t('Open file'), onClick: () => void openWorkspaceFile() },
@@ -292,6 +294,10 @@ function DocumentContent({ file, active, focused }: { file: EditorFile; active: 
           onSelect={codeTabs.onSelect}
           onClose={codeTabs.onClose}
           tabActions={codeTabs.tabActions}
+          onDropOutsideWindow={codeTabs.onDropOutsideWindow}
+          canDropOutsideWindow={codeTabs.canDropOutsideWindow}
+          onDragSingleTab={codeTabs.onDragSingleTab}
+          onTrackWindowDrag={codeTabs.onTrackWindowDrag}
           onMove={codeTabs.onMove}
           menuItems={[
             ...(codeTabs.tabActions?.(codeTabs.selected ?? '') ?? []),

@@ -4,6 +4,7 @@ import { tabCapabilities, type TabHandle } from '@ui/layout/tabHandle';
 import IconCountBadge from '@ui/feedback/IconCountBadge';
 import { Grid } from '@ui/icons';
 import { isHistoryGroupColor } from '@ui/history/historyGroupColor';
+import { canOpenWorkspaceWindow, prewarmDetachedWorkspace } from '@platform/appWindows';
 import { useWorkbenchStore } from '../stores/workbench';
 import { useWorkspaceNavigation } from '../stores/navigation';
 import { moveContainer, moveWorkspaceEntity, panesOf, workspaceStripEntities, type WorkspaceScope } from '../model/workbench';
@@ -27,6 +28,14 @@ import { workspaceAreaStores } from '../stores/paneWorkspace';
 import { useUiStore } from '../stores/ui';
 import { workspaceSplitMenu } from '../model/workspaceCreation';
 import { requestWorkspaceSplit } from '../services/unifiedWorkspace';
+import {
+  beginSingleTabWindowDrag,
+  canDragTabAcrossWindows,
+  canMoveTabToNewWindow,
+  dropWorkspaceTab,
+  moveTabToNewWindow,
+  trackDetachedWorkspaceTab,
+} from '../services/windowHandoff';
 
 /** Every strip row is a layout-owning container, including a one-resource tab. */
 export function useWorkspaceContainerTabs(
@@ -37,6 +46,7 @@ export function useWorkspaceContainerTabs(
 ): WorkspaceTabStrip {
   const snapshot = useWorkbenchStore((state) => state.snapshot);
   const colors = useWorkspaceNavigation((state) => state.groupColors);
+  const area = useWorkspaceNavigation((state) => state.area);
   const signature = resourceHandles.map((handle) => handle.id).join('|');
   useEffect(() => {
     synchronizeWorkbench();
@@ -45,6 +55,19 @@ export function useWorkspaceContainerTabs(
     if (selectedResource && useWorkspaceNavigation.getState().area === scope) focusNativeContainerResource(selectedResource);
   }, [scope, selectedResource]);
   const tabs = snapshot.tabs.filter((tab) => tab.scope === scope);
+  const canTearOff = tabs.filter((tab) => tab.layout).length > 1;
+  useEffect(() => {
+    if (!canTearOff || area !== scope || !canOpenWorkspaceWindow()) return;
+    const warm = () => {
+      if (document.visibilityState === 'visible' && document.hasFocus()) prewarmDetachedWorkspace();
+    };
+    const timer = window.setTimeout(warm, 450);
+    window.addEventListener('focus', warm);
+    return () => {
+      window.clearTimeout(timer);
+      window.removeEventListener('focus', warm);
+    };
+  }, [area, canTearOff, scope]);
   const groups = snapshot.groups.filter((group) => group.scope === scope);
   const handlesById = new Map(resourceHandles.map((handle) => [handle.id, handle]));
   const run = (operation: () => void | Promise<unknown>) => {
@@ -95,6 +118,10 @@ export function useWorkspaceContainerTabs(
       }),
     onSelect: activateContainer,
     onClose: closeContainer,
+    onDropOutsideWindow: dropWorkspaceTab,
+    canDropOutsideWindow: canDragTabAcrossWindows,
+    onDragSingleTab: beginSingleTabWindowDrag,
+    onTrackWindowDrag: trackDetachedWorkspaceTab,
     onMove: (id, over, after) => {
       if (utilityIds.includes(id) || utilityIds.includes(over)) {
         useWorkbenchStore.getState().update((state) => moveWorkspaceEntity(state, scope, `tab:${id}`, `tab:${over}`, after, utilityIds));
@@ -114,6 +141,7 @@ export function useWorkspaceContainerTabs(
       const focused = cells.find((pane) => pane.id === tab.focused) ?? cells[0]!;
       const peers = tabs.filter((peer) => peer.id !== id && peer.layout && panesOf(peer).length + cells.length <= 4);
       return [
+        ...(canMoveTabToNewWindow(id) ? [{ label: t('Move tab to a new window'), onClick: () => moveTabToNewWindow(id) }] : []),
         ...(cells.length < 4
           ? [
               workspaceSplitMenu(scope, (kind, anchor) => {

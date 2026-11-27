@@ -21,7 +21,17 @@ import {
 } from '@features/terminal/model/xtermRenderer';
 import { FitAddon } from '@xterm/addon-fit';
 import { WebLinksAddon } from '@xterm/addon-web-links';
-import { ptySpawn, ptyWrite, ptyResize, ptyClose, onPtyOutput, onPtyExit, type PtySpawnOptions } from '@platform/pty';
+import {
+  ptySpawn,
+  ptyWrite,
+  ptyResize,
+  ptyClose,
+  onPtyOutput,
+  onPtyExit,
+  onPtyMoved,
+  rememberPtyInputEpoch,
+  type PtySpawnOptions,
+} from '@platform/pty';
 import { registerTerminal, unregisterTerminal, useTerminalStore } from '@features/terminal';
 import { getRecentOutputFor } from '@features/terminal/stores/terminal';
 import { useBlockStore } from '@features/terminal';
@@ -60,6 +70,8 @@ import { startAutomaticForwarding } from '@features/ssh';
 import { useToastStore } from '@ui/feedback/Toast';
 import { terminalTypographyChanged, useTypographyStore } from '@config/typography';
 import { isLayoutResizeDragActive, onLayoutResizeDragEnd } from '@ui/layout/layoutResizeDrag';
+import { incomingTerminalHandoff, registerTerminalHandoff } from '../services/windowHandoff';
+import { useInputStore } from '../stores/input';
 
 /** Live session references shared across development reloads. */
 interface SessionRegistry {
@@ -355,9 +367,11 @@ export function useTerminalSession(
 
     // Disabled integration and unsupported local shells use classic rendering. Otherwise the
     // saved opening mode wins, with classic rendering as the remote restoration default.
+    const adoption = incomingTerminalHandoff(paneId);
     const integrationDisabled = spec?.kind === 'ssh' && spec.ssh?.shellIntegration === false;
-    const openMode =
-      integrationDisabled || (spec?.kind === 'local' && spec.shellType === 'cmd')
+    const openMode = adoption
+      ? 'block'
+      : integrationDisabled || (spec?.kind === 'local' && spec.shellType === 'cmd')
         ? 'classic'
         : (spec?.openMode ?? (spec?.kind === 'ssh' ? 'classic' : defaultOpenModeForShell(spec?.shellType)));
     if (integrationDisabled && spec?.openMode === 'block')
@@ -368,7 +382,7 @@ export function useTerminalSession(
     // from closing an eager block.
     const deferBlockUntilPreexec = blockEnabled;
     // Remote authentication must remain interactive until shell integration announces its prompt.
-    const initialScene: 'classic' | 'blockList' = blockEnabled && spec?.kind !== 'ssh' ? 'blockList' : 'classic';
+    const initialScene: 'classic' | 'blockList' = adoption || (blockEnabled && spec?.kind !== 'ssh') ? 'blockList' : 'classic';
     if (isTerminalDebugEnabled()) {
       // A duplicate mount for the same pane means the pane was torn down and
       // rebuilt (SSH would then re-authenticate from scratch); correlate it with
@@ -567,6 +581,29 @@ export function useTerminalSession(
     let firstOutput = true;
     let readinessWait: 'prompt-marker' | 'plain-shell' | 'idle-fallback' = 'idle-fallback';
     let readinessDueAt = 0;
+    const unregisterHandoff = registerTerminalHandoff(paneId, {
+      read: () => {
+        if (!sessionId || disposed || stopped || !startupComplete || !promptReady || !controller.atMovablePrompt) return null;
+        const terminal = useTerminalStore.getState();
+        const blocks = useBlockStore.getState().byTab[paneId] ?? [];
+        if (terminal.manualFullscreen[paneId] || terminal.pendingCommands[paneId]?.length || blocks.some((block) => block.snapshotPending))
+          return null;
+        return {
+          paneId,
+          sessionId,
+          blocks: blocks.filter((block) => block.status === 'done' || block.status === 'interrupted'),
+          cwd: useSessionStore.getState().terminalCwds[paneId] ?? spec?.cwd,
+          shell: terminal.shellTypes[paneId],
+          draft: useInputStore.getState().byPane[paneId],
+        };
+      },
+      release: (id) => {
+        if (sessionId !== id) return;
+        cancelTerminalInput(id);
+        stopped = true;
+        sessionId = null;
+      },
+    });
     const markInputReady = (integrated: boolean) => {
       if (disposed || stopped || !sessionId) return;
       if (startupComplete) return;
@@ -653,6 +690,16 @@ export function useTerminalSession(
     };
 
     // Register output before spawning to retain startup markers.
+    const transferred = adoption
+      ? new Promise<void>((resolve) => {
+          pendingUnlisteners.push(
+            onPtyMoved((ids) => {
+              if (ids.includes(adoption.sessionId)) resolve();
+            }),
+          );
+          startupAbort.signal.addEventListener('abort', () => resolve(), { once: true });
+        })
+      : null;
 
     pendingUnlisteners.push(
       onPtyOutput((id, events) => {
@@ -746,6 +793,14 @@ export function useTerminalSession(
       terminalDebug('pty-spawn-request', { paneId, tabId: ownerTab.current, cols: spawnCols, rows: spawnRows, spawnOpts });
     }
     const startSession = async () => {
+      if (adoption) {
+        await Promise.all(pendingUnlisteners);
+        if (disposed || stopped) throw new Error('Terminal window adoption was interrupted');
+        adoption.ready();
+        await transferred;
+        if (disposed || stopped) throw new Error('Terminal window adoption was interrupted');
+        return adoption.sessionId;
+      }
       if (spec?.kind === 'local' && spawnOpts) {
         traceStartup('shell-detection-start');
         const shells = await getAvailableShells();
@@ -793,9 +848,17 @@ export function useTerminalSession(
           return;
         }
         sessionId = id;
-        if (spec?.kind === 'local' && spawnOpts?.shell) {
-          const shell = spawnOpts.shell;
+        const shell = adoption?.shell ?? (spec?.kind === 'local' ? spawnOpts?.shell : undefined);
+        if (shell) {
           useTerminalStore.setState((state) => ({ shellTypes: { ...state.shellTypes, [paneId]: shell } }));
+        }
+        if (adoption) {
+          rememberPtyInputEpoch(id, adoption.inputEpoch);
+          controller.resumeAtPrompt(adoption.cwd);
+          promptReady = true;
+          automaticForwardingStarted = true;
+          if (spec?.kind === 'ssh') setSshAuthenticated(true);
+          markInputReady(true);
         }
         if (isTerminalDebugEnabled()) terminalDebug('pty-spawn-ready', { paneId, id });
         // Replay initial output buffered before spawn returned (the shell prompt).
@@ -1221,6 +1284,7 @@ export function useTerminalSession(
     traceStartup('effect-ready');
     return () => {
       traceStartup('effect-dispose', { startupComplete, hasSession: Boolean(sessionId) });
+      unregisterHandoff();
       disposeCursorRepaints();
       disposePointer();
       unsubscribeTypography();

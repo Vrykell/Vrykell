@@ -2,13 +2,15 @@ import type { WorkspaceResource } from '../model/workspaceResources';
 import { useWorkspaceStore } from '../stores/workspace';
 import { useAiWorkspace } from '@features/chat/stores/aiWorkspace';
 import { useChatStore } from '@features/chat/stores/chat';
+import { useComposerDrafts } from '@features/chat/stores/composerDrafts';
+import { hasChatContent } from '@features/chat/model/chatContent';
 import { deleteHarnessTranscriptCopy } from '@features/chat/services/harnessTranscriptRuntime';
 import { useHarnessWorkspace } from '@features/chat/stores/harnessWorkspace';
 import { closeAiWorkspaceSession } from '@features/chat/services/aiSessionClose';
 import { workspaceResources } from '../model/workspaceResources';
 import { useTerminalStore } from '@features/terminal/stores/terminal';
 import { useWorkbenchStore } from '../stores/workbench';
-import { focusContainerResource } from '../model/workbench';
+import { focusContainerResource, panesOf } from '../model/workbench';
 import type { PaneResource } from '../model/paneResource';
 import { workspaceHistoryMember } from './workspaceHistory';
 import { deleteSession, deleteTerminalPanes } from '@platform/api/session';
@@ -66,6 +68,33 @@ export function currentWorkspaceResources() {
     useChatStore.getState().conversations,
     useHarnessWorkspace.getState().connections,
   );
+}
+
+/** Blank sidebar chats, like start pages, do not keep an otherwise empty window open. */
+export function hasWorkspaceWindowContent(excluding?: ReadonlySet<string>) {
+  const ai = useAiWorkspace.getState();
+  const side = new Set([...ai.sideSessions, ai.sideSelected]);
+  const placed = new Set(useWorkbenchStore.getState().snapshot.tabs.flatMap((tab) => panesOf(tab).map((pane) => pane.resourceId)));
+  const chat = useChatStore.getState();
+  const drafts = useComposerDrafts.getState().byTab;
+  return currentWorkspaceResources().some((resource) => {
+    if (resource.kind === 'page' || excluding?.has(resource.id)) return false;
+    if (resource.kind !== 'conversation' || !side.has(resource.id) || placed.has(resource.id)) return true;
+    const id = resource.sessionId;
+    const conversation = chat.conversations.find((item) => item.id === id);
+    const messages = chat.byTab[id];
+    const draft = drafts[id];
+    return (
+      !conversation ||
+      conversation.createdAt !== conversation.updatedAt ||
+      !!conversation.environment ||
+      !!conversation.projectDirectory ||
+      chat.sendingTabs.includes(id) ||
+      !messages ||
+      messages.some(hasChatContent) ||
+      !!(draft?.text || draft?.attachments.length || draft?.references?.length)
+    );
+  });
 }
 
 export function activateWorkspaceResource(resource: WorkspaceResource) {

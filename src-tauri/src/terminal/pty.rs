@@ -70,6 +70,8 @@ impl StreamDecoder {
 }
 
 pub struct PtySession {
+    window_label: String,
+    workspace_tab: Option<String>,
     master: Box<dyn MasterPty + Send>,
     /// The PTY stdin writer has its own lock. A write blocks whenever the
     /// foreground program stops reading stdin, and that must never hold the
@@ -220,8 +222,7 @@ fn wait_sessions_bounded(sessions: &[Arc<Mutex<PtySession>>], deadline: std::tim
     }
 }
 
-/// Close every session owned by this process. Called on webview page loads and on
-/// app exit, where the frontend can no longer reach the old session ids.
+/// Close every session owned by this process when the application exits.
 pub fn close_all_sessions<R: tauri::Runtime>(app: &AppHandle<R>) {
     let sessions: Vec<Arc<Mutex<PtySession>>> = {
         let state = app.state::<PtyState>();
@@ -637,6 +638,7 @@ fn spawn_pty(
 pub async fn pty_spawn(
     state: State<'_, PtyState>,
     app: AppHandle,
+    webview: tauri::Webview,
     cols: u16,
     rows: u16,
     cwd: Option<String>,
@@ -712,9 +714,12 @@ pub async fn pty_spawn(
             ),
         );
     }
+    let window_label = webview.label().to_owned();
     lock_unpoisoned(&state.0).insert(
         id.clone(),
         Arc::new(Mutex::new(PtySession {
+            window_label: window_label.clone(),
+            workspace_tab: None,
             master,
             writer: Arc::new(Mutex::new(writer)),
             child,
@@ -813,8 +818,7 @@ pub async fn pty_spawn(
                     if debug::enabled() {
                         debug::write("reader-end", format!("id={} reason={}", tid, reason));
                     }
-                    let code = reap_session(&app, &tid);
-                    let _ = app.emit("pty-exit", PtyExit { id: tid.clone(), code });
+                    reap_session(&app, &tid);
                     break;
                 }
                 Err(std::sync::mpsc::RecvTimeoutError::Disconnected) => {
@@ -827,8 +831,7 @@ pub async fn pty_spawn(
                     if debug::enabled() {
                         debug::write("reader-end", format!("id={} reason=channel-closed", tid));
                     }
-                    let code = reap_session(&app, &tid);
-                    let _ = app.emit("pty-exit", PtyExit { id: tid.clone(), code });
+                    reap_session(&app, &tid);
                     break;
                 }
                 // Idle timeout (no new data within FLUSH_INTERVAL): flush the pending tail so the last output reaches the screen promptly
@@ -852,8 +855,7 @@ pub async fn pty_spawn(
                     if session.is_none() || session.as_ref().is_some_and(session_has_exited) {
                         let reason = if session.is_none() { "closed" } else { "child-exit" };
                         if debug::enabled() { debug::write("reader-end", format!("id={} reason={}", tid, reason)); }
-                        let code = reap_session(&app, &tid);
-                        let _ = app.emit("pty-exit", PtyExit { id: tid.clone(), code });
+                        reap_session(&app, &tid);
                         break;
                     }
                 }
@@ -907,8 +909,12 @@ fn flush_output(
     let events = std::mem::take(pending);
     *pending_bytes = 0;
     let session = lock_unpoisoned(&app.state::<PtyState>().0).get(id).cloned();
-    let input_epoch = session.map(|session| lock_unpoisoned(&session).input_epoch.load(Ordering::Acquire)).unwrap_or(0);
-    if app.emit("pty-output", PtyOutput { id: id.to_string(), events, input_epoch }).is_err() {
+    let session = session?;
+    let (window_label, input_epoch) = {
+        let session = lock_unpoisoned(&session);
+        (session.window_label.clone(), session.input_epoch.load(Ordering::Acquire))
+    };
+    if app.emit_to(&window_label, "pty-output", PtyOutput { id: id.to_string(), events, input_epoch }).is_err() {
         // The window is gone: a session that can no longer reach any listener must be
         // terminated, not left running behind an id nobody owns.
         close_session_by_id(app, id);
@@ -926,14 +932,15 @@ fn advance_input_epoch(epoch: &AtomicU64, events: &[ScanEvent]) {
 }
 
 #[tauri::command]
-pub fn pty_input_epoch(state: State<'_, PtyState>, id: String) -> Result<u64, String> {
+pub fn pty_input_epoch(state: State<'_, PtyState>, webview: tauri::Webview, id: String) -> Result<u64, String> {
     let session = lock_unpoisoned(&state.0).get(&id).cloned().ok_or("session not found")?;
-    let epoch = lock_unpoisoned(&session).input_epoch.load(Ordering::Acquire);
-    Ok(epoch)
+    let session = lock_unpoisoned(&session);
+    if session.window_label != webview.label() { return Err("terminal belongs to another window".into()); }
+    Ok(session.input_epoch.load(Ordering::Acquire))
 }
 
 #[tauri::command]
-pub async fn pty_write(state: State<'_, PtyState>, id: String, data: String, expected_epoch: Option<u64>) -> Result<(), String> {
+pub async fn pty_write(state: State<'_, PtyState>, webview: tauri::Webview, id: String, data: String, expected_epoch: Option<u64>) -> Result<(), String> {
     // On the Windows console Enter is CR (0x0D); \n (0x0A) is Ctrl+J, which PSReadLine/cmd do not treat as Return.
     // The frontend sends commands with \n, so normalize it to CR here; otherwise PowerShell and the like never receive Return and the command does nothing.
     #[cfg(windows)]
@@ -950,8 +957,9 @@ pub async fn pty_write(state: State<'_, PtyState>, id: String, data: String, exp
     };
     // Blocking IO: run it on a blocking thread, and take only the writer lock.
     let log_id = id.clone();
+    let owner = webview.label().to_owned();
     tauri::async_runtime::spawn_blocking(move || {
-        let result = write_session_guarded(&session, data.as_bytes(), expected_epoch);
+        let result = write_session_guarded(&session, data.as_bytes(), expected_epoch, Some(&owner));
         if debug::enabled() {
             debug::write(
                 "write-complete",
@@ -971,15 +979,16 @@ pub async fn pty_write(state: State<'_, PtyState>, id: String, data: String, exp
 /// button included, so force-quitting the app becomes the only way out.
 #[cfg(test)]
 fn write_session(session: &Arc<Mutex<PtySession>>, data: &[u8]) -> Result<(), String> {
-    write_session_guarded(session, data, None)
+    write_session_guarded(session, data, None, None)
 }
 
-fn write_session_guarded(session: &Arc<Mutex<PtySession>>, data: &[u8], expected_epoch: Option<u64>) -> Result<(), String> {
-    let (writer, input_pending, input_epoch, closed) = {
+fn write_session_guarded(session: &Arc<Mutex<PtySession>>, data: &[u8], expected_epoch: Option<u64>, owner: Option<&str>) -> Result<(), String> {
+    let (writer, input_epoch, closed) = {
         let state = lock_unpoisoned(session);
-        (state.writer.clone(), state.input_pending.clone(), state.input_epoch.clone(), state.closed.clone())
+        if owner.is_some_and(|label| label != state.window_label) { return Err("terminal belongs to another window".into()); }
+        state.input_pending.store(true, Ordering::Release);
+        (state.writer.clone(), state.input_epoch.clone(), state.closed.clone())
     };
-    input_pending.store(true, Ordering::Release);
     let mut writer = lock_unpoisoned(&writer);
     write_guarded_input(&mut **writer, data, &input_epoch, &closed, expected_epoch)
 }
@@ -1014,7 +1023,7 @@ fn normalize_enter(data: &str) -> String {
 }
 
 #[tauri::command]
-pub async fn pty_resize(state: State<'_, PtyState>, id: String, cols: u16, rows: u16) -> Result<(), String> {
+pub async fn pty_resize(state: State<'_, PtyState>, webview: tauri::Webview, id: String, cols: u16, rows: u16) -> Result<(), String> {
     if debug::enabled() {
         debug::write("resize", format!("id={} cols={} rows={}", id, cols, rows));
     }
@@ -1024,15 +1033,17 @@ pub async fn pty_resize(state: State<'_, PtyState>, id: String, cols: u16, rows:
     };
     // Resizing the pseudo console can block on its own: run it on a blocking thread so the
     // main thread (the UI) never waits.
-    tauri::async_runtime::spawn_blocking(move || resize_session(&session, cols, rows))
+    let owner = webview.label().to_owned();
+    tauri::async_runtime::spawn_blocking(move || resize_session(&session, &owner, cols, rows))
         .await
         .map_err(|e| e.to_string())?
 }
 
 /// Resize a session's PTY. It takes only the session lock and never touches the writer, so a
 /// stuck write cannot delay it.
-fn resize_session(session: &Arc<Mutex<PtySession>>, cols: u16, rows: u16) -> Result<(), String> {
+fn resize_session(session: &Arc<Mutex<PtySession>>, owner: &str, cols: u16, rows: u16) -> Result<(), String> {
     let state = lock_unpoisoned(session);
+    if state.window_label != owner { return Err("terminal belongs to another window".into()); }
     state
         .master
         .resize(PtySize { rows, cols, pixel_width: 0, pixel_height: 0 })
@@ -1040,7 +1051,7 @@ fn resize_session(session: &Arc<Mutex<PtySession>>, cols: u16, rows: u16) -> Res
 }
 
 #[tauri::command]
-pub async fn pty_close(state: State<'_, PtyState>, kill: State<'_, KillState>, id: String) -> Result<(), String> {
+pub async fn pty_close(state: State<'_, PtyState>, kill: State<'_, KillState>, webview: tauri::Webview, id: String) -> Result<(), String> {
     // Keep the session in the table until it is really closed: a failure before the
     // kill must leave a reachable handle, not an unreachable running child.
     let session = lock_unpoisoned(&state.0).get(&id).cloned();
@@ -1048,6 +1059,11 @@ pub async fn pty_close(state: State<'_, PtyState>, kill: State<'_, KillState>, i
     // never on the main thread. `close_session` also terminates the process tree on
     // Windows and signals the foreground group on Unix.
     if let Some(session) = session {
+        {
+            let session = lock_unpoisoned(&session);
+            if session.window_label != webview.label() { return Ok(()); }
+            session.closed.store(true, Ordering::Release);
+        }
         tauri::async_runtime::spawn_blocking(move || {
             close_session(&session, std::time::Instant::now() + CLOSE_DEADLINE);
         })
@@ -1060,14 +1076,101 @@ pub async fn pty_close(state: State<'_, PtyState>, kill: State<'_, KillState>, i
     Ok(())
 }
 
-/// Close every session at once. The page-load hook and the frontend startup call
+#[derive(serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PtyMove {
+    id: String,
+    input_epoch: u64,
+    tab_id: String,
+}
+
+/// Transfer a bounded set together, after checking the caller, destination, and foreground epochs.
+#[tauri::command]
+pub fn pty_move_to_window(
+    app: AppHandle, state: State<'_, PtyState>, webview: tauri::Webview, target: String, moves: Vec<PtyMove>,
+) -> Result<(), String> {
+    let source = webview.label();
+    if (source != "main" && !source.starts_with("app-"))
+        || (target != "main" && !target.starts_with("app-")) || source == target
+        || !(1..=128).contains(&moves.len())
+        || moves.iter().any(|item| item.id.len() > 64 || item.tab_id.is_empty() || item.tab_id.len() > 256) {
+        return Err("Invalid terminal window transfer".into());
+    }
+    let mut panes_by_tab = HashMap::new();
+    for item in &moves {
+        let panes = panes_by_tab.entry(&item.tab_id).or_insert(0);
+        *panes += 1;
+        if *panes > 4 || panes_by_tab.len() > 32 {
+            return Err("Invalid terminal window transfer size".into());
+        }
+    }
+    {
+        let map = lock_unpoisoned(&state.0);
+        if app.get_webview_window(&target).is_none() { return Err("Destination window closed".into()); }
+        move_pty_ownership(&map, source, &target, &moves)?;
+    }
+    let _ = app.emit_to(&target, "pty-moved", moves.into_iter().map(|item| item.id).collect::<Vec<_>>());
+    Ok(())
+}
+
+fn move_pty_ownership(
+    map: &HashMap<String, Arc<Mutex<PtySession>>>, source: &str, target: &str, moves: &[PtyMove],
+) -> Result<(), String> {
+    let mut unique = std::collections::HashSet::new();
+    let mut sessions = Vec::with_capacity(moves.len());
+    for item in moves {
+        if !unique.insert(item.id.as_str()) { return Err("Duplicate terminal in transfer".into()); }
+        let session = lock_unpoisoned(map.get(&item.id).ok_or("Terminal closed")?);
+        if session.window_label != source || session.closed.load(Ordering::Acquire)
+            || session.input_epoch.load(Ordering::Acquire) != item.input_epoch || session.input_pending.load(Ordering::Acquire) {
+            return Err("The terminal changed during the move".into());
+        }
+        sessions.push((session, &item.tab_id));
+    }
+    for (mut session, tab_id) in sessions {
+        session.window_label = target.to_owned();
+        session.workspace_tab = Some(tab_id.to_owned());
+    }
+    Ok(())
+}
+
+impl PtyState {
+    pub fn moved_tabs_in_other_windows(&self, owner: &str) -> std::collections::HashSet<String> {
+        lock_unpoisoned(&self.0).values().filter_map(|session| {
+            let session = lock_unpoisoned(session);
+            if session.window_label == owner { None } else { session.workspace_tab.clone() }
+        }).collect()
+    }
+}
+
+fn take_window_sessions(state: &PtyState, kill: &KillState, label: &str) -> Vec<Arc<Mutex<PtySession>>> {
+    let mut owned = Vec::new();
+    let mut ids = Vec::new();
+    lock_unpoisoned(&state.0).retain(|id, session| {
+        if lock_unpoisoned(session).window_label != label { return true; }
+        ids.push(id.clone());
+        owned.push(session.clone());
+        false
+    });
+    let mut kill = lock_unpoisoned(&kill.0);
+    for id in ids { kill.remove(&id); }
+    owned
+}
+
+pub fn close_window_sessions<R: tauri::Runtime>(app: &AppHandle<R>, label: &str) {
+    let sessions = take_window_sessions(&app.state::<PtyState>(), &app.state::<KillState>(), label);
+    if !sessions.is_empty() {
+        tauri::async_runtime::spawn_blocking(move || {
+            close_sessions(sessions, std::time::Instant::now() + CLOSE_ALL_DEADLINE);
+        });
+    }
+}
+
+/// Close every session owned by the calling window. The page-load hook and the frontend startup call
 /// this so a reload cannot leave the previous page's PTYs running invisibly.
 #[tauri::command]
-pub async fn pty_close_all(state: State<'_, PtyState>, kill: State<'_, KillState>) -> Result<usize, String> {
-    let sessions: Vec<Arc<Mutex<PtySession>>> = {
-        let mut map = lock_unpoisoned(&state.0);
-        map.drain().map(|(_, session)| session).collect()
-    };
+pub async fn pty_close_all(state: State<'_, PtyState>, kill: State<'_, KillState>, webview: tauri::Webview) -> Result<usize, String> {
+    let sessions = take_window_sessions(&state, &kill, webview.label());
     let count = sessions.len();
     if !sessions.is_empty() {
         tauri::async_runtime::spawn_blocking(move || {
@@ -1076,20 +1179,19 @@ pub async fn pty_close_all(state: State<'_, PtyState>, kill: State<'_, KillState
         .await
         .map_err(|e| e.to_string())?;
     }
-    lock_unpoisoned(&kill.0).clear();
     Ok(count)
 }
 
-/// Tauri page lifecycle hook: reloading the main webview keeps this process alive,
+/// Reloading a workspace webview keeps this process alive,
 /// so the sessions of the page that is going away have to be terminated here.
 pub fn lifecycle_plugin<R: tauri::Runtime>() -> tauri::plugin::TauriPlugin<R> {
     tauri::plugin::Builder::<R>::new("terminal-lifecycle")
         .on_page_load(|webview, payload| {
-            if webview.label() != "main" || payload.event() != tauri::webview::PageLoadEvent::Started {
+            if (webview.label() != "main" && !webview.label().starts_with("app-")) || payload.event() != tauri::webview::PageLoadEvent::Started {
                 return;
             }
             debug::write("page-load", format!("label={} event=started", webview.label()));
-            close_all_sessions(webview.app_handle());
+            close_window_sessions(webview.app_handle(), webview.label());
         })
         .build()
 }
@@ -1097,13 +1199,12 @@ pub fn lifecycle_plugin<R: tauri::Runtime>() -> tauri::plugin::TauriPlugin<R> {
 /// Settles a session after it exits: removes it from the state table, reaps the child and releases the master/writer fds.
 /// Called by the read thread on EOF or read error; the wait is bounded so a leftover handle cannot stall the close.
 /// Returns the child exit code so the session can tell a clean exit from a dropped connection.
-fn reap_session(app: &AppHandle, id: &str) -> Option<i32> {
+fn reap_session(app: &AppHandle, id: &str) {
     let session = lock_unpoisoned(&app.state::<PtyState>().0).remove(id);
-    let mut code = None;
     if let Some(session) = session {
         let mut state = lock_unpoisoned(&session);
         state.closed.store(true, Ordering::Release);
-        code = wait_child_bounded(&mut *state.child, REAP_TIMEOUT);
+        let code = wait_child_bounded(&mut *state.child, REAP_TIMEOUT);
         if code.is_none() {
             // The child is gone from the table but not reaped: force it so no zombie
             // or stopped process keeps the session alive.
@@ -1111,10 +1212,10 @@ fn reap_session(app: &AppHandle, id: &str) -> Option<i32> {
             force_kill_child(&mut *state.child);
             let _ = wait_child_bounded(&mut *state.child, CLOSE_ALL_DEADLINE);
         }
+        let _ = app.emit_to(&state.window_label, "pty-exit", PtyExit { id: id.to_owned(), code });
     }
     // Clear this session's "kill escalation" state in step so it cannot grow without bound during long use
     lock_unpoisoned(&app.state::<KillState>().0).remove(id);
-    code
 }
 
 /// Allowlist of signals that may be sent (prevents the frontend from killing unrelated processes with arbitrary signals)
@@ -1267,6 +1368,7 @@ fn should_escalate(elapsed_since_last: Option<std::time::Duration>) -> bool {
 pub async fn pty_kill_foreground(
     state: State<'_, PtyState>,
     kill: State<'_, KillState>,
+    webview: tauri::Webview,
     id: String,
 ) -> Result<String, String> {
     let session = {
@@ -1285,8 +1387,10 @@ pub async fn pty_kill_foreground(
     // Signaling, terminating the process tree and writing Ctrl+C can all block: run them on a
     // blocking thread so the main thread (the UI) never waits - otherwise the stop button itself
     // wedges and force-quitting the app becomes the only way out.
+    let owner = webview.label().to_owned();
     tauri::async_runtime::spawn_blocking(move || {
         let mut session = lock_unpoisoned(&session);
+        if session.window_label != owner { return Err("terminal belongs to another window".into()); }
         kill_foreground_impl(&mut session, escalate)
     })
     .await
@@ -1608,6 +1712,8 @@ mod tests {
             spawn_pty(80, 24, None, None, None, None).expect("spawn_pty");
         let closed = Arc::new(AtomicBool::new(false));
         let session = Arc::new(Mutex::new(PtySession {
+            window_label: "main".into(),
+            workspace_tab: None,
             master,
             writer: Arc::new(Mutex::new(writer)),
             child,
@@ -1638,6 +1744,8 @@ mod tests {
         assert_eq!(&ready, b"ready");
         let writer = pair.master.take_writer().expect("writer");
         let session = Arc::new(Mutex::new(PtySession {
+            window_label: "main".into(),
+            workspace_tab: None,
             master: pair.master,
             writer: Arc::new(Mutex::new(writer)),
             child,
@@ -1659,6 +1767,8 @@ mod tests {
                 spawn_pty(80, 24, None, None, None, None).expect("spawn_pty");
             drop(reader);
             let session = Arc::new(Mutex::new(PtySession {
+                window_label: "main".into(),
+                workspace_tab: None,
                 master,
                 writer: Arc::new(Mutex::new(writer)),
                 child,
@@ -1678,6 +1788,67 @@ mod tests {
         }
     }
 
+    #[test]
+    fn a_window_sweep_leaves_other_windows_sessions_registered() {
+        let state = PtyState::default();
+        let kill = KillState::default();
+        for label in ["main", "app-other"] {
+            let (_id, master, reader, writer, child) =
+                spawn_pty(80, 24, None, None, None, None).expect("spawn_pty");
+            drop(reader);
+            lock_unpoisoned(&state.0).insert(label.into(), Arc::new(Mutex::new(PtySession {
+                window_label: label.into(),
+                workspace_tab: None,
+                master,
+                writer: Arc::new(Mutex::new(writer)),
+                child,
+                input_pending: Arc::new(AtomicBool::new(false)),
+                input_epoch: Arc::new(AtomicU64::new(0)),
+                closed: Arc::new(AtomicBool::new(false)),
+            })));
+            lock_unpoisoned(&kill.0).insert(label.into(), std::time::Instant::now());
+        }
+        let original = take_window_sessions(&state, &kill, "main");
+        let main_count = original.len();
+        let other_status = lock_unpoisoned(&kill.0).contains_key("app-other");
+        let other = take_window_sessions(&state, &kill, "app-other");
+        let other_count = other.len();
+        close_sessions(original.into_iter().chain(other).collect(), std::time::Instant::now() + CLOSE_ALL_DEADLINE);
+        assert_eq!((main_count, other_count, other_status), (1, 1, true));
+        assert!(lock_unpoisoned(&kill.0).is_empty());
+    }
+
+    #[test]
+    fn a_stale_epoch_leaves_every_session_with_its_original_owner() {
+        let state = PtyState::default();
+        let kill = KillState::default();
+        for id in ["first", "second"] {
+            let (_, master, reader, writer, child) =
+                spawn_pty(80, 24, None, None, None, None).expect("spawn_pty");
+            drop(reader);
+            lock_unpoisoned(&state.0).insert(id.into(), Arc::new(Mutex::new(PtySession {
+                window_label: "main".into(), workspace_tab: None, master,
+                writer: Arc::new(Mutex::new(writer)), child,
+                input_pending: Arc::new(AtomicBool::new(false)),
+                input_epoch: Arc::new(AtomicU64::new(2)),
+                closed: Arc::new(AtomicBool::new(false)),
+            })));
+        }
+        let mut moves = [PtyMove { id: "first".into(), input_epoch: 2, tab_id: "tab".into() },
+            PtyMove { id: "second".into(), input_epoch: 1, tab_id: "tab".into() }];
+        let stale = move_pty_ownership(&lock_unpoisoned(&state.0), "main", "app-other", &moves);
+        let moved_before_retry = state.moved_tabs_in_other_windows("main");
+        moves[1].input_epoch = 2;
+        let accepted = move_pty_ownership(&lock_unpoisoned(&state.0), "main", "app-other", &moves);
+        let source = take_window_sessions(&state, &kill, "main");
+        let destination = take_window_sessions(&state, &kill, "app-other");
+        let counts = (source.len(), destination.len());
+        close_sessions(source.into_iter().chain(destination).collect(), std::time::Instant::now() + CLOSE_ALL_DEADLINE);
+        assert!(stale.is_err() && moved_before_retry.is_empty());
+        assert!(accepted.is_ok());
+        assert_eq!(counts, (0, 2));
+    }
+
     #[cfg(unix)]
     #[test]
     fn close_sessions_escalates_the_entire_batch_before_its_deadline() {
@@ -1694,6 +1865,8 @@ mod tests {
             assert_eq!(&ready, b"ready");
             let writer = pair.master.take_writer().expect("writer");
             sessions.push(Arc::new(Mutex::new(PtySession {
+                window_label: "main".into(),
+                workspace_tab: None,
                 master: pair.master, writer: Arc::new(Mutex::new(writer)), child,
                 input_pending: Arc::new(AtomicBool::new(false)), input_epoch: Arc::new(AtomicU64::new(0)), closed: Arc::new(AtomicBool::new(false)),
             })));
@@ -1784,6 +1957,8 @@ mod tests {
         let (release, resume) = std::sync::mpsc::channel();
         let writer: Box<dyn Write + Send> = Box::new(BlockedWriter { entered, release: resume });
         let session = Arc::new(Mutex::new(PtySession {
+            window_label: "main".into(),
+            workspace_tab: None,
             master: pair.master,
             writer: Arc::new(Mutex::new(writer)),
             child,
@@ -2014,7 +2189,7 @@ mod cmd_interaction_tests {
         command.args(["/d", "/c", "exit", "7"]);
         let child = pair.slave.spawn_command(command).unwrap();
         let writer = pair.master.take_writer().unwrap();
-        let session = Arc::new(Mutex::new(PtySession { master: pair.master, writer: Arc::new(Mutex::new(writer)), child, input_pending: Arc::new(AtomicBool::new(false)), input_epoch: Arc::new(AtomicU64::new(0)), closed: Arc::new(AtomicBool::new(false)) }));
+        let session = Arc::new(Mutex::new(PtySession { window_label: "main".into(), workspace_tab: None, master: pair.master, writer: Arc::new(Mutex::new(writer)), child, input_pending: Arc::new(AtomicBool::new(false)), input_epoch: Arc::new(AtomicU64::new(0)), closed: Arc::new(AtomicBool::new(false)) }));
         let deadline = std::time::Instant::now() + std::time::Duration::from_secs(5);
         while !session_has_exited(&session) && std::time::Instant::now() < deadline {
             std::thread::sleep(std::time::Duration::from_millis(20));

@@ -118,6 +118,7 @@ interface ChatState {
   renameConversation: (id: string, title: string) => void;
   deleteConversation: (id: string, options?: { activateNext?: boolean }) => Promise<void>;
   retryPersistence: () => Promise<void>;
+  flushForWindowMove: (id: string) => Promise<void>;
   /** Independent conversations and terminal history are keyed by their owning ID. */
   byTab: Record<string, ChatMessage[]>;
   /** Active stream owners run independently; each owner's queue remains ordered. */
@@ -637,6 +638,11 @@ export const useChatStore = create<ChatState>((set, get) => {
           if (!message.pending) await persistMessage(conversation.id, message);
         }
       }
+    },
+    flushForWindowMove: async (id) => {
+      await saveQueues.get(id);
+      if (pendingConversationDeletes.has(id) || get().persistenceError)
+        throw new Error(get().persistenceError ?? t('Thread is unavailable'));
     },
     byTab: {},
     sendingTabs: [],

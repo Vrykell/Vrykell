@@ -1,6 +1,27 @@
 import { expect, test, type Locator, type Page } from '@playwright/test';
 import { setupTauriMock } from './tauri-mock';
 
+test('a mouse click on the start tab does not inherit a text field focus ring', async ({ page }) => {
+  await setupTauriMock(page.context());
+  await page.goto('/');
+  await page.getByTestId('workspace-area-code').click();
+  const tab = page.getByTestId('workspace-instance-bar').getByRole('tab', { name: '开始', exact: true });
+  await expect(tab).toBeVisible();
+  await page.evaluate(() => {
+    const field = document.createElement('input');
+    field.dataset.testid = 'focus-probe';
+    document.body.append(field);
+    field.focus();
+  });
+  await expect(page.getByTestId('focus-probe')).toBeFocused();
+  await tab.click();
+  await expect(tab).toBeFocused();
+  await expect(tab).toHaveCSS('outline-style', 'none');
+  await expect(page.locator('[data-reorder-preview="item"], [data-incoming-tab-preview]')).toHaveCount(0);
+  await tab.press('ArrowRight');
+  await expect(tab).toHaveCSS('outline-style', 'solid');
+});
+
 async function expectJoinedCorners(page: Page, pane: Locator, path: string) {
   await expect(pane).toBeVisible();
   const header = page.getByTestId('workspace-instance-bar').locator('.folder-header');

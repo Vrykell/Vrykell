@@ -178,9 +178,12 @@ pub fn delete_chat_message(
 #[tauri::command]
 pub fn list_sessions(
     state: tauri::State<'_, HistoryState>,
+    pty: tauri::State<'_, crate::terminal::pty::PtyState>,
+    webview: tauri::Webview,
 ) -> Result<Vec<SessionEntry>, String> {
+    let moved = pty.moved_tabs_in_other_windows(webview.label());
     let db = state.0.lock().map_err(|e| e.to_string())?;
-    db.list_sessions()
+    Ok(db.list_sessions()?.into_iter().filter(|session| !moved.contains(&session.id)).collect())
 }
 
 #[tauri::command]

@@ -21,7 +21,7 @@ import {
 } from '@config/theme/tokens';
 import { termInstances } from '@features/terminal';
 import { readXtermTheme } from '@features/terminal/model/xtermTheme';
-import { syncWindowFrame } from '@platform/windowChrome';
+import { syncWindowFrame } from '@platform/windowFrame';
 
 export interface TerminalThemeConfig extends ThemePresetSelection {
   /** Native desktop color is visible only through the outer navigation frame. */

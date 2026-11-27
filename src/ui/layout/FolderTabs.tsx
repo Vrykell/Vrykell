@@ -8,7 +8,7 @@ import '@ui/layout/FolderTabs.css';
 import { TextInput } from '@ui/fields/TextInput';
 import type { TabHandle } from './tabHandle';
 import type { TabGroupController } from './tabGroups';
-import GroupedTabList from './GroupedTabList';
+import GroupedTabList, { type TrackWindowTabDrag } from './GroupedTabList';
 
 /** All tab strips share grouping, menus, keyboard navigation and reserved toolbar space. */
 export default function FolderTabs({
@@ -28,6 +28,10 @@ export default function FolderTabs({
   onSelect,
   onClose,
   onMove,
+  onDropOutsideWindow,
+  onTrackWindowDrag,
+  canDropOutsideWindow,
+  onDragSingleTab,
   onRename,
   grouping,
 }: {
@@ -48,6 +52,10 @@ export default function FolderTabs({
   onSelect: (id: string) => void;
   onClose: (id: string) => void;
   onMove: (id: string, over: string, after: boolean) => void;
+  onDropOutsideWindow?: (id: string, point: { x: number; y: number }, client: { x: number; y: number }) => void;
+  canDropOutsideWindow?: (id: string) => boolean;
+  onDragSingleTab?: (id: string, grabRatio?: number) => boolean;
+  onTrackWindowDrag?: TrackWindowTabDrag;
   onRename?: (id: string, title: string) => void;
 }) {
   const instanceId = useId();
@@ -95,6 +103,10 @@ export default function FolderTabs({
         className={className}
         grouping={grouping}
         empty={empty}
+        onDropOutsideWindow={onDropOutsideWindow}
+        canDropOutsideWindow={canDropOutsideWindow}
+        onDragSingleTab={onDragSingleTab}
+        onTrackWindowDrag={onTrackWindowDrag}
         onSelect={onSelect}
         onClose={onClose}
         onMove={onMove}
@@ -181,6 +193,8 @@ export function FolderTabContent({
             data-reorder-handle
             aria-selected={selected}
             data-tip={item.tip}
+            onBlur={(event) => event.currentTarget.removeAttribute('data-pointer-focus')}
+            onKeyDown={(event) => event.currentTarget.removeAttribute('data-pointer-focus')}
             onDoubleClick={(event) => {
               if (!onStartRename) return;
               event.stopPropagation();
@@ -192,9 +206,11 @@ export function FolderTabContent({
             {item.icon}
             <span>{item.label}</span>
           </button>
-          <IconButton compact data-no-drag data-testid={item.closeTestId} aria-label={item.closeLabel} onClick={() => onClose?.(item.id)}>
-            <X size={14} />
-          </IconButton>
+          {onClose && (
+            <IconButton compact data-no-drag data-testid={item.closeTestId} aria-label={item.closeLabel} onClick={() => onClose(item.id)}>
+              <X size={14} />
+            </IconButton>
+          )}
         </>
       )}
     </div>

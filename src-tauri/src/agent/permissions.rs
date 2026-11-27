@@ -331,7 +331,7 @@ impl Default for ToolPolicy {
 
 impl ToolPolicy {
     pub fn issue_ui(&self, label: &str, command: &str, args: &Value) -> Result<String, String> {
-        if !shared_command(command) || !(label == "main" || label.starts_with("tool-")) {
+        if !shared_command(command) || !(label == "main" || label.starts_with("app-") || label.starts_with("tool-")) {
             return Err("This interface cannot authorize the requested command".into());
         }
         self.issue(&format!("ui:{label}:{command}"), args)
