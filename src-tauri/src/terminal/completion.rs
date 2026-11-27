@@ -46,6 +46,9 @@ while ($true) {
     $located = $true
     if ($request.cwd) {
       try { Set-Location -LiteralPath ([string]$request.cwd) -ErrorAction Stop } catch { $located = $false }
+    } else {
+      # A request without a directory must not inherit the previous request's location.
+      $located = $false
     }
     if (-not $located) {
       $payload = '[]'
@@ -101,9 +104,46 @@ struct CachedCompletion {
     candidates: Vec<ShellCompletion>,
 }
 
+/// Resident helper failures are classified so a broken pipe or malformed answer can fall back to
+/// a short-lived query, while a timeout returns no candidates instead of doubling the wait.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum HelperFailure {
+    Timeout,
+    Closed,
+    Protocol,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum ResidentError {
     Unavailable,
-    Query,
+    Timeout,
+    Closed,
+    Protocol,
+}
+
+impl ResidentError {
+    fn falls_back(self) -> bool {
+        !matches!(self, Self::Timeout)
+    }
+
+    fn reason(self) -> &'static str {
+        match self {
+            Self::Unavailable => "unavailable",
+            Self::Timeout => "timeout",
+            Self::Closed => "closed",
+            Self::Protocol => "protocol",
+        }
+    }
+}
+
+impl From<HelperFailure> for ResidentError {
+    fn from(failure: HelperFailure) -> Self {
+        match failure {
+            HelperFailure::Timeout => Self::Timeout,
+            HelperFailure::Closed => Self::Closed,
+            HelperFailure::Protocol => Self::Protocol,
+        }
+    }
 }
 
 impl CompletionState {
@@ -191,25 +231,44 @@ fn spawn_helper(program: &'static str) -> Result<Helper, String> {
     Ok(Helper { child, stdin, stdout: BufReader::new(stdout), last_used: Instant::now() })
 }
 
-async fn helper_exchange(helper: &mut Helper, request: &serde_json::Value) -> Result<Vec<ShellCompletion>, String> {
-    let line = serde_json::to_vec(request).map_err(|error| error.to_string())?;
+/// A request without a reported terminal directory must not inherit the previous request's
+/// location from the resident helper. Fall back to a neutral home directory instead.
+fn completion_directory(cwd: Option<&str>) -> String {
+    if let Some(directory) = cwd { return directory.to_string(); }
+    dirs::home_dir()
+        .or_else(|| std::env::current_dir().ok())
+        .unwrap_or_default()
+        .to_string_lossy()
+        .into_owned()
+}
+
+fn decode_helper_line(buffer: &[u8]) -> Result<Vec<ShellCompletion>, HelperFailure> {
+    if buffer.is_empty() { return Err(HelperFailure::Closed); }
+    if buffer.len() > MAX_HELPER_LINE { return Err(HelperFailure::Protocol); }
+    let encoded = std::str::from_utf8(buffer).map_err(|_| HelperFailure::Protocol)?.trim();
+    if encoded.is_empty() { return Err(HelperFailure::Protocol); }
+    let decoded = base64::engine::general_purpose::STANDARD.decode(encoded).map_err(|_| HelperFailure::Protocol)?;
+    let candidates: Vec<ShellCompletion> = serde_json::from_slice(&decoded).map_err(|_| HelperFailure::Protocol)?;
+    Ok(bounded(candidates))
+}
+
+async fn helper_exchange(helper: &mut Helper, request: &serde_json::Value) -> Result<Vec<ShellCompletion>, HelperFailure> {
+    let line = serde_json::to_vec(request).map_err(|_| HelperFailure::Protocol)?;
     let encoded = base64::engine::general_purpose::STANDARD.encode(line);
-    helper.stdin.write_all(encoded.as_bytes()).await.map_err(|error| error.to_string())?;
-    helper.stdin.write_all(b"\n").await.map_err(|error| error.to_string())?;
-    helper.stdin.flush().await.map_err(|error| error.to_string())?;
+    helper.stdin.write_all(encoded.as_bytes()).await.map_err(|_| HelperFailure::Closed)?;
+    helper.stdin.write_all(b"\n").await.map_err(|_| HelperFailure::Closed)?;
+    helper.stdin.flush().await.map_err(|_| HelperFailure::Closed)?;
     let operation = async {
         let mut buffer = Vec::new();
-        let count = (&mut helper.stdout).take(MAX_HELPER_LINE as u64 + 1).read_until(b'\n', &mut buffer).await.map_err(|error| error.to_string())?;
-        if count == 0 { return Err("The completion helper closed its connection.".to_string()); }
-        if count > MAX_HELPER_LINE { return Err("The completion response exceeds its size limit.".to_string()); }
-        let encoded = std::str::from_utf8(&buffer).map_err(|error| error.to_string())?.trim();
-        let decoded = base64::engine::general_purpose::STANDARD.decode(encoded).map_err(|error| error.to_string())?;
-        let candidates: Vec<ShellCompletion> = serde_json::from_slice(&decoded).map_err(|error| error.to_string())?;
-        Ok(bounded(candidates))
+        let count = (&mut helper.stdout).take(MAX_HELPER_LINE as u64 + 1).read_until(b'\n', &mut buffer).await.map_err(|_| HelperFailure::Closed)?;
+        if count == 0 { return Err(HelperFailure::Closed); }
+        if count > MAX_HELPER_LINE { return Err(HelperFailure::Protocol); }
+        decode_helper_line(&buffer)
     };
-    let result = tokio::time::timeout(HELPER_TIMEOUT, operation).await.map_err(|_| "The completion helper timed out.".to_string())?;
-    helper.last_used = Instant::now();
-    result
+    match tokio::time::timeout(HELPER_TIMEOUT, operation).await {
+        Ok(result) => { helper.last_used = Instant::now(); result }
+        Err(_) => Err(HelperFailure::Timeout),
+    }
 }
 
 async fn resident(runtime: &mut CompletionRuntime, program: &'static str, cwd: Option<&str>, text: &str, cursor: usize) -> Result<Vec<ShellCompletion>, ResidentError> {
@@ -217,15 +276,20 @@ async fn resident(runtime: &mut CompletionRuntime, program: &'static str, cwd: O
         let helper = spawn_helper(program).map_err(|_| ResidentError::Unavailable)?;
         runtime.helpers.insert(program, helper);
     }
-    let request = serde_json::json!({ "text": text, "cursor": cursor, "cwd": cwd });
+    // Every request carries a directory, including one derived from home, so the helper cannot
+    // keep another pane's location between requests.
+    let request = serde_json::json!({ "text": text, "cursor": cursor, "cwd": completion_directory(cwd) });
     let outcome = {
         let helper = runtime.helpers.get_mut(program).ok_or(ResidentError::Unavailable)?;
-        helper_exchange(helper, &request).await.map_err(|_| ResidentError::Query)
+        helper_exchange(helper, &request).await.map_err(ResidentError::from)
     };
-    if outcome.is_err() {
-        runtime.helpers.remove(program);
+    match outcome {
+        Ok(candidates) => Ok(candidates),
+        Err(error) => {
+            runtime.helpers.remove(program);
+            Err(error)
+        }
     }
-    outcome
 }
 
 async fn one_shot(program: &'static str, cwd: Option<&str>, text: &str, cursor: usize, timeout: Duration) -> Result<Vec<ShellCompletion>, String> {
@@ -287,8 +351,15 @@ async fn complete(state: &CompletionState, shell: Option<String>, cwd: Option<St
     let candidates = if is_powershell(program) {
         match resident(&mut runtime, program, cwd.as_deref(), &text, cursor).await {
             Ok(candidates) => candidates,
-            Err(ResidentError::Unavailable) => one_shot(program, cwd.as_deref(), &text, cursor, ONE_SHOT_TIMEOUT).await?,
-            Err(ResidentError::Query) => Vec::new(),
+            Err(error) if error.falls_back() => {
+                let _ = crate::diagnostics::record("completion-fallback", serde_json::json!({
+                    "program": program,
+                    "reason": error.reason(),
+                    "target": "one-shot",
+                }));
+                one_shot(program, cwd.as_deref(), &text, cursor, ONE_SHOT_TIMEOUT).await?
+            }
+            Err(_) => Vec::new(),
         }
     } else {
         one_shot(program, cwd.as_deref(), &text, cursor, ONE_SHOT_TIMEOUT).await?
@@ -362,6 +433,78 @@ mod tests {
         assert_eq!(cached(&runtime, "zsh", Some("/work"), "git", 3), None);
         assert_eq!(cached(&runtime, "bash", Some("/other"), "git", 3), None);
         assert_eq!(cached(&runtime, "bash", Some("/work"), "git", 2), None);
+    }
+
+    #[test]
+    fn helper_failures_keep_timeouts_single_attempt() {
+        assert!(ResidentError::Unavailable.falls_back());
+        assert!(ResidentError::Closed.falls_back());
+        assert!(ResidentError::Protocol.falls_back());
+        assert!(!ResidentError::Timeout.falls_back());
+        assert_eq!(ResidentError::from(HelperFailure::Timeout), ResidentError::Timeout);
+        assert_eq!(ResidentError::from(HelperFailure::Closed), ResidentError::Closed);
+        assert_eq!(ResidentError::from(HelperFailure::Protocol), ResidentError::Protocol);
+    }
+
+    #[test]
+    fn helper_lines_reject_closed_stray_and_oversized_output() {
+        assert_eq!(decode_helper_line(b""), Err(HelperFailure::Closed));
+        assert_eq!(decode_helper_line(b"not-base64!"), Err(HelperFailure::Protocol));
+        let malformed = base64::engine::general_purpose::STANDARD.encode(b"not json");
+        assert_eq!(decode_helper_line(malformed.as_bytes()), Err(HelperFailure::Protocol));
+        let oversized = vec![b'a'; MAX_HELPER_LINE + 1];
+        assert_eq!(decode_helper_line(&oversized), Err(HelperFailure::Protocol));
+        let empty = base64::engine::general_purpose::STANDARD.encode(b"[]");
+        assert_eq!(decode_helper_line(empty.as_bytes()), Ok(Vec::new()));
+    }
+
+    #[test]
+    fn requests_without_a_directory_use_a_neutral_default() {
+        assert_eq!(completion_directory(Some("/work")), "/work");
+        let neutral = completion_directory(None);
+        assert!(!neutral.is_empty());
+    }
+
+    fn test_helper(arguments: &str) -> Helper {
+        #[cfg(target_os = "windows")]
+        let mut command = {
+            let mut command = tokio::process::Command::new("cmd");
+            // Skip AutoRun so the test process cannot print unrelated startup output.
+            command.args(["/D", "/C", arguments]);
+            command
+        };
+        #[cfg(not(target_os = "windows"))]
+        let mut command = {
+            let mut command = tokio::process::Command::new("sh");
+            command.args(["-c", arguments]);
+            command
+        };
+        command.stdin(std::process::Stdio::piped()).stdout(std::process::Stdio::piped())
+            .stderr(std::process::Stdio::null()).kill_on_drop(true);
+        #[cfg(target_os = "windows")]
+        command.creation_flags(0x08000000);
+        let mut child = command.spawn().expect("test helper process");
+        let stdin = child.stdin.take().expect("test helper stdin");
+        let stdout = child.stdout.take().expect("test helper stdout");
+        Helper { child, stdin, stdout: tokio::io::BufReader::new(stdout), last_used: Instant::now() }
+    }
+
+    #[tokio::test]
+    async fn a_closed_helper_is_removed_for_the_single_shot_fallback() {
+        let mut runtime = CompletionRuntime::default();
+        runtime.helpers.insert("powershell", test_helper("exit 0"));
+        let outcome = resident(&mut runtime, "powershell", None, "Get-ChildItem", 13).await;
+        assert_eq!(outcome, Err(ResidentError::Closed));
+        assert!(!runtime.helpers.contains_key("powershell"));
+    }
+
+    #[tokio::test]
+    async fn stray_helper_output_is_removed_for_the_single_shot_fallback() {
+        let mut runtime = CompletionRuntime::default();
+        runtime.helpers.insert("powershell", test_helper("echo not-base64"));
+        let outcome = resident(&mut runtime, "powershell", None, "Get-ChildItem", 13).await;
+        assert_eq!(outcome, Err(ResidentError::Protocol));
+        assert!(!runtime.helpers.contains_key("powershell"));
     }
 
     #[cfg(target_os = "windows")]

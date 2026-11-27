@@ -22,6 +22,11 @@ import { savedJumpRoute } from '../model/jumpRoute';
 import { prepareSshHost } from '../services/hostTrust';
 import { sshConnectionFailureMessage } from '../model/connectionFailure';
 
+/** Host-trust outcomes that stay distinct from an authentication failure. */
+type TrustIssue =
+  | { kind: 'mismatch'; host: string; port: number; keyType?: string; fingerprint?: string; details?: string }
+  | { kind: 'cancelled'; host: string; port: number };
+
 function AuthenticationDialog({ target }: { target: SshAuthenticationTarget & { requestId: number } }) {
   const dialog = useRef<HTMLDivElement>(null);
   const submitting = useRef(false);
@@ -43,6 +48,7 @@ function AuthenticationDialog({ target }: { target: SshAuthenticationTarget & { 
   const [secret, setSecret] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
+  const [trustIssue, setTrustIssue] = useState<TrustIssue | null>(null);
   const [challenge, setChallenge] = useState<{ value: SshAuthenticationChallenge; reply: SshChallengeReply } | null>(null);
   const [responses, setResponses] = useState<string[]>([]);
   const [responding, setResponding] = useState(false);
@@ -80,6 +86,7 @@ function AuthenticationDialog({ target }: { target: SshAuthenticationTarget & { 
     submitting.current = true;
     setBusy(true);
     setError('');
+    setTrustIssue(null);
     const value = secret;
     setSecret('');
     const controller = method === 'keyboardInteractive' ? new AbortController() : null;
@@ -104,7 +111,32 @@ function AuthenticationDialog({ target }: { target: SshAuthenticationTarget & { 
         setMethod('password');
       }
     } catch (reason) {
-      if (useSessionAuthenticationStore.getState().request?.requestId === target.requestId) setError(String(reason));
+      if (useSessionAuthenticationStore.getState().request?.requestId !== target.requestId) return;
+      const name = (reason as Error)?.name;
+      const failure = reason as {
+        host?: string;
+        port?: number;
+        keyType?: string;
+        fingerprint?: string;
+        rawMessage?: string;
+        message?: string;
+      };
+      const host = failure.host ?? selected.host;
+      const port = failure.port ?? selected.port ?? 22;
+      if (name === 'SshHostKeyMismatchError') {
+        setTrustIssue({
+          kind: 'mismatch',
+          host,
+          port,
+          keyType: failure.keyType,
+          fingerprint: failure.fingerprint,
+          details: failure.rawMessage ?? failure.message,
+        });
+      } else if (name === 'SshHostTrustCancelledError') {
+        setTrustIssue({ kind: 'cancelled', host, port });
+      } else {
+        setError(String(reason));
+      }
     } finally {
       active.current = null;
       submitting.current = false;
@@ -152,6 +184,7 @@ function AuthenticationDialog({ target }: { target: SshAuthenticationTarget & { 
                   setSecret('');
                   setMethod('password');
                   setError('');
+                  setTrustIssue(null);
                 }}
                 options={targets.map((candidate) => ({
                   value: candidate.connectionId,
@@ -192,6 +225,7 @@ function AuthenticationDialog({ target }: { target: SshAuthenticationTarget & { 
                   if (value === 'keyboardInteractive') setSelectedId(target.connectionId);
                   setSecret('');
                   setError('');
+                  setTrustIssue(null);
                 }}
                 options={[
                   { value: 'password', label: t('Server password') },
@@ -266,7 +300,40 @@ function AuthenticationDialog({ target }: { target: SshAuthenticationTarget & { 
               )}
             </p>
           )}
-          {error && (
+          {trustIssue?.kind === 'mismatch' && (
+            <ErrorBox
+              tone="error"
+              placement="inline"
+              title={t('Host key mismatch')}
+              details={trustIssue.details}
+              testId="ssh-auth-host-key-mismatch">
+              <p>
+                {t(
+                  'The host key presented by {{host}}:{{port}} does not match the saved record. This may indicate a man-in-the-middle attack. Nothing was overwritten; verify the server before continuing.',
+                  { host: trustIssue.host, port: trustIssue.port },
+                )}
+              </p>
+              <dl className="ssh-host-key-details">
+                <div>
+                  <dt>{t('Key type')}</dt>
+                  <dd>{trustIssue.keyType || t('Unknown')}</dd>
+                </div>
+                <div>
+                  <dt>{t('Presented fingerprint')}</dt>
+                  <dd className="ssh-host-key-fingerprint">{trustIssue.fingerprint || t('Fingerprint unavailable')}</dd>
+                </div>
+              </dl>
+            </ErrorBox>
+          )}
+          {trustIssue?.kind === 'cancelled' && (
+            <ErrorBox tone="info" title={t('Host key not trusted')} testId="ssh-auth-host-key-cancelled">
+              <p>
+                {trustIssue.host}:{trustIssue.port}
+              </p>
+              {t('SSH connection cancelled')}
+            </ErrorBox>
+          )}
+          {error && !trustIssue && (
             <ErrorBox title={t('Authentication failed')} details={error}>
               {sshConnectionFailureMessage(error) ??
                 t(
