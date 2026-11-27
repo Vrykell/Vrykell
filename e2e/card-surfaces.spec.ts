@@ -91,7 +91,7 @@ for (const theme of ['dark', 'light'] as const)
     expect(luminance(hintColors.background)).toBeGreaterThan(luminance(background));
     expect(contrast(hintColors.background, hintColors.text)).toBeGreaterThanOrEqual(4.5);
     await page.screenshot({ path: info.outputPath(`shortcuts-${theme}.png`), animations: 'disabled' });
-    await page.locator('.settings-navigation').getByRole('button', { name: 'Zsh', exact: true }).click();
+    await gotoSetting(page, 'Zsh');
     await expectCards(page.locator('.shell-profile-page .settings-group-panel'), background, '1px');
     await page.screenshot({ path: info.outputPath(`settings-${theme}.png`), animations: 'disabled' });
     await page.getByTestId('workspace-settings').hover();

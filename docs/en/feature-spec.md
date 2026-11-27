@@ -118,6 +118,8 @@ See [Workspace compositions](workspace-compositions.md) for composition ownershi
 
 ## Terminal creation menu regression checklist
 
+- Open **Terminal → Shell profiles** in Settings. The page title selects a profile and shows its icon. Profiles with a fixed opening mode omit the mode control from Settings and the new terminal menu.
+
 - [x] Usage, settings, history and ordinary conversation cards share one borderless surface, separated from the canvas by color in both themes. Host and launch cards reuse the same role; interactive card hover increases emphasis rather than darkening a dark card. Shortcut badges and hover explanations use the brighter field surface. Text contrast stays at least 4.5:1 and card/canvas contrast at least 1.12:1. Approval and error indicators retain semantic colors. Sidebar destinations are short functional names. Conversation bubbles share the send action's color.
 - [x] Row hover and ordinary selection backgrounds use neutral gray. Selected host cards use the requested blue-tinted primary surface. Selected sidebar icons, history-title blue underlines, checks, identity marks and primary actions retain their accents; neutral fills do not desaturate foreground identities.
 - [x] Every supported local shell has a dedicated profile settings page for its name, starting directory, tab title, default selection, menu visibility and opening mode. Explicit directory choices override profile defaults. Hidden profiles remain usable as the default. These settings affect new terminals and persist across reloads.

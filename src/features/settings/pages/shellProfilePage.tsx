@@ -1,14 +1,41 @@
 import { t } from '@i18n';
-import { shellTypeLabel, type ShellType } from '@platform/shells';
+import { SHELL_TYPES, shellTypeLabel, type ShellType } from '@platform/shells';
 import { pickPath } from '@platform/api/fs';
 import { EMPTY_SHELL_PROFILE, useShellProfiles } from '@config/shellProfiles';
 import { useTerminalDefaults } from '@config/terminalDefaults';
 import { useAgentSettings } from '@features/agent';
 import SegmentedControl from '@ui/fields/SegmentedControl';
+import Select from '@ui/fields/Select';
 import { OutlineButton } from '@ui/actions/OutlineButton';
+import { TerminalProfileIcon } from '@ui/icons/shellIcons';
 import { Field, SettingsGroup, Toggle } from '../components/ui';
 import AutoSaveInput from '../components/AutoSaveInput';
 import { useSettingsSave } from '../components/SettingsSaveProvider';
+
+export function ShellProfileTitle({
+  shell,
+  describedBy,
+  onChange,
+}: {
+  shell: ShellType;
+  describedBy?: string;
+  onChange: (shell: ShellType) => void;
+}) {
+  return (
+    <Select
+      aria-label={t('Shell profiles')}
+      aria-describedby={describedBy}
+      triggerClassName="shell-profile-title"
+      options={SHELL_TYPES.map((value) => ({
+        value,
+        label: shellTypeLabel(value),
+        icon: <TerminalProfileIcon kind="local" shellType={value} size={24} />,
+      }))}
+      value={shell}
+      onChange={onChange}
+    />
+  );
+}
 
 export default function ShellProfilePage({ shell }: { shell: ShellType }) {
   const profile = useShellProfiles((state) => state.profiles[shell] ?? EMPTY_SHELL_PROFILE);
@@ -60,19 +87,21 @@ export default function ShellProfilePage({ shell }: { shell: ShellType }) {
             </OutlineButton>
           </div>
         </Field>
-        <Field title={t('Opening mode')}>
-          <SegmentedControl
-            label={t('Opening mode')}
-            value={shell === 'cmd' ? 'classic' : mode}
-            options={shell === 'cmd' ? modeOptions.slice(0, 1) : modeOptions}
-            onChange={(value) => {
-              void save(() => {
-                const store = useAgentSettings.getState();
-                store.update({ openModeByShell: { ...store.global.openModeByShell, [shell]: value } });
-              });
-            }}
-          />
-        </Field>
+        {shell !== 'cmd' && (
+          <Field title={t('Opening mode')}>
+            <SegmentedControl
+              label={t('Opening mode')}
+              value={mode}
+              options={modeOptions}
+              onChange={(value) => {
+                void save(() => {
+                  const store = useAgentSettings.getState();
+                  store.update({ openModeByShell: { ...store.global.openModeByShell, [shell]: value } });
+                });
+              }}
+            />
+          </Field>
+        )}
       </SettingsGroup>
       <SettingsGroup title={t('Menu and defaults')}>
         <Field title={t('Default profile')}>

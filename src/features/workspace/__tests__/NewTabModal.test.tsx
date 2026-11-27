@@ -116,7 +116,7 @@ it('keeps CMD on classic mode only', async () => {
   openPicker();
   await rightClick('new-tab-option-shell:cmd');
   expect(screen.queryByRole('menuitem', { name: '打开方式' })).toBeNull();
-  expect(screen.getByRole('menuitemradio', { name: '经典模式' })).toHaveAttribute('aria-checked', 'true');
+  expect(screen.queryByRole('menuitemradio', { name: '经典模式' })).not.toBeInTheDocument();
   expect(screen.queryByRole('menuitemradio', { name: '块模式' })).toBeNull();
 });
 

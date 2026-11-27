@@ -83,8 +83,7 @@ test.describe('Opening mode settings page', () => {
       }
     }
     await gotoSetting(page, 'CMD');
-    await expect(modes.getByRole('radio')).toHaveCount(1);
-    await expect(modes.getByRole('radio', { name: '经典模式', exact: true })).toBeChecked();
+    await expect(modes).toHaveCount(0);
   });
 
   test('SSH opening mode is configured through the saved host quick menu', async ({ page }) => {

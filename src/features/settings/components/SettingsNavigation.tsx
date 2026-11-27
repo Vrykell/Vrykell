@@ -21,19 +21,19 @@ export default function SettingsNavigation({ navigation }: { navigation: ReturnT
                 icon={<item.icon size={iconSizes.row} />}
                 title={item.label}
                 tooltip={item.label}
-                active={navigation.selected === item.id}
+                active={navigation.sidebarSelected === item.id}
                 tabIndex={0}
                 style={{ fontSize: 'var(--fs-label)' }}
                 dataAttributes={{
                   role: 'button',
                   'aria-label': item.label,
-                  'aria-current': navigation.selected === item.id ? 'page' : undefined,
+                  'aria-current': navigation.sidebarSelected === item.id ? 'page' : undefined,
                 }}
-                onClick={() => navigation.setSelected(item.id)}
+                onClick={() => navigation.selectFromSidebar(item.id)}
                 onKeyDown={(event) => {
                   if (event.key === 'Enter' || event.key === ' ') {
                     event.preventDefault();
-                    navigation.setSelected(item.id);
+                    navigation.selectFromSidebar(item.id);
                   }
                 }}
               />
