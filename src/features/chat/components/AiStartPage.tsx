@@ -2,35 +2,28 @@ import { useEffect, useState } from 'react';
 import { t } from '@i18n';
 import { OutlineButton } from '@ui/actions/OutlineButton';
 import AppMark from '@ui/icons/AppMark';
+import { dropdownAnchorBelow, type DropdownAnchor } from '@ui/menus/AnchoredDropdown';
 import WorkspaceStartPage from '@features/workspace/components/WorkspaceStartPage';
-import type { AgentInstance } from '../model/agentCatalog';
 import AgentLauncher from '@features/workspace/components/AgentLauncher';
+import type { AgentInstance } from '../model/agentCatalog';
 
-/**
- * The AI start page matches every other workspace: one action to begin and one to reach the
- * connected agents, whose searchable list stays in the existing launcher dialog.
- */
 export default function AiStartPage({
-  open,
   active,
   onNewConversation,
   onPick,
   suspended = false,
 }: {
-  open: boolean;
   active: boolean;
   onNewConversation: () => void;
   onPick: (instance: AgentInstance, cwd?: string) => void;
   suspended?: boolean;
 }) {
-  const [launcher, setLauncher] = useState<{ x: number; y: number } | null>(null);
-  // The picker belongs to this page: leaving the workspace closes it instead of leaving it
-  // floating over whatever the user opened next.
+  const [launcher, setLauncher] = useState<DropdownAnchor | null>(null);
   useEffect(() => {
-    if (!active) setLauncher(null);
-  }, [active]);
+    if (!active || suspended) setLauncher(null);
+  }, [active, suspended]);
   return (
-    <div className="ai-start-page" data-testid="ai-start-page" data-active={active || undefined}>
+    <div className="workspace-launch-page" data-testid="ai-start-page">
       <WorkspaceStartPage
         icon={<AppMark size={40} />}
         title={t('Start a conversation')}
@@ -43,23 +36,17 @@ export default function AiStartPage({
             <OutlineButton
               data-testid="ai-start-agents"
               aria-haspopup="dialog"
-              onClick={(event) => {
-                const box = event.currentTarget.getBoundingClientRect();
-                setLauncher({ x: box.left, y: box.bottom });
-              }}>
+              onClick={(event) => setLauncher(dropdownAnchorBelow(event.currentTarget))}>
               {t('Choose an agent…')}
             </OutlineButton>
           </>
         }
       />
       <AgentLauncher
-        open={!!launcher && open && !suspended && active}
+        open={!!launcher && active && !suspended}
         anchor={launcher ?? undefined}
         onClose={() => setLauncher(null)}
-        onPick={(name, cwd) => {
-          setLauncher(null);
-          onPick(name, cwd);
-        }}
+        onPick={onPick}
       />
     </div>
   );

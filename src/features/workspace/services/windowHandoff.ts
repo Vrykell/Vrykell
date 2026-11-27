@@ -765,13 +765,11 @@ function prepareGroupWindowHandoff(
           tabs: state.tabs.map((tab) => (ids.has(tab.id) && isSessionTab(tab) ? { ...tab, groupId: group.id } : tab)),
           groups: [...state.groups, { id: group.id, title: group.title, collapsed: group.collapsed }],
         }));
-      useWorkbenchStore
-        .getState()
-        .update((state) => ({
-          ...state,
-          groups: [...state.groups, group],
-          tabs: state.tabs.map((tab) => (ids.has(tab.id) ? { ...tab, groupId: group.id } : tab)),
-        }));
+      useWorkbenchStore.getState().update((state) => ({
+        ...state,
+        groups: [...state.groups, group],
+        tabs: state.tabs.map((tab) => (ids.has(tab.id) ? { ...tab, groupId: group.id } : tab)),
+      }));
       if (color) useWorkspaceNavigation.getState().setGroupColor(group.id, color);
     });
     select();

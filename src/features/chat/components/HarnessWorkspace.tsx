@@ -210,7 +210,7 @@ export default function HarnessWorkspace({ active, headerActive = active }: { ac
           {activeSystemPage.kind === 'usage' ? (
             <UsageView />
           ) : activeSystemPage.kind === 'start-ai' ? (
-            <AiStartPage open={visible} suspended={!!launcherOpen} active={visible} onPick={pick} onNewConversation={newConversation} />
+            <AiStartPage suspended={!!launcherOpen} active={visible} onPick={pick} onNewConversation={newConversation} />
           ) : (
             <UnifiedHistoryView preset="conversation" destination="native" />
           )}
@@ -249,7 +249,7 @@ export default function HarnessWorkspace({ active, headerActive = active }: { ac
         </ResourceContent>
       ))}
       {!activeSystemPage && !selected && (
-        <AiStartPage open={visible} suspended={!!launcherOpen} active={visible} onPick={pick} onNewConversation={newConversation} />
+        <AiStartPage suspended={!!launcherOpen} active={visible} onPick={pick} onNewConversation={newConversation} />
       )}
       {closing &&
         createPortal(

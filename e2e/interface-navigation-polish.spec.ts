@@ -24,18 +24,6 @@ async function dragTo(page: Page, source: Locator, destination: Locator, after =
   await page.mouse.up();
 }
 
-/** Resolve a theme token to the colour the browser actually paints. */
-async function themeColor(page: Page, variable: string) {
-  return page.evaluate((variable) => {
-    const probe = document.createElement('span');
-    probe.style.backgroundColor = `var(${variable})`;
-    document.body.appendChild(probe);
-    const color = getComputedStyle(probe).backgroundColor;
-    probe.remove();
-    return color;
-  }, variable);
-}
-
 for (const theme of ['dark', 'light'] as const) {
   test(`launch pages, selection and shared surfaces in ${theme}`, async ({ page }, info) => {
     await setupTauriMock(page, {});

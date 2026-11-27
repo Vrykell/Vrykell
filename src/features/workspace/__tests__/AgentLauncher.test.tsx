@@ -90,7 +90,7 @@ describe('AgentLauncher', () => {
     await screen.findByTestId('acp-launcher-Claude Code');
     await waitFor(() =>
       expect(screen.getByRole('textbox', { name: '项目路径' })).toHaveAttribute(
-        'data-tip',
+        'placeholder',
         '在 C:/Users/test/AppData/Local/com.vrykell.app/acp-workspace 下新建文件夹',
       ),
     );
