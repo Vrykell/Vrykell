@@ -1,7 +1,7 @@
 import { expect, test, type Page } from '@playwright/test';
 import { setupTauriMock } from './tauri-mock';
 
-async function pinCommandTitle(page: Page) {
+async function scrollTerminalHistory(page: Page) {
   await page.getByPlaceholder(/输入命令/).fill('echo divider');
   await page.getByPlaceholder(/输入命令/).press('Enter');
   await page.evaluate(() => {
@@ -27,13 +27,12 @@ async function pinCommandTitle(page: Page) {
       },
     ]);
   });
-  await page
-    .locator('[data-testid^="terminal-scroll-"]')
-    .first()
-    .evaluate((element) => {
-      element.scrollTop = 140;
-    });
-  await expect(page.getByTestId('pinned-command')).toBeVisible();
+  const scroll = page.locator('[data-testid^="terminal-scroll-"]').first();
+  await expect(page.getByTestId('command-block-divider-output')).toContainText('divider output');
+  await scroll.evaluate((element) => {
+    element.scrollTop = 140;
+  });
+  await expect.poll(() => scroll.evaluate((element) => element.scrollTop)).toBeGreaterThan(0);
 }
 
 async function expectUniformDrag(page: Page, mode: string, width: number) {
@@ -109,13 +108,13 @@ async function expectUniformDrag(page: Page, mode: string, width: number) {
 for (const density of [1, 1.25, 1.5, 2]) {
   test.describe(`sidebar dividers at ${density}x`, () => {
     test.use({ deviceScaleFactor: density });
-    test('held sidebar drag stays uniform beside pinned titles, editors and comparisons', async ({ page }) => {
+    test('held sidebar drag stays uniform beside terminal output, editors and comparisons', async ({ page }) => {
       test.setTimeout(60_000);
       await setupTauriMock(page, {});
       await page.goto('/');
       await expect(page.getByPlaceholder(/输入命令/)).toBeVisible();
       await page.locator('[data-dock-btn="chat"]').click();
-      await pinCommandTitle(page);
+      await scrollTerminalHistory(page);
       for (const mode of ['terminal', 'editor', 'diff']) {
         await page.setViewportSize({ width: 1240, height: 800 });
         if (!(await page.getByTestId('resize-handle-chat').isVisible())) await page.locator('[data-dock-btn="chat"]').click();

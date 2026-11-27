@@ -66,6 +66,7 @@ test('large command history stays readable and input reaches the terminal prompt
   const beforeProfile = await profiler?.send('Performance.getMetrics');
   const scrollFrames = await page.evaluate(async () => {
     const history = document.querySelector<HTMLElement>('.terminal-block-scroll')!;
+    const viewport = history.getBoundingClientRect();
     const scope = window as unknown as { __TAURI_INTERNALS__: { emitPtyOutput(data: string): void } };
     const frames: number[] = [];
     const boundaries: number[] = [];
@@ -78,8 +79,8 @@ test('large command history stays readable and input reaches the terminal prompt
       await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
       const elapsed = performance.now() - start;
       const currentBlock =
-        history.parentElement?.querySelector<HTMLElement>(':scope > .pinned-command-clip > [data-pinned-block-id]')?.dataset
-          .pinnedBlockId ?? '';
+        document.elementFromPoint(viewport.left + 80, viewport.top + 20)?.closest<HTMLElement>('[data-command-block-id]')?.dataset
+          .commandBlockId ?? '';
       if (currentBlock !== previousBlock) boundaryFrames = 2;
       previousBlock = currentBlock;
       if (boundaryFrames > 0) {
