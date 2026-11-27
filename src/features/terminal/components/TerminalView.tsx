@@ -13,7 +13,6 @@ import { terminalWorkspaceLayout, workspacePaneCells } from '@features/workspace
 import { useWorkspaceContainer, useWorkspacePaneControls } from '@features/workspace/hooks/useWorkspaceContainer';
 import { detachWorkspacePane, mergeWorkspaceContainers, moveWorkspacePane } from '@features/workspace/services/workbench';
 import { showsPaneChatHistory } from '../model/paneHistory';
-import { useTypographyStore } from '@config/typography';
 import { useRef, useEffect, useLayoutEffect, useState, useId, useCallback } from 'react';
 import OverlayScrollbar from '@ui/layout/OverlayScrollbar';
 import { CircleX, Minimize2, Square } from '@ui/icons';
@@ -40,8 +39,6 @@ import {
 } from '@features/workspace/model/windowLayout';
 import InputEditor from '@features/terminal/components/InputEditor';
 import TerminalBlockList, { hasVisibleContent } from '@features/terminal/components/TerminalBlockList';
-import PinnedCommand from './PinnedCommand';
-import { usePinnedCommand } from '../hooks/usePinnedCommand';
 import TerminalPanel from '@features/terminal/components/TerminalPanel';
 import { UnifiedHistoryView } from '@features/session-history';
 import ContextMenu, { type ContextMenuItem } from '@ui/menus/ContextMenu';
@@ -673,10 +670,6 @@ function PaneBlockList({ paneId, insetLeft = 8, insetRight = 8 }: { paneId: stri
   const blocks = useBlockStore(selectBlocks(paneId));
   const scrollRef = useRef<HTMLDivElement>(null);
   const scrollId = useId();
-  const pinned = usePinnedCommand(scrollRef);
-  const titleCollapsed = useTypographyStore((state) => state.commandTitleCollapsed);
-  const updateTypography = useTypographyStore((state) => state.update);
-  const pinnedBlock = pinned ? blocks.find((block) => block.id === pinned.id) : undefined;
   const snap = useFollowBottom(scrollRef, [blocks], paneId);
   useEffect(() => registerFollowEngager(paneId, snap), [paneId, snap]);
   // Route the wheel on the history scroller itself: a continuous gesture keeps addressing
@@ -709,18 +702,6 @@ function PaneBlockList({ paneId, insetLeft = 8, insetRight = 8 }: { paneId: stri
           <PaneEmptyHint paneId={paneId} />
         </div>
       </div>
-      {pinned && pinnedBlock && (
-        <PinnedCommand
-          block={pinnedBlock}
-          paneId={paneId}
-          remaining={pinned.remaining}
-          insetLeft={insetLeft}
-          insetRight={insetRight}
-          scrollRef={scrollRef}
-          collapsed={titleCollapsed}
-          onToggle={() => updateTypography({ commandTitleCollapsed: !titleCollapsed })}
-        />
-      )}
       <OverlayScrollbar scrollRef={scrollRef} controlsId={scrollId} label={t('Scroll command history')} />
     </div>
   );
