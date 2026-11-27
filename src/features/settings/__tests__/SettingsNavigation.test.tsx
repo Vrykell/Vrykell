@@ -17,7 +17,7 @@ afterEach(() => {
 it('keeps the complete directory visible after selecting a page', () => {
   render(<Navigation />);
   const directory = screen.getByRole('complementary', { name: '设置目录' });
-  expect(directory.querySelectorAll('.sidebar-row')).toHaveLength(isWindows ? 27 : 26);
+  expect(directory.querySelectorAll('.sidebar-row')).toHaveLength(isWindows ? 23 : 22);
   expect(screen.queryByRole('button', { name: '联网搜索' })).toBeNull();
   expect(screen.getByRole('button', { name: '关于' })).toBeVisible();
   expect(screen.queryByRole('button', { name: '子代理' })).toBeNull();
@@ -38,6 +38,17 @@ it('supports keyboard selection without folding the directory', () => {
   fireEvent.keyDown(screen.getByRole('button', { name: '字体与显示' }), { key: ' ' });
   expect(screen.getByRole('button', { name: '字体与显示' })).toHaveAttribute('aria-current', 'page');
   expect(screen.getByRole('complementary', { name: '设置目录' })).toBeVisible();
+});
+
+it('keeps one terminal profiles destination and remembers the selected shell', () => {
+  useSettingsNavigationStore.getState().setSelected('profile:cmd');
+  render(<Navigation />);
+  const profile = screen.getByRole('button', { name: 'Shell 配置文件' });
+  expect(profile).toHaveAttribute('aria-current', 'page');
+  expect(screen.queryByRole('button', { name: 'CMD' })).not.toBeInTheDocument();
+  fireEvent.click(screen.getByRole('button', { name: '语言' }));
+  fireEvent.click(profile);
+  expect(useSettingsNavigationStore.getState().selected).toBe('profile:cmd');
 });
 
 it('switches hover presentation without changing the selected page or keyboard focus', () => {

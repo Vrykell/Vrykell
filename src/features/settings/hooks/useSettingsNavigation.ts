@@ -20,8 +20,7 @@ import type { PageId } from '../model/navigation';
 import { isSettingsPageAvailable } from '../model/navigation';
 import { t } from '@i18n';
 import { useSettingsNavigationStore } from '../stores/navigation';
-import { SHELL_TYPES, shellTypeLabel } from '@platform/shells';
-import { shellIconFor } from '@ui/icons/shellIcons';
+import { shellTypeLabel } from '@platform/shells';
 export type { PageId } from '../model/navigation';
 
 export interface SettingItem {
@@ -65,12 +64,10 @@ export const SETTINGS_GROUPS: SettingGroup[] = [
   {
     id: 'terminal',
     label: 'Terminal',
-    items: [{ id: 'command-history', icon: SquareTerminal, label: 'Command history' }],
-  },
-  {
-    id: 'profiles',
-    label: 'Shell profiles',
-    items: SHELL_TYPES.map((shell) => ({ id: `profile:${shell}` as const, icon: shellIconFor(shell), label: shellTypeLabel(shell) })),
+    items: [
+      { id: 'command-history', icon: SquareTerminal, label: 'Command history' },
+      { id: 'profile:zsh', icon: SquareTerminal, label: 'Shell profiles' },
+    ],
   },
   {
     id: 'editor',
@@ -104,11 +101,22 @@ export function useSettingsNavigation() {
     isSettingsPageAvailable(state.selected) ? state.selected : 'application-language',
   );
   const setSelected = useSettingsNavigationStore((state) => state.setSelected);
+  const profile = useSettingsNavigationStore((state) => state.profilePage);
   const groups = SETTINGS_GROUPS.map((group) => ({
     ...group,
     label: t(group.label),
     items: group.items.filter((item) => isSettingsPageAvailable(item.id)).map((item) => ({ ...item, label: t(item.label) })),
   }));
-  const activeLabel = groups.flatMap((group) => group.items).find((item) => item.id === selected)?.label ?? t('Settings');
-  return { selected, setSelected, activeLabel, groups };
+  const sidebarSelected = selected.startsWith('profile:') ? 'profile:zsh' : selected;
+  const activeLabel = selected.startsWith('profile:')
+    ? shellTypeLabel(selected.slice(8))
+    : (groups.flatMap((group) => group.items).find((item) => item.id === sidebarSelected)?.label ?? t('Settings'));
+  return {
+    selected,
+    sidebarSelected,
+    setSelected,
+    selectFromSidebar: (id: PageId) => setSelected(id === 'profile:zsh' ? profile : id),
+    activeLabel,
+    groups,
+  };
 }
