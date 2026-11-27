@@ -1533,6 +1533,7 @@ export async function setupTauriMock(page: Page | BrowserContext, opts: TauriMoc
               return [];
             case 'warm_shell_completion':
               return null;
+
             // ── MCP ──
             case 'mcp_get_servers':
               return mcpServers.map((s) => ({ ...s }));

@@ -12,7 +12,10 @@ import { pickPath } from '@platform/api/fs';
 import { openAppWindow } from '@platform/appWindows';
 import { useSettingsNavigationStore } from '@features/settings';
 
-vi.mock('@platform/appWindows', () => ({ openAppWindow: vi.fn() }));
+vi.mock('@platform/appWindows', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@platform/appWindows')>()),
+  openAppWindow: vi.fn(),
+}));
 
 vi.mock('@platform/shells', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@platform/shells')>()),
@@ -112,12 +115,13 @@ it('persists a shell open-mode change and closes the menu', async () => {
   expect(screen.queryByRole('menu')).toBeNull();
 });
 
-it('keeps CMD on classic mode only', async () => {
+it('omits the opening mode action when the shell only has classic mode', async () => {
   openPicker();
   await rightClick('new-tab-option-shell:cmd');
   expect(screen.queryByRole('menuitem', { name: '打开方式' })).toBeNull();
-  expect(screen.queryByRole('menuitemradio', { name: '经典模式' })).not.toBeInTheDocument();
+  expect(screen.queryByRole('menuitemradio', { name: '经典模式' })).toBeNull();
   expect(screen.queryByRole('menuitemradio', { name: '块模式' })).toBeNull();
+  expect(screen.getByRole('menuitemradio', { name: '设为默认终端' })).toBeEnabled();
 });
 
 it('sets the right-clicked shell as the default terminal', async () => {
@@ -139,6 +143,14 @@ it('shows SSH connection shortcuts and saves a toggled flag', async () => {
   fireEvent.click(screen.getByRole('menuitemradio', { name: '自动重连' }));
 
   expect(save).toHaveBeenCalledWith(expect.objectContaining({ id: 'ssh-1', autoReconnect: true }));
+});
+
+it('omits the opening mode action for a connection with shell integration off', async () => {
+  useSshStore.setState({ connections: [{ ...connection, shellIntegration: false }] });
+  openPicker();
+  await rightClick('new-tab-option-ssh:ssh-1');
+  expect(screen.queryByRole('menuitem', { name: '打开方式' })).toBeNull();
+  expect(screen.getByRole('menuitemradio', { name: 'Shell 集成' })).toHaveAttribute('aria-checked', 'false');
 });
 
 it('opens the SSH editor from the connection row', async () => {
@@ -206,7 +218,7 @@ it('opens terminal configuration from the profile footer', async () => {
   await screen.findByTestId('new-tab-option-shell:zsh');
   fireEvent.click(screen.getByRole('button', { name: '更多配置文件…' }));
   expect(useUiStore.getState().settingsOpen).toBe(true);
-  expect(useSettingsNavigationStore.getState().selected).toBe('profile:zsh');
+  expect(useSettingsNavigationStore.getState()).toMatchObject({ selected: 'shell-profiles', shellProfile: 'zsh' });
 });
 
 it('opens another application window and closes the picker', async () => {

@@ -7,9 +7,9 @@ test('settings navigation has static headings and save feedback appears once the
   await page.goto('/');
   await gotoSetting(page, '模型配置');
   const nav = page.locator('.settings-navigation');
-  await expect(nav.locator('.settings-nav-heading')).toHaveCount(7);
+  await expect(nav.locator('.settings-nav-heading')).toHaveCount(6);
   const rows = nav.locator('.settings-navigation-list').getByRole('button');
-  const expectedRows = await page.evaluate(() => (/Win/.test(navigator.platform) ? 27 : 26));
+  const expectedRows = await page.evaluate(() => (/Windows/.test(navigator.userAgent) ? 23 : 22));
   await expect(rows).toHaveCount(expectedRows);
   await expect(nav.locator('.settings-navigation-list [aria-expanded]')).toHaveCount(0);
   await expect(rows.locator('svg')).toHaveCount(expectedRows);

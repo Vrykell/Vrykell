@@ -95,7 +95,7 @@ export function ThemePage() {
 
       {supportsNativeMaterial && (
         <Field title={t('Desktop material')} description={t('Use acrylic material in the left sidebar. Other regions stay opaque.')}>
-          <Toggle label={t('Desktop material')} on={config.desktopTint ?? true} onChange={(desktopTint) => themeUpdate({ desktopTint })} />
+          <Toggle label={t('Desktop material')} on={config.desktopTint ?? false} onChange={(desktopTint) => themeUpdate({ desktopTint })} />
         </Field>
       )}
 

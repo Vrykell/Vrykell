@@ -56,7 +56,7 @@ export interface ChatMessage {
 
 /** Tool event callback: run is an upsert patch; undefined fields keep existing values. */
 export interface StreamHandlers {
-  delegateAnalysis?: (task: string, toolCallId?: string) => Promise<string>;
+  delegateAnalysis?: (task: string) => Promise<string>;
   onToolEvent?: (run: ToolRun) => void;
   /** Reasoning delta, appended to the answer's reasoning field. */
   onReasoning?: (chunk: string) => void;
@@ -370,9 +370,9 @@ export const useChatStore = create<ChatState>((set, get) => {
             ...(!analysisOnly &&
               question &&
               get().conversations.some((c) => c.id === tabId) && {
-                delegateAnalysis: async (task: string, toolCallId?: string) => {
+                delegateAnalysis: async (task: string) => {
                   const { delegateAnalysis } = await import('../services/threadOperations');
-                  return delegateAnalysis({ driver: 'builtin', id: tabId }, question.id, task, controller.signal, toolCallId);
+                  return delegateAnalysis({ driver: 'builtin', id: tabId }, question.id, task, controller.signal);
                 },
               }),
             // Flush buffered text before applying a tool event so text and tools keep their order.
@@ -744,8 +744,7 @@ export const useChatStore = create<ChatState>((set, get) => {
     },
     send: async (text, opts) => {
       const tabId = opts?.conversationId ?? opts?.ownerId ?? useWorkspaceStore.getState().activeId;
-      if (pendingConversationDeletes.has(tabId) || (!opts?.analysisOnly && analysisChild(useChildTasks.getState().tasks, tabId)))
-        return false;
+      if (pendingConversationDeletes.has(tabId)) return false;
       const conversation = get().conversations.find((item) => item.id === tabId);
       if (opts?.conversationId && (!conversation || !(tabId in get().byTab))) return false;
       const trimmed = text.trim();

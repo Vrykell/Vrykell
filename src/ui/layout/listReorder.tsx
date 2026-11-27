@@ -53,6 +53,12 @@ function horizontalPreviewLeft(x: number, origin: NonNullable<ListReorderDrag['o
   return Math.max(origin.minLeft, Math.min(origin.maxLeft, x - origin.offsetX));
 }
 
+/** Grow the strip only when the dragged item's edge passes its resting end. */
+export function horizontalReorderWidth(drag: ListReorderDrag | null, x: number | undefined): number | undefined {
+  if (!drag?.origin || drag.listWidth === undefined || drag.width === undefined || x === undefined) return drag?.listWidth;
+  return Math.max(drag.listWidth, horizontalPreviewLeft(x, drag.origin) + drag.width - drag.origin.minLeft);
+}
+
 /**
  * Shared transient state for pointer-driven list reordering. The source row
  * leaves its slot, a borderless placeholder marks the expected drop position,

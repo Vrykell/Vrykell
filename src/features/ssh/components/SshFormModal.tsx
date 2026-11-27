@@ -33,18 +33,7 @@ import {
 } from '@ui/icons';
 import { IconBtn } from '@ui/actions/UiBtn';
 import { isMacOS } from '@platform/runtime';
-import {
-  newSshId,
-  validateSshConnection,
-  sshTest,
-  sshTrustHostKey,
-  sshHostKeyInfo,
-  sshConnectionOptions,
-  type SshConnection,
-  type SshAuthMethod,
-  type SshTestResult,
-} from '../services/api';
-import type { SshOptions } from '@core/ssh';
+import { newSshId, validateSshConnection, sshTest, sshTrustHostKey, type SshConnection, type SshAuthMethod } from '../services/api';
 import { useSshStore } from '@features/ssh';
 import ConfirmDialog from '@ui/feedback/ConfirmDialog';
 import ErrorBox from '@ui/feedback/ErrorBox';
@@ -58,7 +47,6 @@ import ProxyManager from './ProxyManager';
 import { getProxies, type ProxyConfiguration } from '../services/proxies';
 import { savedJumpRoute } from '../model/jumpRoute';
 import { prepareSshJumpHosts } from '../services/hostTrust';
-import { sshConnectionFailureMessage } from '../model/connectionFailure';
 import { requestSshAuthentication } from '../hooks/useSessionAuthentication';
 
 interface Props {
@@ -71,8 +59,6 @@ interface Props {
   page?: boolean;
 }
 type Section = 'connection' | 'forwarding' | 'advanced';
-/** A cancelled fingerprint review is shown as its own outcome, not as a connection failure. */
-type TestFeedback = SshTestResult | { status: 'untrusted'; host: string; port: number; message: string };
 const sectionIcons = { connection: Server, forwarding: GitBranch, advanced: Settings };
 const list = (text: string) => {
   const rows = forwardLines(text);
@@ -95,8 +81,6 @@ export default function SshFormModal({ open, initial, onClose, onConnect, onSave
   const connections = useSshStore((s) => s.connections) ?? [];
   const dialog = useRef<HTMLDivElement>(null);
   const savingRef = useRef(false);
-  const testingRef = useRef(false);
-  const trustingRef = useRef(false);
   const [section, setSection] = useState<Section>('connection');
   const [version, setVersion] = useState(0);
   const [name, setName] = useState('');
@@ -113,11 +97,10 @@ export default function SshFormModal({ open, initial, onClose, onConnect, onSave
   const [forwards, setForwards] = useState<ForwardTexts>({ local: '', remote: '', dynamic: '' });
   const [autoReconnect, setAutoReconnect] = useState(false);
   const [testing, setTesting] = useState(false);
-  const [trusting, setTrusting] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
-  const [testResult, setTestResult] = useState<TestFeedback | null>(null);
-  const [testedTarget, setTestedTarget] = useState<{ host: string; port: number } | null>(null);
+  const [testResult, setTestResult] = useState<{ ok: boolean; msg: string } | null>(null);
+  const [pendingTrust, setPendingTrust] = useState<{ host: string; port?: number; fingerprint: string } | null>(null);
   const [deleting, setDeleting] = useState(false);
   const metadata = useHostLibrary((state) => state.hosts);
   const [group, setGroup] = useState('');
@@ -159,7 +142,7 @@ export default function SshFormModal({ open, initial, onClose, onConnect, onSave
     });
     setAutoReconnect(initial?.autoReconnect ?? false);
     setTestResult(null);
-    setTestedTarget(null);
+    setPendingTrust(null);
     setError('');
     setDeleting(false);
     setVersion((value) => value + 1);
@@ -191,17 +174,10 @@ export default function SshFormModal({ open, initial, onClose, onConnect, onSave
   useEffect(() => {
     if (!page || !(error || testResult)) return;
     const frame = requestAnimationFrame(() =>
-      dialog.current
-        ?.querySelector('[data-testid="ssh-test-result"], [data-testid="ssh-host-key-prompt"], [data-testid="ssh-host-key-mismatch"]')
-        ?.scrollIntoView?.({ block: 'nearest' }),
+      dialog.current?.querySelector('[data-testid="ssh-test-result"]')?.scrollIntoView?.({ block: 'nearest' }),
     );
     return () => cancelAnimationFrame(frame);
   }, [page, error, testResult]);
-  useEffect(() => {
-    if (testResult?.status !== 'unknown_host_key') return;
-    const frame = requestAnimationFrame(() => dialog.current?.querySelector<HTMLElement>('[data-testid="ssh-host-key-accept"]')?.focus());
-    return () => cancelAnimationFrame(frame);
-  }, [testResult]);
   const target = () => ({
     forwardingRules: initial?.forwardingRules,
     host: host.trim(),
@@ -234,10 +210,6 @@ export default function SshFormModal({ open, initial, onClose, onConnect, onSave
       return t('Environment variable names must be unique; up to 64 variables are supported.');
     return null;
   };
-  const clearTestResult = () => {
-    setTestResult(null);
-    setTestedTarget(null);
-  };
   const doSave = async (connect = false) => {
     if (savingRef.current) return;
     const conn: SshConnection = {
@@ -249,7 +221,6 @@ export default function SshFormModal({ open, initial, onClose, onConnect, onSave
     const invalid = validateEnvironment() || validateSshConnection(conn);
     if (invalid) {
       setError(invalid);
-      clearTestResult();
       const forwardingError = validateSshConnection({
         name: 'validation',
         host: 'localhost',
@@ -282,138 +253,62 @@ export default function SshFormModal({ open, initial, onClose, onConnect, onSave
       onClose();
     } catch (reason) {
       setError(String((reason as Error)?.message ?? reason));
-      clearTestResult();
     } finally {
       savingRef.current = false;
       setSaving(false);
     }
   };
-  const trustPending = testResult?.status === 'unknown_host_key';
-  const busy = saving || testing || trusting || trustPending;
-  const lockTarget = testing || trusting || trustPending;
-  // A pending fingerprint decision owns the dialog: Enter, Escape and target edits wait for it.
   useDialogKeyboard(dialog, open && !page, {
     onClose,
     onSubmit: () => {
       void doSave();
     },
-    disabled: busy,
+    disabled: saving || testing,
     initialFocus: onConnect ? '[data-testid="ssh-form-host"]' : '[data-testid="ssh-form-name"]',
   });
-  /** Latest key the server presents for a host, or no fingerprint when it cannot be read. */
-  const presentedHostKey = async (host: string, port: number, options?: SshOptions) => {
-    try {
-      const info = await sshHostKeyInfo(host, port, options);
-      return { keyType: info.keyType, fingerprint: info.mismatch ? info.fingerprint : undefined };
-    } catch {
-      return { keyType: undefined, fingerprint: undefined };
-    }
-  };
-  const doTest = async (retest?: { host: string; port: number }) => {
-    if (testingRef.current) return;
+  const doTest = async () => {
+    if (testing) return;
     const draft = target();
-    if (retest) {
-      draft.host = retest.host;
-      draft.port = retest.port;
-    }
     const invalid = validateEnvironment() || validateSshConnection({ ...draft, name: name.trim() || draft.host });
     if (invalid) {
       setError(invalid);
-      clearTestResult();
       return;
     }
     if (initial?.hasPassword && authMethod === 'password' && !password) {
-      setError(t('Enter the password to test authentication. Saving an empty password keeps the stored password.'));
-      clearTestResult();
+      setTestResult({
+        ok: false,
+        msg: t('Enter the password to test authentication. Saving an empty password keeps the stored password.'),
+      });
       return;
     }
-    testingRef.current = true;
     setTesting(true);
     setTestResult(null);
     setError('');
     try {
       if (draft.jumpConnectionId) await prepareSshJumpHosts(draft, connections);
-      const result = await sshTest(draft);
-      setTestedTarget({ host: result.host, port: result.port });
-      setTestResult(result);
+      await sshTest(draft);
+      setTestResult({
+        ok: true,
+        msg: t('Authentication succeeded. Terminal, port forwarding and SFTP availability have not been tested.'),
+      });
     } catch (reason) {
-      const message = String((reason as Error)?.message ?? reason);
-      const name = (reason as Error)?.name;
-      const failure = reason as {
-        host?: string;
-        port?: number;
-        keyType?: string;
-        fingerprint?: string;
-        rawMessage?: string;
-        options?: SshOptions;
-      };
-      const host = failure.host ?? draft.host;
-      const port = failure.port ?? draft.port ?? 22;
-      setTestedTarget({ host, port });
-      if (name === 'SshHostTrustCancelledError') {
-        setTestResult({ status: 'untrusted', host, port, message });
-      } else if (name === 'SshHostKeyMismatchError' || message.includes('HOST_KEY_MISMATCH')) {
-        const presented = failure.fingerprint
-          ? { keyType: failure.keyType, fingerprint: failure.fingerprint }
-          : await presentedHostKey(host, port, failure.options);
-        setTestResult({
-          status: 'host_key_mismatch',
-          host,
-          port,
-          keyType: presented.keyType ?? failure.keyType,
-          fingerprint: presented.fingerprint,
-          message: failure.rawMessage ?? message,
-        });
-      } else {
-        setTestResult({ status: 'other_error', host, port, message });
-      }
+      const msg = String((reason as Error)?.message ?? reason);
+      if (msg.startsWith('HOST_KEY_UNKNOWN:'))
+        setPendingTrust({ host: draft.host, port: draft.port, fingerprint: msg.slice('HOST_KEY_UNKNOWN:'.length) });
+      else setTestResult({ ok: false, msg });
     } finally {
-      testingRef.current = false;
       setTesting(false);
     }
   };
-  const cancelTrust = () => {
-    if (trustingRef.current || testResult?.status !== 'unknown_host_key') return;
-    setTestResult({
-      status: 'untrusted',
-      host: testResult.host,
-      port: testResult.port,
-      message: t('The test was cancelled. Nothing was saved and the host remains untrusted until you confirm its fingerprint.'),
-    });
-  };
   const confirmTrust = async () => {
-    if (!testResult || testResult.status !== 'unknown_host_key' || trustingRef.current) return;
-    const pending = testResult;
-    if (!pending.fingerprint || pending.fingerprint === 'unknown') return;
-    const draft = target();
-    const sameTarget = pending.host === draft.host && pending.port === (draft.port ?? 22);
-    const retest = testedTarget ?? { host: pending.host, port: pending.port };
-    trustingRef.current = true;
-    setTrusting(true);
-    setError('');
+    if (!pendingTrust) return;
     try {
-      await sshTrustHostKey(pending.host, pending.port, pending.fingerprint, sameTarget ? sshConnectionOptions(draft) : undefined);
-      setTestResult(null);
-      await doTest(retest);
+      await sshTrustHostKey(pendingTrust.host, pendingTrust.port, pendingTrust.fingerprint, target());
+      setPendingTrust(null);
+      void doTest();
     } catch (reason) {
-      const message = String((reason as Error)?.message ?? reason);
-      if (!message.includes('HOST_KEY_MISMATCH')) {
-        setTestResult({ status: 'other_error', host: pending.host, port: pending.port, keyType: pending.keyType, message });
-        return;
-      }
-      // Never reuse the confirmed fingerprint after a failed write; show what the server sends now.
-      const presented = await presentedHostKey(pending.host, pending.port, sameTarget ? sshConnectionOptions(draft) : undefined);
-      setTestResult({
-        status: 'host_key_mismatch',
-        host: pending.host,
-        port: pending.port,
-        keyType: presented.keyType ?? pending.keyType,
-        fingerprint: presented.fingerprint,
-        message,
-      });
-    } finally {
-      trustingRef.current = false;
-      setTrusting(false);
+      setPendingTrust(null);
+      setError(String((reason as Error)?.message ?? reason));
     }
   };
   const doDelete = async () => {
@@ -424,114 +319,15 @@ export default function SshFormModal({ open, initial, onClose, onConnect, onSave
     } catch (reason) {
       setDeleting(false);
       setError(String((reason as Error)?.message ?? reason));
-      clearTestResult();
     }
   };
   if (!open) return null;
-  const testFeedback =
-    testResult && testResult.status === 'success' ? (
-      <ErrorBox tone="success" placement="inline" testId="ssh-test-result">
-        {t('Authentication succeeded. Terminal, port forwarding and SFTP availability have not been tested.')}
+  const busy = saving || testing;
+  const feedback = (error || testResult) && (
+    <div className="ssh-inline-error">
+      <ErrorBox compact tone={error || !testResult?.ok ? 'error' : 'success'} testId="ssh-test-result">
+        {t(error || testResult?.msg || '')}
       </ErrorBox>
-    ) : testResult && testResult.status === 'unknown_host_key' ? (
-      <ErrorBox
-        tone="info"
-        placement="inline"
-        title={t('First connection: confirm the host fingerprint')}
-        testId="ssh-host-key-prompt"
-        actions={
-          <>
-            <OutlineButton onClick={cancelTrust} disabled={trusting} data-testid="ssh-host-key-cancel">
-              {t('Cancel')}
-            </OutlineButton>
-            <TextButton
-              className="ssh-primary-action user-primary-action"
-              onClick={() => void confirmTrust()}
-              disabled={trusting || !testResult.fingerprint || testResult.fingerprint === 'unknown'}
-              data-testid="ssh-host-key-accept">
-              {t('Accept and continue')}
-            </TextButton>
-          </>
-        }>
-        <dl className="ssh-host-key-details">
-          <div>
-            <dt>{t('Host')}</dt>
-            <dd>
-              {testResult.host}:{testResult.port}
-            </dd>
-          </div>
-          <div>
-            <dt>{t('Key type')}</dt>
-            <dd>{testResult.keyType || t('Unknown')}</dd>
-          </div>
-          <div>
-            <dt>{t('Host fingerprint')}</dt>
-            <dd className="ssh-host-key-fingerprint">{testResult.fingerprint || t('Unknown')}</dd>
-          </div>
-        </dl>
-        <p>{t('Verify the remote host fingerprint before trusting it.')}</p>
-      </ErrorBox>
-    ) : testResult && testResult.status === 'host_key_mismatch' ? (
-      <ErrorBox
-        tone="error"
-        placement="inline"
-        title={t('Host key mismatch')}
-        testId="ssh-host-key-mismatch"
-        details={t(testResult.message)}>
-        <p>
-          {t(
-            'The host key presented by {{host}}:{{port}} does not match the saved record. This may indicate a man-in-the-middle attack. Nothing was overwritten; verify the server before continuing.',
-            { host: testResult.host, port: testResult.port },
-          )}
-        </p>
-        <dl className="ssh-host-key-details">
-          <div>
-            <dt>{t('Key type')}</dt>
-            <dd>{testResult.keyType || t('Unknown')}</dd>
-          </div>
-          <div>
-            <dt>{t('Presented fingerprint')}</dt>
-            <dd className="ssh-host-key-fingerprint">{testResult.fingerprint || t('Fingerprint unavailable')}</dd>
-          </div>
-        </dl>
-      </ErrorBox>
-    ) : testResult && testResult.status === 'untrusted' ? (
-      <ErrorBox tone="info" placement="inline" title={t('Host key not trusted')} testId="ssh-test-result">
-        <p>
-          {testResult.host}:{testResult.port}
-        </p>
-        {t('The test was cancelled. Nothing was saved and the host remains untrusted until you confirm its fingerprint.')}
-      </ErrorBox>
-    ) : testResult ? (
-      <ErrorBox
-        tone="error"
-        placement="inline"
-        testId="ssh-test-result"
-        details={testResult.message}
-        title={t(
-          testResult.status === 'auth_failed'
-            ? 'Authentication failed'
-            : testResult.status === 'network_error'
-              ? 'Could not reach the SSH server'
-              : 'Could not test the connection',
-        )}>
-        {testResult.status === 'auth_failed'
-          ? t('The server rejected the credentials. Check the username, password or private key.')
-          : testResult.status === 'network_error'
-            ? t('Check the host address, port, network and proxy settings, then try again.')
-            : (sshConnectionFailureMessage(testResult.message) ??
-              t('The connection test did not complete. Check the connection settings and try again.'))}
-      </ErrorBox>
-    ) : null;
-  const feedback = (error || testFeedback) && (
-    <div
-      className={`ssh-inline-error${testResult?.status === 'unknown_host_key' || testResult?.status === 'host_key_mismatch' ? ' ssh-inline-error-roomy' : ''}`}>
-      {error && (
-        <ErrorBox tone="error" placement="inline" testId="ssh-test-result">
-          {t(error)}
-        </ErrorBox>
-      )}
-      {testFeedback}
     </div>
   );
   const deleteButton = initial && (
@@ -581,6 +377,7 @@ export default function SshFormModal({ open, initial, onClose, onConnect, onSave
             ? 'ssh-host-editor'
             : `workspace-floating workspace-floating-dialog ssh-form-dialog${onConnect ? ' ssh-host-editor ssh-quick-connect' : ''}`
         }
+        data-field-outlines={!initial || onConnect ? true : undefined}
         data-testid={page ? 'ssh-host-editor' : undefined}
         role={page ? 'region' : 'dialog'}
         aria-modal={page ? undefined : true}
@@ -697,11 +494,7 @@ export default function SshFormModal({ open, initial, onClose, onConnect, onSave
                     variant="field"
                     value={host}
                     placeholder="192.168.1.10"
-                    disabled={lockTarget}
-                    onChange={(e) => {
-                      setHost(e.target.value);
-                      clearTestResult();
-                    }}
+                    onChange={(e) => setHost(e.target.value)}
                     data-testid="ssh-form-host"
                   />
                 </label>
@@ -712,11 +505,7 @@ export default function SshFormModal({ open, initial, onClose, onConnect, onSave
                     value={port}
                     placeholder="22"
                     inputMode="numeric"
-                    disabled={lockTarget}
-                    onChange={(e) => {
-                      setPort(e.target.value);
-                      clearTestResult();
-                    }}
+                    onChange={(e) => setPort(e.target.value)}
                     data-testid="ssh-form-port"
                   />
                 </label>
@@ -727,11 +516,7 @@ export default function SshFormModal({ open, initial, onClose, onConnect, onSave
                   variant="field"
                   value={user}
                   placeholder={t('Use local account when empty')}
-                  disabled={lockTarget}
-                  onChange={(e) => {
-                    setUser(e.target.value);
-                    clearTestResult();
-                  }}
+                  onChange={(e) => setUser(e.target.value)}
                   data-testid="ssh-form-user"
                 />
               </label>
@@ -742,10 +527,7 @@ export default function SshFormModal({ open, initial, onClose, onConnect, onSave
                 <SegmentedControl
                   label={t('Authentication method')}
                   value={authMethod}
-                  onChange={(value) => {
-                    setAuthMethod(value);
-                    clearTestResult();
-                  }}
+                  onChange={setAuthMethod}
                   options={[
                     { value: 'password', label: t('Password'), icon: <Lock size={14} /> },
                     { value: 'key', label: t('Private key'), icon: <Key size={14} /> },
@@ -771,18 +553,13 @@ export default function SshFormModal({ open, initial, onClose, onConnect, onSave
                     <TextInput
                       variant="field"
                       value={identityFile}
-                      disabled={lockTarget}
-                      onChange={(e) => {
-                        setIdentityFile(e.target.value);
-                        clearTestResult();
-                      }}
+                      onChange={(e) => setIdentityFile(e.target.value)}
                       data-testid="ssh-form-identity"
                       placeholder={t('Use default keys / SSH Agent when empty')}
                       style={{ flex: '1 1 0', minWidth: 0, width: 0 }}
                     />
                     <OutlineButton
                       className="ssh-form-browse"
-                      disabled={lockTarget}
                       onClick={async () => {
                         try {
                           const path = await chooseFile({ multiple: false, directory: false, title: t('Choose SSH private key') });
@@ -865,7 +642,6 @@ export default function SshFormModal({ open, initial, onClose, onConnect, onSave
                     onChange={(id) => {
                       setJumpConnectionId(id);
                       if (id) setJumpHost('');
-                      clearTestResult();
                     }}
                     options={[
                       { value: '', label: t('Use jump addresses') },
@@ -917,11 +693,7 @@ export default function SshFormModal({ open, initial, onClose, onConnect, onSave
                     <TextInput
                       variant="field"
                       value={jumpHost}
-                      disabled={lockTarget}
-                      onChange={(e) => {
-                        setJumpHost(e.target.value);
-                        clearTestResult();
-                      }}
+                      onChange={(e) => setJumpHost(e.target.value)}
                       data-testid="ssh-form-jump"
                       placeholder="user@host:port"
                       data-tip={t('Separate multiple jump hosts with commas. Use none to disable inherited jump hosts.')}
@@ -934,7 +706,6 @@ export default function SshFormModal({ open, initial, onClose, onConnect, onSave
                 <div className="ssh-editor-pair ssh-editor-proxy">
                   <Select
                     aria-label={t('Proxy')}
-                    disabled={busy}
                     value={proxyId}
                     options={[
                       { value: 'default', label: t('Device default') },
@@ -944,10 +715,7 @@ export default function SshFormModal({ open, initial, onClose, onConnect, onSave
                         ? [{ value: proxyId, label: t('Unavailable proxy') }]
                         : []),
                     ]}
-                    onChange={(id) => {
-                      setProxyId(id);
-                      clearTestResult();
-                    }}
+                    onChange={setProxyId}
                   />
                   <OutlineButton className="ssh-editor-action" onClick={() => setProxyManager(true)}>
                     {t('Manage proxies')}
@@ -1100,6 +868,17 @@ export default function SshFormModal({ open, initial, onClose, onConnect, onSave
         {!page && feedback}
         {!page && footer}
       </div>
+      {pendingTrust && (
+        <ConfirmDialog
+          open
+          title={t('Confirm host fingerprint')}
+          message={pendingTrust.fingerprint}
+          confirmLabel={t('Trust and continue')}
+          cancelLabel={t('Cancel')}
+          onConfirm={() => void confirmTrust()}
+          onCancel={() => setPendingTrust(null)}
+        />
+      )}
       {deleting && (
         <ConfirmDialog
           open

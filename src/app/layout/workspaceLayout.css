@@ -1,4 +1,7 @@
 .workspace-layout {
+  --workspace-titlebar-height: 38px;
+  --workspace-context-height: 32px;
+  --workspace-content-surface: var(--canvas);
   position: relative;
   display: grid;
   grid-template-columns: var(--workspace-sidebar-width) minmax(0, 1fr);
@@ -6,6 +9,15 @@
   flex: 1;
   min-width: 0;
   min-height: 0;
+}
+:root[data-theme='dark'] .workspace-layout[data-has-tabs] {
+  --workspace-titlebar-bg: color-mix(in srgb, var(--chrome-bg) 75%, var(--canvas));
+}
+.workspace-layout[data-has-tabs]:not(:has(.workspace-instance-bar .folder-tab[data-active='true'][data-tab-surface='canvas'])) {
+  --workspace-content-surface: var(--xterm-bg);
+}
+.application-window[data-platform='macos'] .workspace-layout {
+  --workspace-titlebar-height: 42px;
 }
 .workspace-sidebar-resize {
   position: absolute;
@@ -30,13 +42,20 @@
   grid-row: 1;
   min-width: 0;
 }
+.workspace-titlebar[data-has-tabs][data-platform='other'] .workspace-title:empty {
+  padding-left: 0;
+}
 .workspace-instance-bar {
   min-width: 0;
   display: flex;
-  height: 34px;
-  flex-shrink: 0;
-  overflow: hidden;
-  background: var(--auxiliary-bg);
+}
+.workspace-titlebar .workspace-instance-bar {
+  --workspace-tab-leading-gap: 6px;
+  flex: 0 1 auto;
+  align-self: stretch;
+  margin-top: 5px;
+  --folder-tab-active-bg: var(--workspace-content-surface);
+  --folder-tab-system-bg: var(--workspace-content-surface);
 }
 .workspace-primary {
   display: flex;
@@ -45,11 +64,92 @@
   min-width: 0;
   min-height: 0;
 }
+.workspace-layout[data-has-tabs] .workspace-main {
+  background: var(--workspace-content-surface);
+}
 .workspace-header-surface {
   display: contents;
 }
 .workspace-instance-bar .folder-header {
   flex: 1;
+}
+.workspace-context-bar {
+  --embedded-toolbar-surface: var(--workspace-content-surface);
+  flex: 0 0 var(--workspace-context-height);
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  padding: 0 12px;
+  background: var(--embedded-toolbar-surface);
+  color: var(--text-muted);
+  font-size: var(--fs-caption);
+}
+.workspace-context-bar > span {
+  max-width: 22%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.workspace-layout:not(:has(.workspace-titlebar .folder-actions :is(button, input))) .workspace-context-bar::after,
+.workspace-layout:has(.workspace-instance-bar .folder-tab[data-active='true']:is([data-tab-kind='history'], [data-tab-kind='ai-history']))
+  .workspace-context-bar::after {
+  content: none;
+}
+.workspace-titlebar .workspace-instance-bar > .workspace-header-surface > .folder-header {
+  min-height: 0;
+  container-type: normal;
+  background: transparent;
+}
+.workspace-titlebar .workspace-instance-bar > .workspace-header-surface > .folder-header > .folder-more {
+  padding-block: 0;
+  padding-inline-start: var(--workspace-tab-leading-gap);
+  background: transparent;
+}
+.workspace-titlebar .workspace-instance-bar > .workspace-header-surface > .folder-header > .folder-tab-list {
+  flex: 0 1 auto;
+  container-type: normal;
+  padding-inline-start: var(--workspace-tab-leading-gap);
+  scroll-padding-inline-start: var(--workspace-tab-leading-gap);
+}
+.workspace-titlebar .workspace-instance-bar .folder-tab {
+  max-width: min(264px, 34vw);
+}
+.workspace-titlebar .workspace-instance-bar .terminal-ungrouped-tail {
+  min-width: 4px;
+}
+.workspace-titlebar .workspace-instance-bar > .workspace-header-surface > .folder-header > .folder-create {
+  --control-size: 28px;
+  --workspace-toolbar-icon-size: 16px;
+  align-self: center;
+  height: 30px;
+  padding-inline: 0;
+}
+.workspace-titlebar .folder-create .terminal-new-controls {
+  background: transparent;
+}
+.workspace-titlebar .workspace-instance-bar > .workspace-header-surface > .folder-header > .folder-actions {
+  /* Keep the toolbar with its tab owner in the DOM and place it in the reserved row below. */
+  position: absolute;
+  top: 100%;
+  right: var(--workspace-toolbar-inset, 0px);
+  height: var(--workspace-context-height);
+  z-index: 1;
+  max-inline-size: calc(100% - var(--workspace-toolbar-inset, 0px) - var(--workspace-toolbar-leading, 0px));
+  overflow-x: auto;
+  scrollbar-width: none;
+  --control-size: 32px;
+  --icon-color: var(--embedded-toolbar-icon-color);
+}
+.workspace-titlebar .workspace-instance-bar > .workspace-header-surface > .folder-header > .folder-actions > * {
+  flex-shrink: 0;
+}
+.workspace-layout[data-hide-context]
+  .workspace-titlebar
+  .workspace-instance-bar
+  > .workspace-header-surface
+  > .folder-header
+  > .folder-actions {
+  display: none;
 }
 .workspace-layout > .workspace-body {
   grid-column: 2;
@@ -65,10 +165,8 @@
 .workspace-layout .workspace-titlebar[data-platform='macos'][data-fullscreen='false'] {
   --workspace-title-inset: max(16px, calc(92px - var(--workspace-sidebar-width)));
 }
-/* The collapsed expand button is centered in the first row, so the label inset mirrors its
-   vertical centering. */
-.workspace-layout .workspace-titlebar[data-sidebar-collapsed='true'] {
-  --workspace-title-inset: calc((var(--workspace-titlebar-height) - var(--control-size-compact)) / 2);
+.workspace-layout .workspace-titlebar[data-platform='other'][data-sidebar-collapsed='true'] {
+  --workspace-title-inset: calc((var(--workspace-titlebar-height) - 28px) / 2);
 }
 .workspace-sidebar {
   grid-column: 1;
@@ -114,6 +212,11 @@
   align-items: center;
   gap: 2px;
 }
+.workspace-layout[data-has-tabs]
+  :is(.workspace-side-panel[data-side='right'] .workspace-panel-heading, .workspace-ssh-status-slot .sidebar-heading) {
+  min-height: var(--workspace-context-height);
+  padding-block: 0;
+}
 button.workspace-sidebar-toggle.icon-button:is(:enabled, :hover, :active, :focus, :focus-visible) {
   background: transparent;
 }
@@ -123,7 +226,7 @@ button.workspace-sidebar-toggle.icon-button:focus-visible {
 }
 .workspace-title > .workspace-sidebar-toggle {
   flex-shrink: 0;
-  margin-right: 8px;
+  margin-right: 4px;
 }
 .workspace-area-navigation {
   padding: 12px 6px 0;
@@ -220,7 +323,6 @@ button.workspace-sidebar-toggle.icon-button:focus-visible {
   color: var(--text-muted);
   background: var(--xterm-bg);
 }
-/* Start pages are system pages: their surface matches the active singleton tab above them. */
 .workspace-start-page {
   background: var(--canvas);
 }
@@ -234,10 +336,6 @@ button.workspace-sidebar-toggle.icon-button:focus-visible {
   margin: 0 0 10px;
   font-size: var(--fs-label);
 }
-/* The shared simple start page: one icon, a heading, one line of orientation and the primary
-   actions. Every functional workspace rests on this same shape. */
-/* The start page fills the pane and centers its content both ways, matching the file start
-   page it replaces. */
 .workspace-start-simple {
   flex: 1;
 }
@@ -246,23 +344,20 @@ button.workspace-sidebar-toggle.icon-button:focus-visible {
   flex-direction: column;
   align-items: center;
   gap: 10px;
+  width: 100%;
   max-width: 520px;
 }
 .workspace-start-simple-icon {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  color: var(--text-muted);
 }
 .workspace-start-simple-body h2 {
   margin-top: 2px;
 }
 .workspace-start-simple-body p {
   margin: 0;
-  color: var(--text-muted);
 }
-/* Actions wrap and centre by default; a page whose buttons would otherwise end up ragged
-   opts into an even grid, which gives every action the same width. */
 .workspace-start-simple-actions {
   display: flex;
   flex-wrap: wrap;
@@ -296,9 +391,6 @@ button.workspace-sidebar-toggle.icon-button:focus-visible {
   user-select: none;
   min-width: 0;
 }
-.terminal-tab-tools {
-  order: 2;
-}
 .terminal-new-controls {
   display: inline-flex;
   align-items: center;
@@ -328,11 +420,6 @@ button.workspace-sidebar-toggle.icon-button:focus-visible {
 }
 .terminal-group-reorder-preview:has(.terminal-group-preview) {
   width: auto !important;
-}
-@container (max-width: 560px) {
-  .terminal-tab-tools .terminal-secondary-actions {
-    display: none;
-  }
 }
 .terminal-tab-search {
   width: clamp(72px, 12vw, 160px) !important;
@@ -386,8 +473,9 @@ button.workspace-sidebar-toggle.icon-button:focus-visible {
 .terminal-tab-group[data-group-collapsed='true']::after {
   display: none;
 }
-.terminal-tab-group[data-group-collapsed='true'] .tab-group-header[data-tab-surface='true'] {
-  background: var(--xterm-bg);
+.terminal-tab-group[data-group-collapsed='true'] .tab-group-header[data-tab-surface='true']::before,
+.terminal-tab-group[data-group-collapsed='true'] .tab-group-header[data-tab-surface='true']::after {
+  content: none;
 }
 .terminal-tab-group > .tab-group-container {
   min-width: 0;
@@ -402,6 +490,7 @@ button.workspace-sidebar-toggle.icon-button:focus-visible {
   max-width: 190px;
   min-width: 28px;
 }
+.terminal-tab-group .tab-group-header[data-tab-surface],
 .terminal-tab-group .tab-group-header,
 .terminal-tab-group .tab-group-header:is(:hover, :focus-visible) {
   background: transparent;
@@ -463,12 +552,6 @@ button.workspace-sidebar-toggle.icon-button:focus-visible {
   padding-top: 24px;
 }
 @media (max-width: 600px) {
-  .terminal-tab-tools > :is([data-testid='tab-history-btn'], [data-testid='tab-acp-btn']) {
-    display: none;
-  }
-  .workspace-layout > .workspace-titlebar {
-    --workspace-title-gap: 4px;
-  }
   .workspace-layout .workspace-title-actions .window-control-button {
     width: 36px !important;
   }
@@ -517,6 +600,7 @@ button.workspace-sidebar-toggle.icon-button:focus-visible {
     .folder-more,
     .folder-tab-list,
     .folder-tab-spacer,
+    .folder-create,
     .workspace-resource-switch-action,
     .workspace-open-action,
     .workspace-create-action

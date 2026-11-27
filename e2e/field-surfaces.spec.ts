@@ -2,7 +2,7 @@ import { test, expect, type Locator, type Page } from '@playwright/test';
 import { setupTauriMock } from './tauri-mock';
 import { gotoSetting } from './settings';
 
-/** Chromium serializes color-mix() results as `color(srgb r g b)` with 0..1 channels. */
+/** Mixed colors can serialize as `color(srgb r g b)` with 0..1 channels. */
 const channels = (color: string) => {
   const values = color
     .match(/\d+(?:\.\d+)?/g)!
@@ -59,10 +59,9 @@ async function expectFieldHierarchy(field: Locator, editable: boolean | null = t
   const panel = colors.chain.find((color) => !transparent(color)) ?? 'rgba(0, 0, 0, 0)';
   const fieldRgb = channels(colors.field);
   const panelRgb = channels(panel);
-  // Neutral surfaces may carry a slight tint (the light control is #F8FAFC); reject a strong
-  // colour cast instead of requiring identical channels.
-  expect(Math.max(...fieldRgb) - Math.min(...fieldRgb)).toBeLessThanOrEqual(8);
   if (editable) {
+    // Editable surfaces stay neutral; readouts may follow the theme's tinted panel colour.
+    expect(new Set(fieldRgb).size).toBe(1);
     expect(luminance(colors.field)).toBeGreaterThanOrEqual(luminance(panel));
     expect(Math.max(...fieldRgb.map((value, index) => value - panelRgb[index]))).toBeLessThanOrEqual(36);
   } else if (editable === false) {
@@ -85,6 +84,7 @@ for (const theme of ['深色', '浅色']) {
     await expectFieldHierarchy(preview, null);
     const fontSize = page.getByRole('combobox', { name: '终端字号' });
     await expectFieldHierarchy(fontSize);
+    await expect(fontSize).toHaveCSS('border-top-width', '0px');
     const fieldColor = await fontSize.evaluate((element) => getComputedStyle(element).backgroundColor);
     await fontSize.hover();
     if (theme === '深色') {
@@ -94,12 +94,25 @@ for (const theme of ['深色', '浅色']) {
     }
     await page.mouse.move(0, 0);
     await expect(fontSize).toHaveCSS('background-color', fieldColor);
+    await fontSize.focus();
+    await expect(fontSize).toHaveCSS('border-top-width', '0px');
+    await fontSize.blur();
     await preview.scrollIntoViewIfNeeded();
     await page.screenshot({ path: test.info().outputPath('theme-preview.png') });
 
     await page.locator('aside').getByRole('button', { name: '模型配置', exact: true }).click();
+    const modelSearch = page.getByTestId('model-search');
+    await expect(modelSearch).toHaveCSS('border-top-width', '0px');
+    await modelSearch.focus();
+    await expect(modelSearch).toHaveCSS('border-top-width', '0px');
     await page.getByTestId('model-settings').first().click();
-    await expectFieldHierarchy(page.getByPlaceholder('模型名称').first());
+    const modelName = page.getByTestId('model-settings-dialog').getByRole('textbox', { name: '模型名称', exact: true });
+    await expectFieldHierarchy(modelName);
+    await modelName.blur();
+    await expect(modelName).toHaveCSS('border-top-width', '1px');
+    const modelBorder = await modelName.evaluate((element) => getComputedStyle(element).borderTopColor);
+    await modelName.focus();
+    await expect(modelName).not.toHaveCSS('border-top-color', modelBorder);
     await page.screenshot({ path: test.info().outputPath('model-fields.png') });
     await page.keyboard.press('Escape');
     await page.keyboard.press('Meta+1');
@@ -126,7 +139,14 @@ for (const theme of ['深色', '浅色']) {
     await page.getByTestId('ssh-new-btn').click();
     const host = page.getByTestId('ssh-form-host');
     await expectFieldHierarchy(host);
+    await host.blur();
+    await expect(host).toHaveCSS('border-top-width', '1px');
+    const restingBorder = await host.evaluate((element) => getComputedStyle(element).borderTopColor);
     await host.fill('example.invalid');
+    await expect(host).toHaveCSS('border-top-width', '1px');
+    await expect(host).not.toHaveCSS('border-top-color', restingBorder);
+    const focusedBorder = channels(await host.evaluate((element) => getComputedStyle(element).borderTopColor));
+    expect(Math.max(...focusedBorder) - Math.min(...focusedBorder)).toBeLessThan(32);
     await expect(host).toHaveCSS('outline-style', 'none');
     await expect(host).toHaveValue('example.invalid');
     await page.screenshot({ path: test.info().outputPath('ssh-fields.png') });

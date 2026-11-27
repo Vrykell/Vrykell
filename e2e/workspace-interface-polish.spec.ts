@@ -32,16 +32,19 @@ for (const theme of ['深色', '浅色'])
     const panel = page.locator('.workspace-side-panel[data-visible="true"]');
     await expect(panel.locator('.workspace-panel-heading > span')).toHaveText('AI 助手');
     const surfaceColor = (name: string) =>
-      page.evaluate((name) => {
+      page.locator('.workspace-titlebar').evaluate((parent, name) => {
         const element = document.createElement('div');
         element.style.background = `var(${name})`;
-        document.body.append(element);
+        parent.append(element);
         const color = getComputedStyle(element).backgroundColor;
         element.remove();
         return color;
       }, name);
     await expect(panel.locator(':scope > div').first()).toHaveCSS('background-color', await surfaceColor('--auxiliary-bg'));
-    await expect(page.locator('.workspace-titlebar')).toHaveCSS('background-color', await surfaceColor('--chrome-bg'));
+    await expect(page.locator('.workspace-titlebar')).toHaveCSS(
+      'background-color',
+      await surfaceColor(theme === '深色' ? '--workspace-titlebar-bg' : '--chrome-bg'),
+    );
     await expect(page.locator('.workspace-main')).toHaveCSS('background-color', await surfaceColor('--canvas'));
     const composerColor = await surfaceColor('--composer-bg');
     for (const composer of [page.locator('main .terminal-composer').first(), panel.locator('.chat-composer')]) {

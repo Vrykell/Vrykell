@@ -276,14 +276,12 @@ it('keeps following fractional programmatic offsets and content-clamp scroll eve
   expect(el.scrollTop).toBe(1800);
 });
 
-it('captures a reading anchor near the viewport top', async () => {
+it('captures a reading anchor near the top of the scroll viewport', async () => {
   const scroll = makeEl(800);
-  const parent = document.createElement('div');
   const content = document.createElement('div');
   content.dataset.testid = 'command-block-anchor';
   scroll.appendChild(content);
-  parent.append(scroll);
-  document.body.appendChild(parent);
+  document.body.appendChild(scroll);
   const rect = (top: number, bottom: number): DOMRect => ({
     top,
     bottom,
@@ -309,5 +307,5 @@ it('captures a reading anchor near the viewport top', async () => {
   unmount();
   if (original) Object.defineProperty(document, 'elementFromPoint', original);
   else Reflect.deleteProperty(document, 'elementFromPoint');
-  parent.remove();
+  scroll.remove();
 });

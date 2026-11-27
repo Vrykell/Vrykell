@@ -1,6 +1,6 @@
 import { test, expect } from '@playwright/test';
 import { setupTauriMock } from './tauri-mock';
-import { gotoSetting } from './settings';
+import { gotoSetting, selectShellProfile } from './settings';
 
 test('prefix cards replace the scope picker and persist on recent searches', async ({ page }) => {
   await setupTauriMock(page);
@@ -31,7 +31,8 @@ test('prefix cards replace the scope picker and persist on recent searches', asy
 test('default terminal applies to new tabs and survives reload', async ({ page }) => {
   await setupTauriMock(page);
   await page.goto('/');
-  await gotoSetting(page, 'Bash');
+  await gotoSetting(page, 'Shell 配置文件');
+  await selectShellProfile(page, 'Bash');
   await page.getByRole('switch', { name: '默认配置文件', exact: true }).click();
   await expect
     .poll(() => page.evaluate(() => JSON.parse(localStorage.getItem('vrykell-terminal-defaults') ?? '{}').state?.shell))

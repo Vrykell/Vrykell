@@ -123,7 +123,7 @@ test('isolates a compact menu slot and keeps create actions at the far right', a
     const first = (await track.locator('.folder-tab').first().boundingBox())!;
     expect(first.x - menu.x - menu.width).toBeLessThanOrEqual(8);
     const labels = await bar
-      .locator('.folder-actions button:visible')
+      .locator('.folder-create button:visible')
       .evaluateAll((elements) => elements.map((element) => element.getAttribute('aria-label')));
     if (area === 'code') expect(labels.slice(-2)).toEqual(['打开文件', '新建文件']);
     if (area === 'ai') expect(labels.slice(-2)).toEqual(['新对话', '连接服务器']);
@@ -131,7 +131,7 @@ test('isolates a compact menu slot and keeps create actions at the far right', a
   }
   await page.setViewportSize({ width: 500, height: 800 });
   const search = page.getByTestId('global-search-trigger');
-  await expect(page.locator('.workspace-titlebar')).toHaveAttribute('data-search-compact', 'true');
+  await expect(search).toHaveAccessibleName('全局搜索');
   await expect(search.locator('kbd')).toBeHidden();
   expect(await search.evaluate((element) => element.scrollWidth - element.clientWidth)).toBeLessThanOrEqual(1);
   await search.click();

@@ -1,7 +1,7 @@
 import { expect, test } from '@playwright/test';
 import { setupTauriMock } from './tauri-mock';
 import { pickPlacementZone } from './placement';
-import { gotoSetting } from './settings';
+import { gotoSetting, selectShellProfile } from './settings';
 import { openWorkspaceActions } from './workbench';
 
 for (const theme of ['dark', 'light'])
@@ -110,17 +110,23 @@ for (const theme of ['dark', 'light'])
     const channels = paint.fill.match(/\d+/g)!.map(Number);
     expect(channels[2]).toBeGreaterThan(channels[0]!);
     await page.keyboard.press('Escape');
-    await gotoSetting(page, 'Windows PowerShell');
-    const header = page.locator('.settings-page-header [data-shell-mark="powershell"]');
-    await expect(header).toBeVisible();
-    const all = page.locator('[data-shell-mark="powershell"]:visible');
-    expect(await all.count()).toBeGreaterThanOrEqual(2);
-    for (const icon of await all.all()) {
+    await gotoSetting(page, 'Shell 配置文件');
+    await selectShellProfile(page, 'Windows PowerShell');
+    const profileSelect = page.getByRole('combobox', { name: 'Shell 配置文件' });
+    await page.setViewportSize({ width: 760, height: 800 });
+    expect(await profileSelect.locator('.ui-select-value').evaluate((label) => label.scrollWidth - label.clientWidth)).toBeLessThanOrEqual(
+      1,
+    );
+    await profileSelect.click();
+    const selectedProfile = page.getByRole('option', { name: 'Windows PowerShell', exact: true });
+    await expect(selectedProfile).toHaveAttribute('aria-selected', 'true');
+    for (const owner of [profileSelect, selectedProfile]) {
+      const icon = owner.locator('[data-shell-mark="powershell"]');
+      await expect(icon).toBeVisible();
       expect(await icon.locator('path').first().getAttribute('fill')).toBe('currentColor');
       expect(await icon.locator('[id]').count()).toBe(0);
     }
-    await page.setViewportSize({ width: 760, height: 800 });
-    await page.screenshot({ path: info.outputPath(`blue-shell-${theme}.png`) });
+    await page.screenshot({ path: info.outputPath(`blue-shell-${theme}.png`), animations: 'disabled' });
   });
 
 for (const placement of ['main', 'side'])

@@ -22,19 +22,18 @@ export async function openSettings(page: Page): Promise<void> {
 export async function gotoSetting(page: Page, label: string): Promise<void> {
   await openSettings(page);
   const nav = page.locator('aside');
-  if (['Zsh', 'Bash', 'Windows PowerShell', 'PowerShell 7', 'CMD'].includes(label)) {
-    await nav.getByRole('button', { name: 'Shell 配置文件', exact: true }).click();
-    const picker = page.getByRole('combobox', { name: 'Shell 配置文件', exact: true });
-    if ((await picker.textContent())?.trim() !== label) {
-      await picker.click();
-      await page.getByRole('option', { name: label, exact: true }).click();
-    }
-    await expect(picker).toHaveText(label);
-    return;
-  }
   const item = nav.getByRole('button', { name: label, exact: true });
   await item.click();
-  await expect(page.locator('section').getByText(label, { exact: true }).first()).toBeVisible({ timeout: 3000 });
+  const content = page.locator('section');
+  const pageTitle = content.getByRole('heading', { name: label, exact: true });
+  await expect(pageTitle.or(content.getByText(label, { exact: true })).first()).toBeVisible({ timeout: 3000 });
+}
+
+export async function selectShellProfile(page: Page, name: string): Promise<void> {
+  const picker = page.getByRole('combobox', { name: 'Shell 配置文件' });
+  await picker.click();
+  await page.getByRole('option', { name, exact: true }).click();
+  await expect(picker).toHaveText(name);
 }
 
 /** Locate a control container inside the settings page by its field title (the field div holding the title). */

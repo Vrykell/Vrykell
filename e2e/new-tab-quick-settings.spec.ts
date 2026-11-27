@@ -1,5 +1,77 @@
 import { expect, test } from '@playwright/test';
 import { setupTauriMock, ensureTabsOpen } from './tauri-mock';
+import { gotoSetting, selectShellProfile } from './settings';
+
+test('Shell profiles share one page, save separately and omit the mode for a classic-only profile', async ({ page }, info) => {
+  await setupTauriMock(page, {
+    shells: [
+      { id: 'zsh', label: 'Zsh', default: true },
+      { id: 'cmd', label: 'CMD', default: false },
+    ],
+  });
+  await page.goto('/');
+  await ensureTabsOpen(page);
+  await page.getByTestId('tab-new-btn').click();
+  await page.getByTestId('new-tab-option-shell:cmd').click({ button: 'right' });
+  const menu = page.getByRole('menu', { name: '操作菜单' });
+  await expect(menu.getByRole('menuitemradio', { name: '设为默认终端' })).toBeVisible();
+  await expect(menu.getByText('打开方式')).toHaveCount(0);
+  await expect(menu.getByText('经典模式')).toHaveCount(0);
+  await page.keyboard.press('Escape');
+  await page.keyboard.press('Escape');
+
+  await gotoSetting(page, 'Shell 配置文件');
+  const nav = page.getByRole('complementary', { name: '设置目录' });
+  await expect(nav.getByRole('button', { name: 'Shell 配置文件', exact: true })).toHaveAttribute('aria-current', 'page');
+  await selectShellProfile(page, 'Zsh');
+  const name = page.getByRole('textbox', { name: '配置名称' });
+  await name.fill('Build shell');
+  await expect(page.getByRole('radiogroup', { name: '打开方式' })).toBeVisible();
+  await selectShellProfile(page, 'CMD');
+  await expect(page.getByRole('combobox', { name: 'Shell 配置文件' }).locator('[data-shell-mark="cmd"]')).toBeVisible();
+  await expect(name).toHaveValue('');
+  await name.fill('Local shell');
+  await expect(page.locator('.shell-profile-page').getByText('打开方式', { exact: true })).toHaveCount(0);
+  await selectShellProfile(page, 'Zsh');
+  await expect(name).toHaveValue('Build shell');
+  const trigger = page.getByRole('combobox', { name: 'Shell 配置文件' });
+  await trigger.press('End');
+  await trigger.press('Enter');
+  await expect(trigger).toHaveText('CMD');
+  await expect(trigger).toBeFocused();
+  await expect(name).toHaveValue('Local shell');
+  await selectShellProfile(page, 'PowerShell 7');
+  for (const width of [1240, 700]) {
+    await page.setViewportSize({ width, height: 800 });
+    const title = page.getByRole('heading', { name: 'Shell 配置文件', exact: true });
+    await expect(title.getByRole('combobox', { name: 'Shell 配置文件' })).toBeVisible();
+    await expect(trigger.locator('.ui-select-value')).toHaveText('PowerShell 7');
+    const geometry = await trigger.evaluate((element) => {
+      const text = element.querySelector('.ui-select-value')!;
+      const mark = element.querySelector('.ui-select-icon svg')!;
+      const range = document.createRange();
+      range.selectNodeContents(text);
+      return {
+        lines: range.getClientRects().length,
+        clipping: text.scrollWidth - text.clientWidth,
+        font: Number.parseFloat(getComputedStyle(text).fontSize),
+        icon: mark.getBoundingClientRect().height,
+      };
+    });
+    expect(geometry.lines).toBe(1);
+    expect(geometry.clipping).toBeLessThanOrEqual(1);
+    expect(geometry.icon).toBeGreaterThanOrEqual(geometry.font);
+    const button = (await trigger.boundingBox())!;
+    const hint = (await page.locator('.settings-save-hint').boundingBox())!;
+    expect(button.y + button.height).toBeLessThanOrEqual(hint.y);
+    await trigger.click();
+    const choices = page.getByRole('listbox', { name: 'Shell 配置文件' });
+    await expect(choices.getByRole('option', { name: 'Windows PowerShell', exact: true })).toBeVisible();
+    expect((await choices.boundingBox())!.y).toBeGreaterThanOrEqual(button.y + button.height);
+    await page.screenshot({ path: info.outputPath(`shell-profiles-${width}.png`) });
+    await trigger.press('Escape');
+  }
+});
 
 test.describe('new tab type quick settings', () => {
   test('restored default shell icons follow the resolved default and nested settings stay on screen', async ({ page }, info) => {

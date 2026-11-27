@@ -1,5 +1,5 @@
 import { canSearchQuery, parseSearchQuery, searchQuerySources } from '../model/searchQuery';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import type { KeyboardEvent as ReactKeyboardEvent } from 'react';
 import type { AppIcon } from '@ui/icons';
 import { getCommands } from '@app/commands';
@@ -64,6 +64,10 @@ export function useGlobalSearch({ open, onClose }: UseGlobalSearchOptions) {
     if (open) search(input);
   }, [enabledIds, open, input, search]);
 
+  useLayoutEffect(() => {
+    if (open) inputRef.current?.focus();
+  }, [open]);
+
   useEffect(() => {
     if (!open) return;
     setInput('');
@@ -72,7 +76,6 @@ export function useGlobalSearch({ open, onClose }: UseGlobalSearchOptions) {
     if (listRef.current) listRef.current.scrollTop = 0;
     setFilterOpen(false);
     setHighlightQuery('');
-    requestAnimationFrame(() => inputRef.current?.focus());
   }, [open, setHighlightQuery]);
 
   const close = useCallback(() => {

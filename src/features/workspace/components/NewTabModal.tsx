@@ -9,7 +9,7 @@ import FolderPlusMark from '~icons/mdi/folder-plus-outline';
 import { openAppWindow } from '@platform/appWindows';
 import KeyHint from '@ui/feedback/KeyHint';
 import { TerminalProfileIcon } from '@ui/icons/shellIcons';
-import { type ShellType } from '@platform/shells';
+import { shellSupportsBlockMode, type ShellType } from '@platform/shells';
 import { pickPath } from '@platform/api/fs';
 import { isMacOS } from '@platform/runtime';
 import { touchRecentOpen, type NewTabOption } from '@features/workspace/model/tabTypes';
@@ -47,6 +47,19 @@ interface MenuState {
   option: NewTabOption;
   /** SSH connection snapshot for the right-clicked row (null for shells or missing connections). */
   conn: SshConnection | null;
+}
+
+function openingModeItem(mode: 'classic' | 'block', setMode: (mode: 'classic' | 'block') => void): ContextMenuItem {
+  return {
+    label: t('Opening mode'),
+    group: 'view',
+    submenu: {
+      items: [
+        { label: t('settings.openMode.classic'), checked: mode === 'classic', onClick: () => setMode('classic') },
+        { label: t('settings.openMode.block'), checked: mode === 'block', onClick: () => setMode('block') },
+      ],
+    },
+  };
 }
 
 /**
@@ -191,25 +204,16 @@ export default function NewTabModal({ open, onClose, groupId, onPick, source = '
     setMenu({ x: event.clientX, y: event.clientY, option, conn });
   }, []);
 
-  /**
-   * Quick settings for the right-clicked row: the terminal open mode always, plus
-   * type-specific shortcuts — default terminal for shells, connection actions for SSH.
-   */
   const buildMenuItems = (state: MenuState): ContextMenuItem[] => {
     if (state.option.kind === 'shell') {
       const shell = state.option.shellType;
-      const mode = openModeByShell[shell];
-      const modes: ContextMenuItem[] = [
-        { label: t('settings.openMode.classic'), checked: mode === 'classic', onClick: () => setShellMode(shell, 'classic') },
-        { label: t('settings.openMode.block'), checked: mode === 'block', onClick: () => setShellMode(shell, 'block') },
-      ];
       return [
         {
           label: t('Set as default terminal'),
           checked: shell === preferredShell(defaultShell, shells),
           onClick: () => useTerminalDefaults.getState().setShell(shell),
         },
-        ...(shell === 'cmd' ? [] : [{ label: t('Opening mode'), group: 'view' as const, submenu: { items: modes } }]),
+        ...(shellSupportsBlockMode(shell) ? [openingModeItem(openModeByShell[shell], (mode) => setShellMode(shell, mode))] : []),
       ];
     }
     const conn = state.conn;
@@ -224,16 +228,7 @@ export default function NewTabModal({ open, onClose, groupId, onPick, source = '
           selectWorkspaceArea('ssh');
         },
       },
-      {
-        label: t('Opening mode'),
-        group: 'view',
-        submenu: {
-          items: [
-            { label: t('settings.openMode.classic'), checked: sshOpenMode === 'classic', onClick: () => setSshMode('classic') },
-            { label: t('settings.openMode.block'), checked: sshOpenMode === 'block', onClick: () => setSshMode('block') },
-          ],
-        },
-      },
+      ...(conn.shellIntegration !== false ? [openingModeItem(sshOpenMode, setSshMode)] : []),
       // Missing flags follow the form defaults: shell integration on, auto reconnect off.
       {
         label: t('Shell integration'),
@@ -359,7 +354,8 @@ export default function NewTabModal({ open, onClose, groupId, onPick, source = '
                 useHostEditor.getState().open();
                 selectWorkspaceArea('ssh');
               } else {
-                useSettingsNavigationStore.getState().setSelected(`profile:${preferredShell(defaultShell, shells) ?? 'powershell'}`);
+                const navigation = useSettingsNavigationStore.getState();
+                navigation.openShellProfile(preferredShell(defaultShell, shells) ?? navigation.shellProfile);
                 useSessionStore.getState().openSettings();
               }
             }}>

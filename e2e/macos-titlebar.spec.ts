@@ -10,7 +10,7 @@ test.beforeEach(async ({ page }) => {
 });
 
 for (const width of [720, 1240]) {
-  test(`native controls, title, search and actions have room at ${width}px`, async ({ page }) => {
+  test(`native controls, tabs, search and actions have room at ${width}px`, async ({ page }) => {
     await page.setViewportSize({ width, height: 800 });
     const header = page.locator('.workspace-titlebar');
     await expect(header).toHaveAttribute('data-platform', 'macos');
@@ -19,18 +19,17 @@ for (const width of [720, 1240]) {
     const inset = Math.max(16, 92 - sidebarWidth);
     await expect(page.locator('.workspace-title')).toHaveCSS('padding-left', `${inset}px`);
     const search = (await page.getByTestId('global-search-trigger').boundingBox())!;
-    const title = (await page.locator('.workspace-title span').boundingBox())!;
+    const strip = (await page.getByTestId('workspace-instance-bar').boundingBox())!;
     const ai = (await page.locator(width <= 760 ? '[data-testid="auxiliary-more"]' : '[data-dock-btn="chat"]').boundingBox())!;
-    expect(title.x).toBe(sidebarWidth + inset + (sidebarWidth === 0 ? 36 : 0));
-    expect(title.width).toBeGreaterThan(0);
-    expect(title.x + title.width).toBeLessThan(search.x);
-    expect(Math.abs(search.x + search.width / 2 - width / 2)).toBeLessThan(1);
+    expect(strip.x).toBeGreaterThanOrEqual(sidebarWidth + inset);
+    expect(strip.width).toBeGreaterThan(0);
+    expect(strip.x + strip.width).toBeLessThan(search.x);
     expect(search.x + search.width).toBeLessThan(ai.x);
-    expect(width - ai.x - ai.width).toBe(16);
-    await expect(header).toHaveCSS('height', '40px');
-    expect(ai.y + ai.height / 2).toBe(20);
-    expect(search.y + search.height / 2).toBe(20);
-    const dragHit = await page.evaluate((x) => document.elementFromPoint(x, 20)?.hasAttribute('data-tauri-drag-region'), sidebarWidth + 8);
+    expect(width - ai.x - ai.width).toBeCloseTo(16);
+    await expect(header).toHaveCSS('height', '42px');
+    expect(ai.y + ai.height / 2).toBe(21);
+    expect(search.y + search.height / 2).toBe(21);
+    const dragHit = await page.evaluate((x) => document.elementFromPoint(x, 21)?.hasAttribute('data-tauri-drag-region'), sidebarWidth + 8);
     expect(dragHit).toBe(true);
     await page.screenshot({ path: test.info().outputPath(`macos-titlebar-${width}.png`), animations: 'disabled' });
     await page.getByTestId('global-search-trigger').click();
@@ -49,7 +48,7 @@ test('fullscreen releases the traffic-light space and restores it on exit', asyn
     }, value);
   };
   await setFullscreen(true);
-  await expect(page.locator('.workspace-title')).toHaveCSS('padding-left', '20px');
+  await expect(page.locator('.workspace-title')).toHaveCSS('padding-left', '8px');
   await setFullscreen(false);
   await expect(page.locator('.workspace-title')).toHaveCSS('padding-left', '16px');
   await expect(page.locator('.workspace-title-actions')).toHaveCSS('padding-right', '16px');

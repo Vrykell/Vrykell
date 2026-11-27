@@ -2,48 +2,49 @@ import { useEffect, useState } from 'react';
 import { t } from '@i18n';
 import { TerminalPrompt } from '@ui/icons';
 import { OutlineButton } from '@ui/actions/OutlineButton';
+import { dropdownAnchorBelow, type DropdownAnchor } from '@ui/menus/AnchoredDropdown';
 import { useSessionStore } from '@features/workspace';
 import { ensureSshLoaded, useSshStore } from '@features/ssh';
 import { selectWorkspaceArea } from '../services/selectWorkspaceArea';
+import { useWorkspaceNavigation } from '../stores/navigation';
+import { useUiStore } from '../stores/ui';
 import NewTabModal from './NewTabModal';
 import WorkspaceStartPage from './WorkspaceStartPage';
 
-/**
- * The terminal start page keeps the same resting shape as every other workspace: a title,
- * one line of orientation and the primary actions. Profile and host lists live in the
- * existing picker, which already carries search, defaults, locations and per-row settings.
- */
 export default function TerminalLauncher() {
-  const [pickerOpen, setPickerOpen] = useState<{ x: number; y: number } | null>(null);
-  const hosts = useSshStore((state) => state.connections);
+  const [picker, setPicker] = useState<DropdownAnchor | null>(null);
+  const hasHosts = useSshStore((state) => state.connections.length > 0);
+  const terminalActive = useWorkspaceNavigation((state) => state.area === 'terminal');
+  const settingsOpen = useUiStore((state) => state.settingsOpen);
+  const pickerAvailable = terminalActive && !settingsOpen;
   useEffect(() => {
     ensureSshLoaded();
   }, []);
-  // The picker opens under its own trigger, aligned to the button's start edge, so it reads as
-  // belonging to the action instead of appearing wherever the pointer happened to be.
-  const openPicker = (event: React.MouseEvent<HTMLElement>) => {
-    const box = event.currentTarget.getBoundingClientRect();
-    setPickerOpen({ x: box.left, y: box.bottom });
-  };
+  useEffect(() => {
+    if (!pickerAvailable) setPicker(null);
+  }, [pickerAvailable]);
   return (
     <div className="workspace-launch-page" data-testid="start-page">
       <WorkspaceStartPage
         icon={<TerminalPrompt size={40} />}
         title={t('Start a terminal')}
-        description={t(hosts.length ? 'Open a shell profile or connect to a saved host.' : 'Open a shell profile to start a session.')}
+        description={t(hasHosts ? 'Open a shell profile or connect to a saved host.' : 'Open a shell profile to start a session.')}
         actions={
           <>
             <OutlineButton className="primary-button" data-testid="terminal-start-new" onClick={() => useSessionStore.getState().addTab()}>
               {t('New terminal')}
             </OutlineButton>
-            <OutlineButton data-testid="terminal-start-picker" onClick={openPicker}>
+            <OutlineButton
+              data-testid="terminal-start-picker"
+              aria-haspopup="dialog"
+              onClick={(event) => setPicker(dropdownAnchorBelow(event.currentTarget))}>
               {t('Choose a profile…')}
             </OutlineButton>
-            {!!hosts.length && <OutlineButton onClick={() => selectWorkspaceArea('ssh')}>{t('Connect a server')}</OutlineButton>}
+            {hasHosts && <OutlineButton onClick={() => selectWorkspaceArea('ssh')}>{t('Connect a server')}</OutlineButton>}
           </>
         }
       />
-      <NewTabModal open={!!pickerOpen} anchor={pickerOpen ?? undefined} onClose={() => setPickerOpen(null)} />
+      <NewTabModal open={!!picker && pickerAvailable} anchor={picker ?? undefined} onClose={() => setPicker(null)} />
     </div>
   );
 }

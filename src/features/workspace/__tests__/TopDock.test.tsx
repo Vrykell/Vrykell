@@ -10,7 +10,8 @@ const native = vi.hoisted(() => ({
   isFullscreen: vi.fn<() => Promise<boolean>>(),
 }));
 
-vi.mock('@platform/runtime', () => ({
+vi.mock('@platform/runtime', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@platform/runtime')>()),
   get isMacOS() {
     return native.macOS;
   },
@@ -31,6 +32,7 @@ import SshResourcesAction from '../components/SshResourcesAction';
 import { useWorkspaceNavigation } from '../stores/navigation';
 import { useTerminalStore } from '@features/terminal';
 import { useAuxiliarySidebarStore } from '../stores/auxiliarySidebar';
+import WorkspaceHeader, { WorkspaceHeaderProvider } from '@ui/layout/WorkspaceHeader';
 
 beforeEach(() => {
   native.macOS = true;
@@ -83,28 +85,6 @@ describe('desktop titlebar', () => {
     expect(screen.queryByRole('button', { name: '连接面板' })).toBeNull();
     useWorkspaceNavigation.setState({ area: previous });
   });
-  it('steps back and forward through visited workspaces and disables the missing direction', () => {
-    useWorkspaceNavigation.setState({ area: 'terminal', areaHistory: ['terminal'], areaHistoryIndex: 0 });
-    render(<TopDock />);
-    const back = screen.getByTestId('workspace-history-back');
-    const forward = screen.getByTestId('workspace-history-forward');
-    expect(back).toBeDisabled();
-    expect(forward).toBeDisabled();
-    act(() => {
-      useWorkspaceNavigation.getState().selectArea('code');
-      useWorkspaceNavigation.getState().selectArea('ssh');
-    });
-    expect(back).toBeEnabled();
-    act(() => fireEvent.click(back));
-    expect(useWorkspaceNavigation.getState().area).toBe('code');
-    expect(forward).toBeEnabled();
-    act(() => fireEvent.click(forward));
-    expect(useWorkspaceNavigation.getState().area).toBe('ssh');
-    expect(forward).toBeDisabled();
-    act(() =>
-      useWorkspaceNavigation.setState({ area: 'terminal', previousArea: 'terminal', areaHistory: ['terminal'], areaHistoryIndex: 0 }),
-    );
-  });
   it('uses the native-control layout and keeps search clickable', async () => {
     const { container } = render(<TopDock />);
     const header = container.querySelector('header');
@@ -114,7 +94,7 @@ describe('desktop titlebar', () => {
     expect(screen.queryByTestId('window-controls')).not.toBeInTheDocument();
     fireEvent.click(screen.getByTestId('global-search-trigger'));
     expect(useUiStore.getState().globalSearchOpen).toBe(true);
-    expect(screen.getByLabelText('Meta+F')).toBeVisible();
+    expect(screen.getByTestId('global-search-trigger')).toHaveAttribute('data-tip-shortcut', 'Meta+F');
     await waitFor(() => expect(native.resize).toBeDefined());
   });
 
@@ -140,8 +120,24 @@ describe('desktop titlebar', () => {
     native.macOS = false;
     const { container } = render(<TopDock />);
     expect(container.querySelector('header')).toHaveAttribute('data-platform', 'other');
-    expect(screen.getByLabelText('Control+F')).toBeVisible();
+    expect(screen.getByTestId('global-search-trigger')).toHaveAttribute('data-tip-shortcut', 'Control+F');
     expect(native.isFullscreen).not.toHaveBeenCalled();
+  });
+
+  it('places the active workspace strip and labeled global search in the titlebar', () => {
+    const { container } = render(
+      <WorkspaceHeaderProvider>
+        <TopDock showTabs />
+        <WorkspaceHeader>
+          <button>Open resource</button>
+        </WorkspaceHeader>
+      </WorkspaceHeaderProvider>,
+    );
+    const header = container.querySelector('header');
+    expect(header).toContainElement(screen.getByRole('button', { name: 'Open resource' }));
+    const search = screen.getByRole('button', { name: '全局搜索' });
+    expect(header).toContainElement(search);
+    expect(search).toHaveTextContent('全局搜索');
   });
 
   it('preserves the windowed layout when native state is unavailable', async () => {

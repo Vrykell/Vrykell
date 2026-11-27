@@ -16,10 +16,8 @@ async function expectDockedStatus(page: Page) {
   const content = (await pane.locator('.ssh-pane-content').boundingBox())!;
   const status = (await panel.boundingBox())!;
   expect(content.width).toBeGreaterThanOrEqual(320);
-  expect(status.y).toBeCloseTo(
-    (await page.locator('.workspace-titlebar').boundingBox())!.y + (await page.locator('.workspace-titlebar').boundingBox())!.height,
-    0,
-  );
+  const context = (await page.getByTestId('workspace-context-bar').boundingBox())!;
+  expect(status.y).toBeCloseTo(context.y, 0);
   expect(await pane.evaluate((element) => element.scrollWidth - element.clientWidth)).toBeLessThanOrEqual(1);
 }
 

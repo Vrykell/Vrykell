@@ -433,7 +433,7 @@ export default function SkillsSettings() {
         <div className="resource-search">
           <Search size={16} aria-hidden="true" />
           <TextInput
-            variant="field"
+            variant="search"
             aria-label={t('Search skills…')}
             placeholder={t('Search skills…')}
             value={query}

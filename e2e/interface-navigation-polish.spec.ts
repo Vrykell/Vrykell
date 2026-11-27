@@ -2,6 +2,17 @@ import { expect, test, type Locator, type Page } from '@playwright/test';
 import { fsOps, setupTauriMock } from './tauri-mock';
 import { gotoSetting } from './settings';
 
+async function themeColor(page: Page, variable: string) {
+  return page.evaluate((variable) => {
+    const sample = document.createElement('span');
+    sample.style.backgroundColor = `var(${variable})`;
+    document.body.appendChild(sample);
+    const color = getComputedStyle(sample).backgroundColor;
+    sample.remove();
+    return color;
+  }, variable);
+}
+
 async function dragTo(page: Page, source: Locator, destination: Locator, after = false) {
   const from = (await source.boundingBox())!;
   await page.mouse.move(from.x + 28, from.y + from.height / 2);
@@ -53,25 +64,25 @@ for (const theme of ['dark', 'light'] as const) {
     await page.getByTestId('workspace-area-code').hover();
     await expect(terminal).toHaveAttribute('aria-current', 'page');
     await expect(content).toHaveCSS('background-color', selection);
-    expect(selection).toBe(selectedToken);
-    await expect(page.locator('.workspace-title > span')).toHaveText('终端会话');
-    // Profile selection lives in the shared picker the start page opens.
+    expect(selection).toBe(await themeColor(page, '--selection-bg'));
+    const area = page.getByTestId('workspace-context-bar');
+    await expect(area).toHaveText('终端会话');
     await start.getByTestId('terminal-start-picker').click();
-    const picker = page.getByRole('dialog', { name: '新建标签页' });
-    const zshOption = picker.getByTestId('new-tab-option-shell:zsh');
-    await expect(zshOption).toBeVisible();
-    await expect(zshOption.locator('[data-shell-mark="zsh"]')).toHaveCSS('color', 'rgb(241, 90, 36)');
+    const profiles = page.getByRole('dialog', { name: '新建标签页' });
+    await expect(profiles.getByTestId('new-tab-option-shell:zsh').locator('[data-shell-mark="zsh"]')).toHaveCSS(
+      'color',
+      'rgb(241, 90, 36)',
+    );
     await page.keyboard.press('Escape');
-    await expect(picker).toHaveCount(0);
+    await expect(profiles).toHaveCount(0);
     await page.screenshot({ path: info.outputPath(`terminal-start-${theme}.png`), animations: 'disabled' });
     await page.setViewportSize({ width: 700, height: 800 });
-    await expect(start.getByTestId('terminal-start-new')).toBeVisible();
+    await expect(start.getByTestId('terminal-start-new')).toBeInViewport();
     expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBe(700);
     await page.screenshot({ path: info.outputPath(`terminal-start-narrow-${theme}.png`), animations: 'disabled' });
     await page.setViewportSize({ width: 1240, height: 800 });
     await page.getByTestId('workspace-sidebar-expand').click();
     await page.getByTestId('tab-new-btn').click();
-    // The dialog and the row more-button paint shared tokens; assert the tokens, not literals.
     await expect(page.getByRole('dialog', { name: '新建标签页' })).toHaveCSS('background-color', await themeColor(page, '--menu-bg'));
     await page.keyboard.press('Escape');
     const more = page.locator('.folder-more-button').first();
@@ -88,16 +99,15 @@ for (const theme of ['dark', 'light'] as const) {
     expect(Math.abs(emptyBox.y + emptyBox.height / 2 - strip.y - strip.height / 2)).toBeLessThan(2);
     await page.getByTestId('tab-search-toggle').click();
     await page.getByTestId('workspace-area-ai').click();
-    await expect(page.locator('.workspace-title > span')).toHaveText('智能对话');
+    await expect(area).toHaveText('智能对话');
     await expect(page.getByTestId('ai-start-new-conversation')).toBeVisible();
-    // The agent list stays one action away, in the shared launcher dialog.
     await page.getByTestId('ai-start-agents').click();
-    await expect(page.getByTestId('acp-launcher-Fake ACP')).toContainText('Fake ACP');
+    await expect(page.getByTestId('acp-launcher-Fake ACP')).toBeVisible();
     await page.keyboard.press('Escape');
     await expect(page.getByTestId('acp-launcher')).toHaveCount(0);
     await page.screenshot({ path: info.outputPath(`ai-start-${theme}.png`), animations: 'disabled' });
     await page.setViewportSize({ width: 700, height: 800 });
-    await expect(page.getByTestId('ai-start-new-conversation')).toBeVisible();
+    await expect(page.getByTestId('ai-start-new-conversation')).toBeInViewport();
     expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBe(700);
     await page.screenshot({ path: info.outputPath(`ai-start-narrow-${theme}.png`), animations: 'disabled' });
     await page.setViewportSize({ width: 1240, height: 800 });
@@ -109,10 +119,7 @@ for (const theme of ['dark', 'light'] as const) {
       element.scrollTop = 0;
     });
     await expect(nav.getByRole('button', { name: '字体与显示', exact: true })).toHaveAttribute('aria-current', 'page');
-    await expect(page.getByRole('combobox', { name: '终端字号' })).toHaveCSS(
-      'background-color',
-      theme === 'dark' ? 'rgb(60, 60, 60)' : 'rgb(255, 255, 255)',
-    );
+    await expect(page.getByRole('combobox', { name: '终端字号' })).toHaveCSS('background-color', await themeColor(page, '--field-bg'));
   });
 
   test(`file rename uses the shared fixed-width field in ${theme}`, async ({ page }, info) => {

@@ -351,6 +351,8 @@ test.describe('File panel', () => {
     // Release confirms it: the panel stays expanded
     await page.mouse.up();
     await expect(page.getByText('Documents')).toBeVisible();
+    const panel = handle.locator('..');
+    const savedWidth = (await panel.boundingBox())!.width;
     // Drag to collapse again and release right away -> it stays collapsed; the dock button restores it
     // (the width changed, so the handle moved and has to be located again)
     const box2 = await handle.boundingBox();
@@ -361,10 +363,24 @@ test.describe('File panel', () => {
       await page.mouse.move(cx2 + (i + 1) * 16, cy);
       await page.waitForTimeout(12);
     }
+    await expect(page.getByText('Documents')).toBeHidden();
+    await page.mouse.move(cx2 + 118, cy);
     await page.mouse.up();
     await expect(page.getByText('Documents')).toBeHidden();
+    await page.reload();
+    await expect(page.locator('[data-dock-btn="files"]')).toHaveAttribute('aria-pressed', 'false');
     await page.locator('[data-dock-btn="files"]').click();
     await expect(page.getByText('Documents')).toBeVisible({ timeout: 3000 });
+    await expect.poll(async () => (await panel.boundingBox())!.width).toBe(savedWidth);
+    await page.reload();
+    await expect.poll(async () => (await panel.boundingBox())!.width).toBe(savedWidth);
+    const viewport = page.viewportSize()!;
+    await page.setViewportSize({ ...viewport, width: 360 + Math.round(savedWidth) - 30 });
+    await expect.poll(async () => (await panel.boundingBox())!.width).toBeLessThan(savedWidth);
+    await page.reload();
+    await expect(panel).toBeVisible();
+    await page.setViewportSize(viewport);
+    await expect.poll(async () => (await panel.boundingBox())!.width).toBe(savedWidth);
   });
 
   test('dragging back after a collapse keeps the panel state without reloading it', async ({ page }) => {

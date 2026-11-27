@@ -25,12 +25,28 @@ beforeEach(() => {
 });
 
 describe('AgentLauncher', () => {
+  it('shows actual daily usage and persisted agent turns, including zero usage', async () => {
+    const view = render(<AgentLauncher embedded open onClose={() => {}} />);
+    expect(screen.getByText('今日请求').nextElementSibling).toHaveTextContent('0');
+    expect(screen.getByText('今日 Tokens').nextElementSibling).toHaveTextContent('0');
+    view.unmount();
+    useUsageStore.getState().recordTurn({ provider: 'provider', model: 'model', inputTokens: 120, outputTokens: 40 });
+    useUsageStore
+      .getState()
+      .recordTurn({ provider: 'provider', model: 'model', inputTokens: 900, outputTokens: 200, at: Date.now() - 86_400_000 });
+    useUsageStore.getState().acpTurn('Claude Code');
+    await useUsageStore.persist.rehydrate();
+    render(<AgentLauncher embedded open onClose={() => {}} />);
+    expect(screen.getByText('今日请求').nextElementSibling).toHaveTextContent('1');
+    expect(screen.getByText('今日 Tokens').nextElementSibling).toHaveTextContent('160');
+    expect(await screen.findByTestId('acp-launcher-Claude Code')).toHaveTextContent('1 轮');
+  });
   it('launches built-in and configured agents from the same keyboard list', async () => {
     const onPick = vi.fn();
-    render(<AgentLauncher open onClose={() => {}} onPick={onPick} />);
-    const agents = screen.getByRole('dialog', { name: '选择智能体' });
-    const native = screen.getByTestId('agent-launcher-builtin');
-    expect(within(agents).getByTestId('agent-launcher-builtin')).toBe(native);
+    render(<AgentLauncher embedded open onClose={() => {}} onPick={onPick} />);
+    const agents = screen.getByRole('region', { name: '智能体' });
+    const native = screen.getByTestId('ai-start-new-conversation');
+    expect(within(agents).getByTestId('ai-start-new-conversation')).toBe(native);
     await within(agents).findByTestId('acp-launcher-Claude Code');
     fireEvent.keyDown(screen.getByTestId('acp-launcher-search'), { key: 'ArrowDown' });
     fireEvent.keyDown(screen.getByTestId('acp-launcher-search'), { key: 'Enter' });

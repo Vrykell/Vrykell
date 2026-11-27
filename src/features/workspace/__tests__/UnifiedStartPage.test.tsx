@@ -2,29 +2,29 @@ import { fireEvent, render, screen } from '@testing-library/react';
 import { expect, it, vi } from 'vitest';
 import UnifiedStartPage from '../components/UnifiedStartPage';
 
-it('offers the mixed-work creation and connection actions on one simple page', () => {
+it('offers the six workspace actions and anchors each picker to its trigger', () => {
   const create = vi.fn();
+  const terminal = vi.fn();
   const server = vi.fn();
   const agent = vi.fn();
   const open = vi.fn();
-  render(<UnifiedStartPage onNew={create} onOpen={open} onConnect={server} onAgent={agent} />);
+  render(<UnifiedStartPage onNew={create} onTerminal={terminal} onOpen={open} onConnect={server} onAgent={agent} />);
   expect(screen.getByRole('heading', { level: 2 })).toHaveTextContent('聚合工作区');
+  expect(screen.getAllByRole('button')).toHaveLength(6);
   fireEvent.click(screen.getByRole('button', { name: '新建文件' }));
   expect(create).toHaveBeenLastCalledWith('document');
   fireEvent.click(screen.getByRole('button', { name: '打开文件' }));
   expect(open).toHaveBeenCalledOnce();
-  fireEvent.click(screen.getByRole('button', { name: '连接服务器' }));
-  expect(server).toHaveBeenCalledWith({ x: 0, y: 0 });
-  expect(agent).not.toHaveBeenCalled();
-  fireEvent.click(screen.getByRole('button', { name: /智能体/ }));
-  expect(agent).toHaveBeenCalledWith({ x: 0, y: 0 });
-  fireEvent.click(screen.getByRole('button', { name: '新终端' }));
-  expect(create).toHaveBeenLastCalledWith('terminal');
   fireEvent.click(screen.getByRole('button', { name: '新对话' }));
   expect(create).toHaveBeenLastCalledWith('conversation');
-});
-
-it('no longer offers a history destination', () => {
-  render(<UnifiedStartPage onNew={vi.fn()} onOpen={vi.fn()} onConnect={vi.fn()} onAgent={vi.fn()} />);
-  expect(screen.queryByRole('button', { name: /历史/ })).toBeNull();
+  for (const [name, action, left] of [
+    ['新终端', terminal, 20],
+    ['连接服务器', server, 50],
+    ['ACP 智能体', agent, 80],
+  ] as const) {
+    const trigger = screen.getByRole('button', { name });
+    vi.spyOn(trigger, 'getBoundingClientRect').mockReturnValue(new DOMRect(left, 10, 40, 30));
+    fireEvent.click(trigger);
+    expect(action).toHaveBeenCalledExactlyOnceWith({ x: left, y: 44, align: 'start', below: true });
+  }
 });

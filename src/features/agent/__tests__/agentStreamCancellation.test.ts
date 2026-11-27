@@ -57,7 +57,6 @@ it('preserves cancellation in structured tool results', async () => {
 });
 
 it('retains the denial reason from a structured tool result', async () => {
-  enableAgentMode();
   metrics.parts = [
     {
       type: 'tool-result',
@@ -69,13 +68,6 @@ it('retains the denial reason from a structured tool result', async () => {
   const runs: ToolRun[] = [];
   await agentStream([{ role: 'user', content: 'Run it' }], () => {}, { handlers: { onToolEvent: (run) => runs.push(run) } });
   expect(runs[runs.length - 1]).toMatchObject({ state: 'denied', error: 'Policy denied this command' });
-});
-
-it('ignores tool results when the stream registered no tools', async () => {
-  metrics.parts = [{ type: 'tool-result', toolCallId: 'phantom', toolName: 'run_command', output: { ok: true } }];
-  const runs: ToolRun[] = [];
-  await agentStream([{ role: 'user', content: 'Run it' }], () => {}, { handlers: { onToolEvent: (run) => runs.push(run) } });
-  expect(runs).toEqual([]);
 });
 
 it('finishes the reply without waiting for optional usage and records it when available', async () => {

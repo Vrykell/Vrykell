@@ -200,10 +200,13 @@ it('shows the terminal history singleton in the strip but never the AI pages', (
   expect(useWorkspaceNavigation.getState()).toMatchObject({ area: 'terminal' });
 });
 
-it('prevents pointer activation from moving focus onto a nested tab button', () => {
+it('selects a tab on click and leaves close controls out of reordering', () => {
   render(<PanelTabs />);
-  const row = screen.getByTestId('tab-row-local');
-  expect(fireEvent.pointerDown(row.querySelector('[role="tab"]')!, { button: 0, isPrimary: true })).toBe(false);
+  const tab = within(screen.getByTestId('tab-row-local')).getByRole('tab');
+  const active = useSessionStore.getState().activeId;
+  expect(fireEvent.pointerDown(tab, { button: 0, isPrimary: true })).toBe(false);
+  expect(useSessionStore.getState().activeId).toBe(active);
+  fireEvent.click(tab);
   expect(useSessionStore.getState().activeId).toBe('local');
   expect(fireEvent.pointerDown(screen.getByTestId('tab-close-local'), { button: 0, isPrimary: true })).toBe(true);
 });
@@ -380,7 +383,9 @@ it('gives a collapsed group the tab surface only while it owns the active tab, i
   act(() => useSessionStore.setState({ activeId: 'local' }));
   expect(header).toHaveAttribute('data-tab-surface', 'true');
   act(() => useListReorder.getState().start({ listId: 'session-tabs', id: 'group-a', kind: 'group' }, { x: 10, y: 10 }));
-  expect(document.querySelector('.terminal-group-preview .tab-group-header')).toHaveAttribute('data-tab-surface', 'true');
+  const preview = document.querySelector('.terminal-group-preview .tab-group-header');
+  expect(preview).toHaveTextContent('Group');
+  expect(preview).not.toHaveAttribute('data-tab-surface');
   act(() => useListReorder.getState().end());
   expect(header).toHaveAttribute('data-tab-surface', 'true');
 });

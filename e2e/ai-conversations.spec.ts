@@ -49,11 +49,6 @@ test('completed tool cards fold while reply text remains visible', async ({ page
     await expect(reply.locator('strong')).toBeVisible();
     await summary.press('Enter');
     const file = surface.getByRole('button', { name: /读取文件.*package.json/ });
-    const title = file.locator('.ai-tool-label');
-    for (const property of ['font-family', 'font-size', 'font-weight', 'color']) {
-      const expected = await title.evaluate((element, css) => getComputedStyle(element).getPropertyValue(css), property);
-      await expect(summary.locator('.ai-tool-label')).toHaveCSS(property, expected);
-    }
     await file.click();
     await expect(surface.getByText('Configuration loaded.', { exact: true })).toBeVisible();
     await surface.screenshot({ path: info.outputPath(`cards-open-${placement}.png`) });
@@ -63,79 +58,29 @@ test('completed tool cards fold while reply text remains visible', async ({ page
   }
 });
 
-for (const placement of ['side', 'main'] as const)
-  test(`model delegation opens a child and returns to the ${placement} parent`, async ({ page }, info) => {
-    const task = '核对项目说明中关于会话恢复的描述';
-    await mockAnthropicToolCall(page, 'delegate_analysis', { task });
-    await boot(page, '已核对恢复条件。');
-    if (placement === 'main') await page.getByTestId('ai-return-to-workspace').click();
-    const surface = page.getByTestId(`ai-surface-${placement}`);
-    const composer = surface.locator('[data-chat-composer]:visible');
-    // Hold the child transport so navigation and cancellation are exercised during real execution.
-    await page.evaluate((task) => {
-      const bridge = window as unknown as {
-        __TAURI_INTERNALS__: { invoke: (command: string, args?: { req?: { body?: string } }) => Promise<unknown> };
-        releaseAnalysis?: () => void;
-      };
-      const invoke = bridge.__TAURI_INTERNALS__.invoke.bind(bridge.__TAURI_INTERNALS__);
-      bridge.__TAURI_INTERNALS__.invoke = async (command, args) => {
-        if (command === 'llm_stream') {
-          const messages = JSON.parse(args?.req?.body || '{}').messages ?? [];
-          if (messages.at(-1)?.role === 'user' && JSON.stringify(messages.at(-1).content).includes(task)) {
-            await new Promise<void>((resolve) => {
-              bridge.releaseAnalysis = resolve;
-            });
-          }
-        }
-        return invoke(command, args);
-      };
-    }, task);
-    await composer.fill('请独立复核会话恢复条件');
-    await composer.press('Enter');
-    const row = surface.locator('.subagent-row');
-    await expect(row).toHaveCount(1);
-    await expect(row.locator('.ai-tool-label')).toHaveText('子智能体');
-    await expect(row.locator('.ai-tool-state')).toHaveAttribute('data-state', 'running');
-    await expect(row.getByRole('status')).toHaveText('运行中');
-    await expect(surface.locator('.ai-tool-summary').filter({ hasText: 'delegate_analysis' })).toHaveCount(0);
-    await composer.fill('稍后继续的草稿');
-    const open = row.getByRole('button', { name: /打开子智能体/ });
-    const stop = row.getByRole('button', { name: /停止子智能体/ });
-    const openRect = (await open.boundingBox())!;
-    const stopRect = (await stop.boundingBox())!;
-    expect(stopRect.x - openRect.x - openRect.width).toBeGreaterThanOrEqual(7);
-    await surface.screenshot({ path: info.outputPath(`parent-${placement}.png`) });
-    await open.press('Enter');
-    const bar = surface.getByRole('region', { name: '子智能体' });
-    const edges = await bar.evaluate((footer) => {
-      const rect = footer.getBoundingClientRect();
-      const pane = footer.closest('.ai-chat-panel')!.getBoundingClientRect();
-      return [rect.left - pane.left, pane.right - rect.right, pane.bottom - rect.bottom];
-    });
-    expect(edges.every((inset) => Math.abs(inset) <= 1)).toBe(true);
-    await expect(bar).toHaveCSS('border-top-width', '1px');
-    await expect(bar).toHaveCSS('border-radius', '0px');
-    await expect(bar.getByRole('status')).toHaveText('运行中');
-    await expect(composer).toHaveCount(0);
-    await surface.screenshot({ path: info.outputPath(`child-${placement}.png`) });
-    await bar.getByRole('button', { name: '返回父会话' }).press('Enter');
-    await expect(composer).toHaveValue('稍后继续的草稿');
-    if (placement === 'main') await stop.click();
-    await page.evaluate(() => (window as unknown as { releaseAnalysis: () => void }).releaseAnalysis());
-    await expect(row.getByRole('status')).toHaveText(placement === 'main' ? '已停止' : '完成');
-    await expect(stop).toHaveCount(0);
-    await surface.screenshot({ path: info.outputPath(`parent-settled-${placement}.png`) });
-    await expect(surface.locator('.ai-block-answer .md')).toContainText('已核对恢复条件。');
-    await expect(composer).toHaveValue('稍后继续的草稿');
-  });
-
-test('branches inherit only the chosen reply', async ({ page }) => {
+test('branches inherit only the chosen reply and child tasks return to the parent draft', async ({ page }, info) => {
   await boot(page, 'Review complete.');
   const composer = page.locator('[data-chat-composer]:visible');
   await composer.fill('Read the first draft');
   await composer.press('Enter');
   const first = page.getByTestId('ai-surface-side').locator('.chat-exchange').first();
-  await expect(first).toContainText('Review complete.');
+  await first.getByRole('button', { name: '线程操作' }).click();
+  await page.getByRole('menuitem', { name: '子智能体', exact: true }).click();
+  const dialog = page.getByRole('dialog', { name: '子智能体' });
+  const instruction = dialog.getByRole('textbox', { name: '任务说明' });
+  const assign = dialog.getByRole('button', { name: '分配任务' });
+  await expect(assign).toBeDisabled();
+  await instruction.fill('Review the terminology');
+  await expect(assign).toBeEnabled();
+  const buttonBox = (await assign.boundingBox())!;
+  const fieldBox = (await instruction.boundingBox())!;
+  expect(buttonBox.x + buttonBox.width).toBeCloseTo(fieldBox.x + fieldBox.width, 0);
+  expect(buttonBox.y - fieldBox.y - fieldBox.height).toBeGreaterThanOrEqual(8);
+  await assign.click();
+  await expect(dialog.getByRole('status')).toHaveText('完成');
+  await dialog.screenshot({ path: info.outputPath('child-result.png') });
+  await dialog.getByRole('button', { name: '将结果插入草稿' }).click();
+  await expect(composer).toHaveValue('Review complete.');
   await composer.fill('A later unrelated question');
   await composer.press('Enter');
   const exchanges = page.getByTestId('ai-surface-side').locator('.chat-exchange');

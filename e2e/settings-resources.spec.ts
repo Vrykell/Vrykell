@@ -22,15 +22,6 @@ for (const theme of ['dark', 'light'])
       ).toBe('1px');
       expect(
         await page
-          .locator('.skill-list-row')
-          .nth(1)
-          .evaluate((row) => {
-            const style = getComputedStyle(row, '::before');
-            return [style.left, style.right];
-          }),
-      ).toEqual(['16px', '16px']);
-      expect(
-        await page
           .locator('.skill-open')
           .first()
           .evaluate((element) => getComputedStyle(element).backgroundColor),

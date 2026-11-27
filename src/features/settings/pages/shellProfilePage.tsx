@@ -1,5 +1,5 @@
 import { t } from '@i18n';
-import { SHELL_TYPES, shellTypeLabel, type ShellType } from '@platform/shells';
+import { SHELL_TYPES, shellSupportsBlockMode, shellTypeLabel, type ShellType } from '@platform/shells';
 import { pickPath } from '@platform/api/fs';
 import { EMPTY_SHELL_PROFILE, useShellProfiles } from '@config/shellProfiles';
 import { useTerminalDefaults } from '@config/terminalDefaults';
@@ -7,37 +7,44 @@ import { useAgentSettings } from '@features/agent';
 import SegmentedControl from '@ui/fields/SegmentedControl';
 import Select from '@ui/fields/Select';
 import { OutlineButton } from '@ui/actions/OutlineButton';
+import { iconSizes } from '@ui/icons';
 import { TerminalProfileIcon } from '@ui/icons/shellIcons';
 import { Field, SettingsGroup, Toggle } from '../components/ui';
 import AutoSaveInput from '../components/AutoSaveInput';
 import { useSettingsSave } from '../components/SettingsSaveProvider';
+import { useSettingsNavigationStore } from '../stores/navigation';
 
-export function ShellProfileTitle({
-  shell,
-  describedBy,
-  onChange,
-}: {
-  shell: ShellType;
-  describedBy?: string;
-  onChange: (shell: ShellType) => void;
-}) {
+const options = SHELL_TYPES.map((shell) => ({
+  value: shell,
+  label: shellTypeLabel(shell),
+  icon: <TerminalProfileIcon kind="local" shellType={shell} size={iconSizes.compact} />,
+}));
+
+export function ShellProfileTitle({ description }: { description?: string }) {
+  const shell = useSettingsNavigationStore((state) => state.shellProfile);
+  const selectShell = useSettingsNavigationStore((state) => state.openShellProfile);
   return (
     <Select
       aria-label={t('Shell profiles')}
-      aria-describedby={describedBy}
+      aria-describedby={description}
       triggerClassName="shell-profile-title"
-      options={SHELL_TYPES.map((value) => ({
-        value,
-        label: shellTypeLabel(value),
-        icon: <TerminalProfileIcon kind="local" shellType={value} size={24} />,
-      }))}
+      options={options}
       value={shell}
-      onChange={onChange}
+      onChange={selectShell}
     />
   );
 }
 
-export default function ShellProfilePage({ shell }: { shell: ShellType }) {
+export default function ShellProfilePage() {
+  const shell = useSettingsNavigationStore((state) => state.shellProfile);
+  return (
+    <div className="shell-profile-page">
+      <ShellProfileFields key={shell} shell={shell} />
+    </div>
+  );
+}
+
+function ShellProfileFields({ shell }: { shell: ShellType }) {
   const profile = useShellProfiles((state) => state.profiles[shell] ?? EMPTY_SHELL_PROFILE);
   const update = useShellProfiles((state) => state.update);
   const defaultShell = useTerminalDefaults((state) => state.shell);
@@ -49,7 +56,7 @@ export default function ShellProfilePage({ shell }: { shell: ShellType }) {
   const { save } = useSettingsSave();
   const set = (patch: Partial<typeof profile>) => save(() => update(shell, patch));
   return (
-    <div className="shell-profile-page">
+    <>
       <SettingsGroup title={t('Profile identity')}>
         <Field title={t('Profile name')}>
           <AutoSaveInput
@@ -87,7 +94,7 @@ export default function ShellProfilePage({ shell }: { shell: ShellType }) {
             </OutlineButton>
           </div>
         </Field>
-        {shell !== 'cmd' && (
+        {shellSupportsBlockMode(shell) && (
           <Field title={t('Opening mode')}>
             <SegmentedControl
               label={t('Opening mode')}
@@ -115,6 +122,6 @@ export default function ShellProfilePage({ shell }: { shell: ShellType }) {
           <Toggle label={t('Show in new terminal menu')} on={!profile.hidden} onChange={(value) => set({ hidden: !value })} />
         </Field>
       </SettingsGroup>
-    </div>
+    </>
   );
 }

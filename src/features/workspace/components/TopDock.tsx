@@ -1,7 +1,8 @@
-import KeyHint from '@ui/feedback/KeyHint';
 import { useEffect, useRef, useState } from 'react';
-import { iconSizes, Search, PanelLeft, ArrowLeft, ArrowRight } from '@ui/icons';
+import { iconSizes, Search, PanelLeft } from '@ui/icons';
 import { IconButton } from '@ui/actions/IconButton';
+import { TextButton } from '@ui/actions/TextButton';
+import { WorkspaceHeaderSlot } from '@ui/layout/WorkspaceHeader';
 import { getCurrentWindow } from '@tauri-apps/api/window';
 import { useUiStore, useWorkspaceNavigation } from '@features/workspace';
 import { WORKSPACE_AREA_LABELS } from '../stores/navigation';
@@ -10,21 +11,21 @@ import WindowControls from '@features/workspace/components/WindowControls';
 import WindowMenu from './WindowMenu';
 import { isMacOS } from '@platform/runtime';
 import { t } from '@i18n';
-import { useBalancedTitlebar } from '../hooks/useBalancedTitlebar';
-import { goBackWorkspaceArea, goForwardWorkspaceArea } from '../services/areaHistory';
 
 /** Keep window controls and global actions separate from workspace navigation. */
-export default function TopDock({ sidebarOverlayRequired = false }: { sidebarOverlayRequired?: boolean }) {
+export default function TopDock({
+  sidebarOverlayRequired = false,
+  showTabs = false,
+}: {
+  sidebarOverlayRequired?: boolean;
+  showTabs?: boolean;
+}) {
   const settingsOpen = useUiStore((state) => state.settingsOpen);
   const area = useWorkspaceNavigation((state) => state.area);
   const collapsed = useWorkspaceNavigation((state) => state.collapsed);
-  const canGoBack = useWorkspaceNavigation((state) => state.areaHistoryIndex > 0);
-  const canGoForward = useWorkspaceNavigation((state) => state.areaHistoryIndex < state.areaHistory.length - 1);
   const workspaceTitle = t(WORKSPACE_AREA_LABELS[area]);
   const [fullscreen, setFullscreen] = useState(false);
   const headerRef = useRef<HTMLElement>(null);
-  const actionsRef = useRef<HTMLDivElement>(null);
-  useBalancedTitlebar(headerRef, actionsRef);
 
   useEffect(() => {
     if (!isMacOS) return;
@@ -56,15 +57,14 @@ export default function TopDock({ sidebarOverlayRequired = false }: { sidebarOve
   }, []);
 
   return (
-    // Every non-interactive part of the titlebar is a window drag handle; buttons
-    // below keep their own behaviour because a clickable element without the
-    // attribute blocks dragging for the whole path.
     <header
       ref={headerRef}
       className="workspace-titlebar"
       data-platform={isMacOS ? 'macos' : 'other'}
       data-fullscreen={fullscreen}
       data-sidebar-collapsed={collapsed}
+      data-has-tabs={showTabs || undefined}
+      data-reorder-frame
       data-tauri-drag-region>
       <div data-tauri-drag-region className="workspace-title">
         {collapsed && (
@@ -78,39 +78,22 @@ export default function TopDock({ sidebarOverlayRequired = false }: { sidebarOve
             <PanelLeft size={iconSizes.control} />
           </IconButton>
         )}
-        <span data-tauri-drag-region>{settingsOpen ? t('Settings') : workspaceTitle}</span>
-        <div className="workspace-title-history" data-tauri-drag-region>
-          <IconButton
-            compact
-            data-testid="workspace-history-back"
-            aria-label={t('Back')}
-            data-tip={t('Back')}
-            disabled={!canGoBack}
-            onClick={goBackWorkspaceArea}>
-            <ArrowLeft size={iconSizes.control} />
-          </IconButton>
-          <IconButton
-            compact
-            data-testid="workspace-history-forward"
-            aria-label={t('Forward')}
-            data-tip={t('Forward')}
-            disabled={!canGoForward}
-            onClick={goForwardWorkspaceArea}>
-            <ArrowRight size={iconSizes.control} />
-          </IconButton>
-        </div>
+        {!showTabs && <span data-tauri-drag-region>{settingsOpen ? t('Settings') : workspaceTitle}</span>}
       </div>
-      <button
-        data-subtle
-        data-testid="global-search-trigger"
-        className="workspace-search"
-        aria-label={t('Search files, commands, settings…')}
-        onClick={() => useUiStore.getState().setGlobalSearchOpen(true)}>
-        <Search size={iconSizes.control} />
-        <span>{t('Search files, commands, settings…')}</span>
-        <KeyHint shortcut={isMacOS ? 'Meta+F' : 'Control+F'} />
-      </button>
-      <div ref={actionsRef} className="workspace-title-actions">
+      <WorkspaceHeaderSlot visible={showTabs} />
+      <div className="workspace-title-drag" data-reorder-clearance data-tauri-drag-region />
+      <div className="workspace-title-actions">
+        <TextButton
+          className="workspace-global-search"
+          data-testid="global-search-trigger"
+          aria-label={t('Global search')}
+          aria-haspopup="dialog"
+          data-tip={t('Global search')}
+          data-tip-shortcut={isMacOS ? 'Meta+F' : 'Control+F'}
+          onClick={() => useUiStore.getState().setGlobalSearchOpen(true)}>
+          <Search size={iconSizes.control} />
+          <span>{t('Global search')}</span>
+        </TextButton>
         <DockNavigation side="right" />
         <WindowControls />
       </div>

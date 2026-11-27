@@ -2,7 +2,7 @@ import { expect, test } from '@playwright/test';
 import { setupTauriMock } from './tauri-mock';
 
 for (const theme of ['dark', 'light'])
-  test(`uses the existing launcher design and one tab toolbar in ${theme}`, async ({ page }, info) => {
+  test(`uses the shared start page and one tab toolbar in ${theme}`, async ({ page }, info) => {
     await setupTauriMock(page, {});
     await page.addInitScript((value) => {
       localStorage.setItem('vrykell-theme-mode', value);
@@ -15,11 +15,17 @@ for (const theme of ['dark', 'light'])
     for (const width of [1240, 760]) {
       await page.setViewportSize({ width, height: 800 });
       await expect(start.getByRole('button', { name: '新建文件', exact: true })).toBeInViewport();
-      const actions = (await start.locator('.workspace-start-simple-actions').boundingBox())!;
-      expect(actions.height).toBeGreaterThan(28);
-      const buttons = start.locator('.workspace-start-simple-actions > button');
+      const buttons = start.getByRole('button');
       await expect(buttons).toHaveCount(6);
-      for (const button of await buttons.all()) expect((await button.boundingBox())!.height).toBeLessThanOrEqual(30);
+      for (const button of await buttons.all()) {
+        const size = await button.evaluate((element) => ({
+          height: element.clientHeight,
+          width: element.clientWidth,
+          content: element.scrollWidth,
+        }));
+        expect(size.height).toBeLessThanOrEqual(30);
+        expect(size.content).toBeLessThanOrEqual(size.width + 1);
+      }
       await page.screenshot({ path: info.outputPath(`unified-start-${theme}-${width}.png`) });
     }
     await start.getByRole('button', { name: '新建文件', exact: true }).click();
@@ -39,13 +45,21 @@ test('keeps the English start actions on one line', async ({ page }, info) => {
   await page.goto('/');
   await page.getByTestId('workspace-area-unified').click();
   const start = page.getByTestId('unified-start-page');
-  const buttons = start.locator('.workspace-start-simple-actions > button');
+  const buttons = start.getByRole('button');
   await expect(buttons).toHaveCount(6);
-  await expect(buttons.nth(3)).toHaveText('New chat');
-  await expect(buttons.nth(4)).toHaveText('Connect');
+  await expect(start.getByRole('button', { name: 'New conversation' })).toHaveText('New chat');
+  await expect(start.getByRole('button', { name: 'Connect a server' })).toHaveText('Connect');
   for (const width of [1240, 760]) {
     await page.setViewportSize({ width, height: 800 });
-    for (const button of await buttons.all()) expect((await button.boundingBox())!.height).toBeLessThanOrEqual(30);
+    for (const button of await buttons.all()) {
+      const size = await button.evaluate((element) => ({
+        height: element.clientHeight,
+        width: element.clientWidth,
+        content: element.scrollWidth,
+      }));
+      expect(size.height).toBeLessThanOrEqual(30);
+      expect(size.content).toBeLessThanOrEqual(size.width + 1);
+    }
     await page.screenshot({ path: info.outputPath(`unified-start-en-${width}.png`) });
   }
 });

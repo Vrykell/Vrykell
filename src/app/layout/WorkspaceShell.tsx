@@ -1,4 +1,4 @@
-import { useEffect, useState, type CSSProperties } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties } from 'react';
 import { memoLocalized } from '@ui/hooks/memoLocalized';
 import {
   selectActiveSessionTab,
@@ -9,7 +9,7 @@ import {
   useScopedPaneActive,
 } from '@features/workspace';
 import SettingsScreen from '@features/settings/components/SettingsScreen';
-import { MIN_PANE_SIZE, minTerminalWidth } from '@features/workspace/model/windowLayout';
+import { leaves, MIN_PANE_SIZE, minTerminalWidth } from '@features/workspace/model/windowLayout';
 import TopDock from '@features/workspace/components/TopDock';
 import SidePanel from '@features/workspace/components/SidePanel';
 import PanelSurfaces from '@features/workspace/components/PanelSurfaces';
@@ -17,8 +17,14 @@ import TerminalView from '@features/terminal/components/TerminalView';
 import WorkspaceSidebar from '@features/workspace/components/WorkspaceSidebar';
 import PanelTabs from '@features/workspace/components/PanelTabs';
 import { WORKSPACE_GAP, workspaceFrameWidth } from '@features/workspace/stores/dock';
-import { useWorkspaceNavigation, workspaceAreaForKind, workspaceSidebarWidth } from '@features/workspace/stores/navigation';
-import { WorkspaceHeaderProvider, WorkspaceHeaderSlot } from '@ui/layout/WorkspaceHeader';
+import {
+  useWorkspaceNavigation,
+  WORKSPACE_AREA_LABELS,
+  workspaceAreaForKind,
+  workspaceSidebarWidth,
+} from '@features/workspace/stores/navigation';
+import { useT } from '@i18n';
+import { WorkspaceHeaderProvider } from '@ui/layout/WorkspaceHeader';
 import { AiWorkspaceProvider } from '@features/chat/components/AiWorkspaceSurface';
 import PanelSsh from '@features/ssh/components/PanelSsh';
 import PortForwardingPage from '@features/ssh/components/PortForwardingPage';
@@ -40,6 +46,9 @@ import { useGitSelection } from '@features/git';
 import { startWorkbenchRuntime } from '@features/workspace/services/workbench';
 import { startHarnessTranscriptRuntime } from '@features/chat/services/harnessTranscriptRuntime';
 import WorkbenchFeedback from '@features/workspace/components/WorkbenchFeedback';
+import { useTerminalStore } from '@features/terminal/stores/terminal';
+import { useManualFullscreenVisible } from '@features/terminal/hooks/useManualFullscreenVisible';
+import { useUnifiedWorkspace } from '@features/workspace/stores/unifiedWorkspace';
 
 const StableTerminalView = memoLocalized(TerminalView);
 const StablePanelTabs = memoLocalized(PanelTabs);
@@ -58,12 +67,32 @@ export default function WorkspaceShell() {
   useGitContext();
   const settingsOpen = useUiStore((state) => state.settingsOpen);
   const area = useWorkspaceNavigation((state) => state.area);
+  const showTabs = !settingsOpen && (area === 'terminal' || area === 'code' || area === 'ai' || area === 'unified');
+  const { t } = useT();
+  const layoutRef = useRef<HTMLDivElement>(null);
+  const bodyRef = useRef<HTMLDivElement>(null);
+  const primaryRef = useRef<HTMLDivElement>(null);
+  const contextLabelRef = useRef<HTMLSpanElement>(null);
   const collapsed = useWorkspaceNavigation((state) => state.collapsed);
   const sidebarOverlay = useWorkspaceNavigation((state) => state.sidebarOverlay);
   const sidebarPreference = useWorkspaceNavigation((state) => state.sidebarWidth);
   const sidebarDragWidth = useWorkspaceNavigation((state) => state.sidebarDragWidth);
   const activeTab = useSessionStore((state) => state.tabs.find((tab) => tab.id === state.activeId));
   const contentVisible = !!activeTab && area === workspaceAreaForKind(activeTab.kind);
+  const nativePanes = activeTab?.kind === 'session' && area === 'terminal' ? leaves(activeTab.layout) : [];
+  const nativeFocus = useTerminalStore((state) => state.focusedPaneId);
+  const nativeFullscreen = useManualFullscreenVisible(nativeFocus ?? '');
+  const unifiedTerminal = useUnifiedWorkspace((state) =>
+    state.layout?.type === 'pane' && state.layout.resourceId.startsWith('terminal:') ? state.layout.resourceId.slice(9) : '',
+  );
+  const unifiedFullscreen = useManualFullscreenVisible(unifiedTerminal);
+  const fullSizePane = area === 'unified' ? unifiedTerminal : nativePanes.length === 1 ? nativePanes[0]!.id : '';
+  const alternateScreen = useTerminalStore((state) => state.scenes[fullSizePane] === 'altScreen');
+  const hideContext =
+    area === 'unified'
+      ? !!unifiedTerminal && (alternateScreen || unifiedFullscreen)
+      : area === 'terminal' && (alternateScreen || nativeFullscreen);
+  const showContext = showTabs && !hideContext;
   const codePaneActive = useScopedPaneActive('code');
   const gitSelection = useGitSelection();
   const codeResourceId =
@@ -88,6 +117,28 @@ export default function WorkspaceShell() {
   const sidebarWidth = workspaceSidebarWidth(viewportWidth, mainMinWidth);
   const sidebarMaxWidth = sidebarOverlay ? Math.min(400, viewportWidth - 40) : Math.min(400, viewportWidth - mainMinWidth);
   const overlayWidth = Math.min(sidebarDragWidth ?? sidebarPreference, Math.max(160, sidebarMaxWidth));
+
+  useLayoutEffect(() => {
+    const layout = layoutRef.current;
+    const body = bodyRef.current;
+    const primary = primaryRef.current;
+    const label = contextLabelRef.current;
+    if (!layout || !body || !primary) return;
+    const alignToolbar = () => {
+      const content = primary.getBoundingClientRect();
+      const inset = Math.max(0, body.getBoundingClientRect().right - content.right);
+      const leading = label ? label.getBoundingClientRect().right - content.left + 8 : 0;
+      layout.style.setProperty('--workspace-toolbar-inset', `${inset}px`);
+      layout.style.setProperty('--workspace-toolbar-leading', `${leading}px`);
+    };
+    alignToolbar();
+    if (typeof ResizeObserver === 'undefined') return;
+    const observer = new ResizeObserver(alignToolbar);
+    observer.observe(body);
+    observer.observe(primary);
+    if (label) observer.observe(label);
+    return () => observer.disconnect();
+  }, [showContext]);
 
   useEffect(() => {
     const reconcile = () => {
@@ -126,8 +177,11 @@ export default function WorkspaceShell() {
 
   return (
     <div
+      ref={layoutRef}
       className="workspace-layout"
       data-area={area}
+      data-has-tabs={showTabs || undefined}
+      data-hide-context={hideContext || undefined}
       data-sidebar-overlay={(sidebarOverlay && !collapsed) || undefined}
       data-settings-open={settingsOpen || undefined}
       style={
@@ -149,11 +203,12 @@ export default function WorkspaceShell() {
             sideActive={chatOpen && (chatOnLeft ? !collapsed : !sshStatusOwner) && !settingsOpen}>
             <PanelSurfaces>
               <WorkspaceSidebar maxWidth={Math.max(160, sidebarMaxWidth)} />
-              <StableTopDock sidebarOverlayRequired={viewportWidth - mainMinWidth < 160} />
+              <StableTopDock showTabs={showTabs} sidebarOverlayRequired={viewportWidth - mainMinWidth < 160} />
               <SshAuthenticationDialog />
               <WorkbenchFeedback />
               <StablePanelTabs active={area === 'terminal' && !settingsOpen} />
               <div
+                ref={bodyRef}
                 className="workspace-body"
                 data-settings-open={settingsOpen || undefined}
                 style={
@@ -165,10 +220,12 @@ export default function WorkspaceShell() {
                     '--workspace-gap': `${WORKSPACE_GAP}px`,
                   } as CSSProperties
                 }>
-                <div className="workspace-primary" style={{ minWidth: area === 'terminal' ? terminalMinWidth : 0 }}>
-                  <WorkspaceHeaderSlot
-                    visible={!settingsOpen && (area === 'terminal' || area === 'code' || area === 'ai' || area === 'unified')}
-                  />
+                <div ref={primaryRef} className="workspace-primary" style={{ minWidth: area === 'terminal' ? terminalMinWidth : 0 }}>
+                  {showContext && (
+                    <div className="workspace-context-bar" data-testid="workspace-context-bar">
+                      <span ref={contextLabelRef}>{t(WORKSPACE_AREA_LABELS[area])}</span>
+                    </div>
+                  )}
                   <main
                     className="workspace-main"
                     inert={settingsOpen}

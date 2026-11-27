@@ -116,34 +116,53 @@ for (const density of [1, 1.25])
       await expect(async () => expect((await ptyResizes(page)).at(-1)?.cols).toBe((await grid(page)).cols)).toPass();
     });
 
-    test('running controls stay in the command block when its header scrolls away', async ({ page }, info) => {
+    test('running controls scroll with the block and remain usable in its heading', async ({ page }, info) => {
       await openRunning(page);
       await emitPtyOutput(page, 'log entry\r\n'.repeat(160));
       const scroll = page.locator('[data-testid^="terminal-scroll-"]').first();
-      const row = scroll.locator('[data-running="true"] .command-block-info');
+      const heading = scroll.locator('[data-running="true"] .command-block-info');
       for (const width of [1240, 760]) {
         await page.setViewportSize({ width, height: 700 });
-        await expect(row).toHaveCount(1);
+        await expect(async () => {
+          const size = await grid(page);
+          expect((await ptyResizes(page)).at(-1)).toMatchObject({ cols: size.cols, rows: size.rows });
+          expect(size.width).toBeLessThanOrEqual(size.available + 1);
+        }).toPass();
         await scroll.evaluate((element) => {
           element.scrollTop = 0;
         });
-        await expect(row).toBeInViewport();
+        await expect(heading).toBeInViewport();
         await scroll.evaluate((element) => {
-          const header = element.querySelector<HTMLElement>('[data-running="true"] .command-block-info')!;
-          element.scrollTop += header.getBoundingClientRect().bottom - element.getBoundingClientRect().top + 20;
+          const row = element.querySelector<HTMLElement>('[data-running="true"] .command-block-info')!;
+          element.scrollTop += row.getBoundingClientRect().bottom - element.getBoundingClientRect().top + 80;
         });
-        await expect(row).not.toBeInViewport();
+        await expect(heading).not.toBeInViewport();
         await expect(page.getByTestId('pinned-command')).toHaveCount(0);
-        await page.screenshot({ path: info.outputPath(`unobstructed-running-${width}.png`) });
+        await scroll.evaluate((element) => {
+          element.scrollTop = 0;
+        });
+        await heading.hover();
+        await expect(heading.locator('.command-block-actions')).toHaveCSS('opacity', '1');
+        const viewport = (await scroll.boundingBox())!;
+        for (const label of ['重绘终端', '终止命令', '结束前台应用', '进入全屏交互']) {
+          const button = heading.getByRole('button', { name: label, exact: true });
+          await expect(button).toBeVisible();
+          const box = (await button.boundingBox())!;
+          expect(box.x).toBeGreaterThanOrEqual(viewport.x);
+          expect(box.x + box.width).toBeLessThanOrEqual(viewport.x + viewport.width + 1);
+        }
+        await page.screenshot({ path: info.outputPath(`inline-running-${width}.png`) });
       }
+      const before = (await ptyWrites(page)).length;
+      await heading.getByRole('button', { name: '终止命令', exact: true }).click();
+      await expect.poll(async () => (await ptyWrites(page)).slice(before)).toEqual(['\x03']);
+      await heading.getByRole('button', { name: '进入全屏交互', exact: true }).click();
+      await expect(page.getByTestId('tui-fullscreen')).toBeVisible();
+      await page.locator('[data-tip="退出全屏"]').click();
+      await expect(page.getByTestId('running-term')).toBeVisible();
       await scroll.evaluate((element) => {
         element.scrollTop = 0;
       });
-      await row.hover();
-      const before = (await ptyWrites(page)).length;
-      await row.getByRole('button', { name: '终止命令', exact: true }).click();
-      await expect.poll(async () => (await ptyWrites(page)).slice(before)).toEqual(['\x03']);
-      await row.getByRole('button', { name: '进入全屏交互', exact: true }).click();
-      await expect(page.getByTestId('tui-fullscreen')).toBeVisible();
+      await expect(heading).toBeInViewport();
     });
   });

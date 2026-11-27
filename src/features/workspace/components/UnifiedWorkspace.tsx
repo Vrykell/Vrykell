@@ -7,7 +7,7 @@ import type { PaneTarget } from '@core/paneLayout';
 import ContextMenu, { type ContextMenuItem, type MenuAnchor } from '@ui/menus/ContextMenu';
 import { dropdownAnchorBelow, type DropdownAnchor } from '@ui/menus/AnchoredDropdown';
 import { flattenSingleSubmenu } from '@ui/menus/menuGroups';
-import { FolderOpen, History, PanelRight, Plus } from '@ui/icons';
+import { FolderOpenSmall, History, PanelRight, Plus, iconSizes } from '@ui/icons';
 import { useWorkspaceResources } from '../hooks/useWorkspaceResources';
 import { detachCompositionPane, mergeCompositionTab, useUnifiedWorkspace } from '../stores/unifiedWorkspace';
 import { useWorkspaceNavigation } from '../stores/navigation';
@@ -221,8 +221,12 @@ export default function UnifiedWorkspace({ active }: { active: boolean }) {
                   <PanelRight size={16} />
                 </IconButton>
               )}
+            </>
+          }
+          creation={
+            <>
               <IconButton compact aria-label={t('Open file')} data-tip={t('Open file')} onClick={() => void openWorkspaceFile()}>
-                <FolderOpen size={16} />
+                <FolderOpenSmall size={iconSizes.compact} />
               </IconButton>
               <IconButton
                 ref={newButton}
@@ -238,8 +242,9 @@ export default function UnifiedWorkspace({ active }: { active: boolean }) {
       </WorkspaceHeader>
       {state.startActive && (
         <UnifiedStartPage
-          onNew={(kind) => (kind === 'terminal' ? setTerminalPicker({ source: 'shell', split: false }) : newItem(kind))}
+          onNew={newItem}
           onOpen={() => void openWorkspaceFile()}
+          onTerminal={(anchor) => setTerminalPicker({ source: 'shell', split: false, anchor })}
           onConnect={(anchor) => setTerminalPicker({ source: 'ssh', split: false, anchor })}
           onAgent={(anchor) => setLauncher({ split: false, anchor })}
         />

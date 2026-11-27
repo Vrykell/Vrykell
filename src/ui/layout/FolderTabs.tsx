@@ -6,6 +6,7 @@ import { X, iconSizes } from '@ui/icons';
 import { t } from '@i18n';
 import '@ui/layout/FolderTabs.css';
 import { TextInput } from '@ui/fields/TextInput';
+import { useHorizontalWheel } from '@ui/hooks/useHorizontalWheel';
 import type { TabHandle } from './tabHandle';
 import type { TabGroupController } from './tabGroups';
 import GroupedTabList, { type TrackWindowTabDrag } from './GroupedTabList';
@@ -19,6 +20,7 @@ export default function FolderTabs({
   className = '',
   headerClassName = '',
   toolbar,
+  creation,
   leading,
   empty,
   menuItems,
@@ -47,6 +49,7 @@ export default function FolderTabs({
   menuItems?: ContextMenuItem[];
   menuLabel?: string;
   leading?: ReactNode;
+  creation?: ReactNode;
   tabActions?: (id: string) => ContextMenuItem[];
   onBlankContext?: (anchor: import('@ui/menus/ContextMenu').MenuAnchor) => void;
   onSelect: (id: string) => void;
@@ -63,6 +66,8 @@ export default function FolderTabs({
   const [editTitle, setEditTitle] = useState('');
   const [blankMenu, setBlankMenu] = useState<MenuAnchor | null>(null);
   const renameFinished = useRef(false);
+  const toolbarRef = useRef<HTMLDivElement>(null);
+  useHorizontalWheel(toolbarRef, true);
   const beginRename = (item: TabHandle) => {
     if (!onRename || !item.capabilities.renameable) return;
     renameFinished.current = false;
@@ -117,7 +122,6 @@ export default function FolderTabs({
           <FolderTabContent
             item={item}
             selected={selected === item.id}
-            onSelect={preview ? undefined : onSelect}
             onClose={preview ? undefined : onClose}
             editing={!preview && editingId === item.id}
             editTitle={editTitle}
@@ -128,7 +132,10 @@ export default function FolderTabs({
           />
         )}
       />
-      <div className="folder-actions">{toolbar}</div>
+      <div ref={toolbarRef} className="folder-actions">
+        {toolbar}
+      </div>
+      {creation && <div className="folder-create">{creation}</div>}
       {blankMenu && (
         <ContextMenu
           anchor={blankMenu}
@@ -142,10 +149,9 @@ export default function FolderTabs({
   );
 }
 
-export function FolderTabContent({
+function FolderTabContent({
   item,
   selected,
-  onSelect,
   onClose,
   editing = false,
   editTitle = '',
@@ -156,7 +162,6 @@ export function FolderTabContent({
 }: {
   item: TabHandle;
   selected: boolean;
-  onSelect?: (id: string) => void;
   onClose?: (id: string) => void;
   editing?: boolean;
   editTitle?: string;
@@ -189,7 +194,9 @@ export function FolderTabContent({
       ) : (
         <>
           <button
+            type="button"
             role="tab"
+            data-subtle
             data-reorder-handle
             aria-selected={selected}
             data-tip={item.tip}
@@ -199,9 +206,6 @@ export function FolderTabContent({
               if (!onStartRename) return;
               event.stopPropagation();
               onStartRename();
-            }}
-            onClick={() => {
-              if (!selected) onSelect?.(item.id);
             }}>
             {item.icon}
             <span>{item.label}</span>

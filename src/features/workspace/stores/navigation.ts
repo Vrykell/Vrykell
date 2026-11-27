@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { safeJsonParse, safeLocalStorageGet, safeLocalStorageSet } from '@utils/errorHandler';
+import { secondaryWorkspaceLabel } from '@platform/workspaceWindowIdentity';
 import { isHistoryGroupColor, type HistoryGroupColor } from '@ui/history/historyGroupColor';
 
 export type WorkspaceArea = 'terminal' | 'code' | 'ai' | 'ssh' | 'forwarding' | 'history' | 'unified';
@@ -13,14 +14,15 @@ export const WORKSPACE_AREA_LABELS = {
   unified: 'Unified workspace',
 } as const;
 export type HistoryTypePreset = 'all' | 'terminal' | 'conversation';
-export const WORKSPACE_SIDEBAR_WIDTH = 208;
+export const WORKSPACE_SIDEBAR_WIDTH = 288;
 export const WORKSPACE_SIDEBAR_MIN_WIDTH = 160;
 export const WORKSPACE_SIDEBAR_MAX_WIDTH = 400;
 export const WORKSPACE_COMPACT_BREAKPOINT = 900;
 /** Back and forward keep a bounded, session-only trail of visited workspaces. */
 export const WORKSPACE_AREA_HISTORY_LIMIT = 50;
 const STORAGE_KEY = 'workspace-navigation-v1';
-const DEFAULT_WORKSPACE_ORDER: WorkspaceArea[] = ['terminal', 'code', 'ai', 'ssh', 'unified'];
+const independentLayout = secondaryWorkspaceLabel() !== null;
+const DEFAULT_WORKSPACE_ORDER: WorkspaceArea[] = ['terminal', 'code', 'ai', 'unified', 'ssh'];
 
 export { workspaceAreaForKind } from '../model/tabArea';
 
@@ -101,7 +103,7 @@ export function runWithoutAreaHistory<T>(operation: () => T): T {
 export const useWorkspaceNavigation = create<NavigationState>((set, get) => ({
   area: 'terminal',
   previousArea: 'terminal',
-  collapsed: saved?.collapsed === true || window.innerWidth <= WORKSPACE_COMPACT_BREAKPOINT,
+  collapsed: independentLayout || saved?.collapsed === true || window.innerWidth <= WORKSPACE_COMPACT_BREAKPOINT,
   sidebarWidth: normalizeSidebarWidth(saved?.sidebarWidth),
   sidebarDragWidth: null,
   sidebarOverlay: false,
@@ -185,6 +187,7 @@ export const useWorkspaceNavigation = create<NavigationState>((set, get) => ({
 }));
 
 useWorkspaceNavigation.subscribe((state, previous) => {
+  if (independentLayout) return;
   if (
     state.collapsed !== previous.collapsed ||
     state.sidebarOverlay !== previous.sidebarOverlay ||

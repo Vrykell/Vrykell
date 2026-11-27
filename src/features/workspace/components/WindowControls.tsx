@@ -100,6 +100,7 @@ export default function WindowControls() {
 
   return (
     <div
+      className="workspace-window-controls"
       data-testid="window-controls"
       data-window-maximized={maximized}
       style={{ display: 'flex', alignItems: 'stretch', alignSelf: 'stretch', height: '100%', flexShrink: 0 }}

@@ -14,7 +14,7 @@ import { requestTerminalSplit } from '@features/workspace/services/unifiedWorksp
 export default function AppShell() {
   const wallpaperDataUrl = useTerminalThemeStore((state) => state.wallpaperDataUrl);
   const appOpacity = useTerminalThemeStore((state) => state.config.opacity);
-  const desktopTint = useTerminalThemeStore((state) => state.config.desktopTint ?? true);
+  const desktopTint = useTerminalThemeStore((state) => state.config.desktopTint ?? false);
   const { mode } = useTheme();
   const effectiveOpacity = wallpaperDataUrl ? appOpacity : 1;
   useEffect(() => {

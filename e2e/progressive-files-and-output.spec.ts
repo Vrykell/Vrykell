@@ -42,7 +42,11 @@ for (const mode of ['global', 'remote'] as const) {
     }
     const input =
       mode === 'global' ? page.getByPlaceholder('搜索文件、命令、设置…') : page.getByRole('textbox', { name: '文件名', exact: true });
+    const searchField = mode === 'global' ? page.locator('.global-search-query') : input;
+    await input.blur();
+    await expect(searchField).toHaveCSS('border-top-width', '0px');
     await input.fill(mode === 'global' ? 'file: early' : 'early');
+    await expect(searchField).toHaveCSS('border-top-width', '0px');
     await expect.poll(() => page.evaluate(() => (window as unknown as { __FILE_REQUESTS__: unknown[] }).__FILE_REQUESTS__.length)).toBe(1);
     const publish = async (index: number, name: string, finish = false) =>
       page.evaluate(
@@ -68,8 +72,8 @@ for (const mode of ['global', 'remote'] as const) {
       await expect(close).toBeVisible();
       await expect(close.locator('svg')).toBeVisible();
       await expect(close).not.toHaveText('关闭搜索');
-      for (const side of ['top', 'right', 'bottom', 'left'])
-        await expect(menu.locator('[data-file-search-result]').first()).toHaveCSS(`border-${side}-width`, '0px');
+      const result = menu.locator('[data-file-search-result]').first();
+      for (const side of ['top', 'right', 'bottom', 'left']) await expect(result).toHaveCSS(`border-${side}-width`, '0px');
     }
     await page.screenshot({ path: info.outputPath(`${mode}-partial.png`) });
     await input.fill(mode === 'global' ? 'file: latest' : 'latest');

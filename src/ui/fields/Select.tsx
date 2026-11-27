@@ -16,25 +16,20 @@ import '@ui/fields/Select.css';
 import { useListNavigationMode } from '../hooks/useListNavigationMode';
 import { t } from '@i18n';
 
+type SelectVariant = 'field' | 'switcher';
+
 /** Shared field trigger for option lists and richer selection dropdowns. */
-export const SelectTrigger = forwardRef<HTMLButtonElement, ButtonHTMLAttributes<HTMLButtonElement>>(function SelectTrigger(
-  { children, className, onClick, onKeyDown, ...props },
-  ref,
-) {
-  return (
-    <button
-      {...props}
-      ref={ref}
-      type="button"
-      data-subtle
-      onClick={onClick}
-      onKeyDown={onKeyDown}
-      className={className ? `ui-select ${className}` : 'ui-select'}>
-      {children}
-      <ChevronDown size={iconSizes.compact} aria-hidden="true" className="ui-select-chevron" />
-    </button>
-  );
-});
+export const SelectTrigger = forwardRef<HTMLButtonElement, ButtonHTMLAttributes<HTMLButtonElement> & { variant?: SelectVariant }>(
+  function SelectTrigger({ children, className, variant = 'field', onClick, onKeyDown, ...props }, ref) {
+    const classes = ['ui-select', variant === 'switcher' && 'selection-switcher', className].filter(Boolean).join(' ');
+    return (
+      <button {...props} ref={ref} type="button" data-subtle onClick={onClick} onKeyDown={onKeyDown} className={classes}>
+        {children}
+        {variant === 'field' && <ChevronDown size={iconSizes.compact} aria-hidden="true" className="ui-select-chevron" />}
+      </button>
+    );
+  },
+);
 
 export interface SelectOption<Value extends string | number> {
   value: Value;
@@ -69,6 +64,7 @@ interface SelectProps<Value extends string | number> {
   disabled?: boolean;
   placeholder?: string;
   style?: CSSProperties;
+  variant?: SelectVariant;
   /** Extra class on the trigger, for a surface that is not a plain form control. */
   triggerClassName?: string;
   action?: SelectAction;
@@ -85,6 +81,7 @@ export default function Select<Value extends string | number>({
   id,
   action,
   triggerClassName,
+  variant = 'field',
   'aria-label': label,
   'aria-describedby': description,
   'data-testid': testId,
@@ -145,7 +142,7 @@ export default function Select<Value extends string | number>({
       const height = Math.min(240, menu.current?.scrollHeight || options.length * 32 + 10);
       const flip = below < height && above > below;
       const maxHeight = Math.min(240, flip ? above : below);
-      const width = Math.min(Math.max(rect.width, 160), window.innerWidth - gutter * 2);
+      const width = Math.min(Math.max(rect.width, variant === 'switcher' ? 216 : 160), window.innerWidth - gutter * 2);
       setPlacement(flip ? 'top' : 'bottom');
       setPosition({
         left: Math.max(gutter, Math.min(rect.left, window.innerWidth - width - gutter)),
@@ -174,7 +171,7 @@ export default function Select<Value extends string | number>({
       document.removeEventListener('scroll', onScroll, true);
       document.removeEventListener('pointerdown', outside);
     };
-  }, [expanded, options.length]);
+  }, [expanded, options.length, variant]);
 
   useLayoutEffect(() => {
     if (expanded && (!wasExpanded.current || navigation.keyboardNavigation)) {
@@ -229,6 +226,7 @@ export default function Select<Value extends string | number>({
         data-tip-description={tipDescription}
         className={triggerClassName}
         style={style}
+        variant={variant}
         role="combobox"
         aria-label={label}
         aria-describedby={description}

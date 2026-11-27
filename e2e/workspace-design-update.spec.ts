@@ -147,24 +147,22 @@ for (const theme of ['dark', 'light'])
     await expect(aiEntry.locator('.sidebar-row-icon svg')).toHaveCSS('color', inheritedColor);
     await expect(aiEntry.locator('.sidebar-row-icon svg')).toHaveCSS('filter', 'none');
     await expect(page.getByTestId('ai-start-new-conversation')).toBeVisible();
-    await expect(page.getByTestId('ai-start-agents')).toBeVisible();
-    await expect(page.getByTestId('agent-launcher-builtin')).toHaveCount(0);
-    await page.screenshot({ path: info.outputPath(`ai-home-${theme}.png`), animations: 'disabled' });
     await page.getByTestId('ai-start-agents').click();
-    await expect(page.getByRole('dialog', { name: '选择智能体' }).getByTestId('agent-launcher-builtin')).toBeVisible();
     await expect(page.getByTestId('acp-launcher-Fake ACP')).toBeVisible();
+    const launcher = page.getByTestId('acp-launcher');
+    await expect(launcher).toBeVisible();
     await page.screenshot({ path: info.outputPath(`ai-launch-${theme}.png`) });
     await page.setViewportSize({ width: 700, height: 800 });
     expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(700);
     await page.screenshot({ path: info.outputPath(`ai-launch-narrow-${theme}.png`) });
     await page.setViewportSize({ width: 500, height: 800 });
-    // The picker is a floating panel, so its rows span the content width the panel gives them.
     const row = (await page.getByTestId('acp-launcher-Fake ACP').boundingBox())!;
-    const panel = (await page.getByTestId('acp-launcher').boundingBox())!;
+    const panel = (await launcher.boundingBox())!;
     expect(row.x).toBeGreaterThanOrEqual(panel.x);
     expect(row.x + row.width).toBeLessThanOrEqual(panel.x + panel.width + 1);
     expect(row.width).toBeGreaterThan(panel.width - 40);
     await page.screenshot({ path: info.outputPath(`ai-launch-small-${theme}.png`), animations: 'disabled' });
+    await page.keyboard.press('Escape');
     await page.setViewportSize({ width: 1240, height: 800 });
     await page.keyboard.press('Escape');
     await page.getByTestId('ai-start-new-conversation').click();

@@ -7,6 +7,7 @@ import ConfirmDialog from '@ui/feedback/ConfirmDialog';
 import { HistoryColorChoices } from '@ui/history/HistoryColorPalette';
 import { historyGroupColor, isHistoryGroupColor } from '@ui/history/historyGroupColor';
 import {
+  horizontalReorderWidth,
   ListReorderPlaceholder,
   ListReorderPreview,
   ListReorderZonePlaceholder,
@@ -87,6 +88,9 @@ export default function GroupedTabList({
   const groups = grouping?.groups ?? [];
   const drag = useListReorder((state) => (state.drag?.listId === listId ? state.drag : null));
   const externalDragSourceId = useListReorder((state) => state.externalDragSourceId);
+  const stripWidth = useListReorder((state) =>
+    state.drag?.listId === listId ? horizontalReorderWidth(state.drag, state.position?.x) : undefined,
+  );
   const dwell = useListReorder((state) => (state.drag?.listId === listId ? state.dwellZoneId : null));
   useHorizontalWheel(strip, true);
   useActiveTabVisibility(
@@ -216,7 +220,6 @@ export default function GroupedTabList({
         }}
         onClick={(event) => {
           if ((event.target as Element).closest('input, [data-no-drag]')) return;
-          if ((event.target as Element).closest('[role="tab"]')) return;
           if (listId !== 'session-tabs' && event.detail > 0) {
             const tab = event.currentTarget.querySelector<HTMLButtonElement>('[role="tab"]');
             tab?.setAttribute('data-pointer-focus', '');
@@ -290,6 +293,7 @@ export default function GroupedTabList({
         aria-label={label}
         data-reorder-list={listId}
         data-empty={!items.length || undefined}
+        style={{ width: stripWidth }}
         onContextMenu={(event) => {
           event.preventDefault();
           onBlankContext?.({ x: event.clientX, y: event.clientY, trigger: event.currentTarget });
@@ -437,7 +441,7 @@ export default function GroupedTabList({
               style={
                 { '--terminal-group-color': color === 'neutral' ? 'var(--text-secondary)' : `var(--group-${color})` } as CSSProperties
               }>
-              <div className="folder-tab tab-group-header" data-tab-surface="true">
+              <div className="folder-tab tab-group-header">
                 <span className="terminal-group-chip">
                   <span>{group?.title}</span>
                 </span>

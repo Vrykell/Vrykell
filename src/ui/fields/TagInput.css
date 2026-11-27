@@ -8,12 +8,12 @@
   gap: 4px;
   min-height: var(--control-size-compact);
   padding: 2px 6px;
-  border: 1px solid var(--border);
+  border: 1px solid var(--field-outline, var(--border));
   border-radius: var(--radius-inner);
   background: var(--field-bg);
 }
 .tag-input-field:focus-within {
-  border-color: var(--border-strong);
+  border-color: var(--field-outline-focus, var(--border-strong));
 }
 .tag-input-field > input.text-input-field {
   flex: 1 1 60px;

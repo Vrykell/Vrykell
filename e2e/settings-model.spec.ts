@@ -18,7 +18,7 @@ test.beforeEach(async ({ page }) => {
 });
 
 test.describe('Model configuration page', () => {
-  test('supported capability badges use distinct theme colors', async ({ page }, testInfo) => {
+  test('supported capabilities read as neutral line icons in both themes', async ({ page }, testInfo) => {
     await page.evaluate(async () => {
       const { setAiModels, useAiConfigStore } =
         (await import('/src/features/agent/stores/aiConfig.ts')) as typeof import('../src/features/agent/stores/aiConfig');
@@ -29,7 +29,7 @@ test.describe('Model configuration page', () => {
       await gotoSetting(page, '主题');
       await selectThemeMode(page, theme);
       await gotoSetting(page, '模型配置');
-      const badges = page.getByTestId('model-row').first().locator('.model-cap-chip');
+      const badges = page.getByTestId('model-row').first().locator('[data-testid^="model-cap-"]');
       await expect(badges).toHaveCount(4);
       const colors = await badges.evaluateAll((elements) =>
         elements.map((element) => {
@@ -37,15 +37,15 @@ test.describe('Model configuration page', () => {
           return { foreground: style.color, background: style.backgroundColor, radius: style.borderRadius };
         }),
       );
-      expect(new Set(colors.map((color) => color.foreground)).size).toBe(4);
+      expect(new Set(colors.map((color) => color.foreground)).size).toBe(1);
       for (const color of colors) {
-        expect(color.background).not.toBe('rgba(0, 0, 0, 0)');
-        expect(color.radius).toBe('999px');
+        expect(color.background).toBe('rgba(0, 0, 0, 0)');
+        expect(color.radius).toBe('0px');
       }
       await page
         .locator('.settings-model-group')
         .first()
-        .screenshot({ path: testInfo.outputPath(`capability-colors-${theme}.png`) });
+        .screenshot({ path: testInfo.outputPath(`capability-icons-${theme}.png`) });
     }
   });
 
@@ -232,16 +232,16 @@ test.describe('Model configuration page', () => {
     await expect(names).toHaveCount(1);
     await expect(names.first()).toHaveText('本地模型');
     const localRow = page.getByTestId('model-row').first();
-    await expect(localRow.locator('.model-cap-chip')).toHaveCount(1);
+    await expect(localRow.locator('[data-testid^="model-cap-"]')).toHaveCount(1);
     await expect(localRow.getByTestId('model-cap-tools')).toHaveAttribute('data-supported', 'true');
     await expect(localRow.getByTestId('model-cap-vision')).toHaveCount(0);
-    await expect(localRow.getByTestId('model-cap-tools')).not.toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
+    await expect(localRow.getByTestId('model-cap-tools')).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
     await expect(localRow.getByTestId('model-id')).toHaveText('qwen2.5');
     // The active row combines its rail and tinted surface with an explicit current badge.
     await expect(localRow).toHaveAttribute('data-active', 'true');
     await expect(localRow.getByTestId('model-current')).toHaveText('当前');
     // The capability column sits left of the row actions so the trailing buttons stay grouped.
-    const capabilities = (await localRow.locator('.model-cap-chip').last().boundingBox())!;
+    const capabilities = (await localRow.locator('[data-testid^="model-cap-"]').last().boundingBox())!;
     const settings = (await localRow.getByTestId('model-settings').boundingBox())!;
     const actions = (await localRow.getByTestId('model-actions').boundingBox())!;
     expect(settings.x - (capabilities.x + capabilities.width)).toBeLessThanOrEqual(12);

@@ -88,8 +88,8 @@ test('quick connection reuses the connection form cards without a native disclos
   const form = page.getByRole('dialog', { name: 'SSH 连接' });
   await page.setViewportSize({ width: 1240, height: 800 });
   await expect(form.locator('.ssh-editor-advanced > summary')).toBeHidden();
-  await expect(form.locator('#ssh-section-connection .ssh-form-section-fields')).toHaveCSS('border-radius', '12px');
-  await expect(form.getByTestId('ssh-forward-add')).toHaveCSS('border-radius', '8px');
+  await expect(form.locator('#ssh-section-connection .ssh-form-section-fields')).toHaveCSS('border-radius', '10px');
+  await expect(form.getByTestId('ssh-forward-add')).toHaveCSS('border-radius', '10px');
   const quickCard = (await form.locator('#ssh-section-connection .ssh-form-section-fields').boundingBox())!;
   const quickGap = await form.evaluate((element) => {
     const sections = [...element.querySelectorAll<HTMLElement>('.ssh-form-section:not([hidden])')];

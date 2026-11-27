@@ -29,12 +29,21 @@ it('keeps all pages available and clears field targets when choosing a page', ()
   const { result } = renderHook(() => useSettingsNavigation());
   expect(result.current.groups.flatMap((group) => group.items)).toHaveLength(isWindows ? 23 : 22);
   act(() => useSettingsNavigationStore.getState().openField('ai-perms', 'Permissions'));
-  act(() => result.current.setSelected('profile:powershell'));
-  expect(result.current.selected).toBe('profile:powershell');
-  expect(result.current.activeLabel).toBe('Windows PowerShell');
+  act(() => useSettingsNavigationStore.getState().openShellProfile('powershell'));
+  expect(result.current.selected).toBe('shell-profiles');
+  expect(result.current.activeLabel).toBe('Shell 配置文件');
   expect(useSettingsNavigationStore.getState().targetField).toBeNull();
+  act(() => result.current.setSelected('command-history'));
+  act(() => result.current.setSelected('shell-profiles'));
+  expect(useSettingsNavigationStore.getState().shellProfile).toBe('powershell');
   expect(result.current.groups).toHaveLength(6);
   expect(result.current.groups.flatMap((group) => group.items).some((item) => item.label === '终端默认行为')).toBe(false);
+});
+
+it('indexes opening mode only for profiles with a mode choice', () => {
+  const settingIds = getSettings().map((setting) => setting.id);
+  expect(settingIds).toContain('open-mode-pwsh');
+  expect(settingIds).not.toContain('open-mode-cmd');
 });
 it('splits the appearance theme page into theme, blocks, typography and files', () => {
   const { result } = renderHook(() => useSettingsNavigation());

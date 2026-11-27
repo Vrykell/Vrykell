@@ -132,18 +132,13 @@ export default function FileSearchMenu({
         </div>
         <div style={{ color: 'var(--text-muted)', overflowWrap: 'anywhere' }}>{root}</div>
         <TextInput
+          variant="search"
           autoFocus
           value={query}
           onChange={(event) => setQuery(event.target.value)}
           aria-label={t('File name')}
           placeholder={t('Search file names in this directory and its subdirectories')}
-          style={{
-            background: 'var(--field-bg)',
-            color: 'var(--text-primary)',
-            border: '1px solid var(--border)',
-            padding: 8,
-            borderRadius: 'var(--radius-inner)',
-          }}
+          style={{ padding: 8 }}
         />
         {busy && <div role="status">{t('Searching files…')}</div>}
         {error && (

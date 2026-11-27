@@ -184,10 +184,19 @@ for (const width of [1240, 760])
     await expect(panel.getByText('无法读取版本库', { exact: true })).toHaveCount(0);
     await notice.getByRole('button', { name: '技术详情', exact: true }).click();
     await expect(notice.getByText('Repository unavailable', { exact: true })).toBeVisible();
+    const details = notice.locator('.error-details-output');
+    await expect(details).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
+    await expect(details.getByRole('button', { name: '复制技术详情' })).toBeVisible();
+    await expect(notice.locator('.notification-card-heading').getByRole('button', { name: '技术详情' })).toHaveAttribute(
+      'aria-expanded',
+      'true',
+    );
     const bounds = (await notice.boundingBox())!;
     expect(bounds.x).toBeGreaterThanOrEqual(0);
     expect(bounds.x + bounds.width).toBeLessThanOrEqual(width);
     await page.screenshot({ path: info.outputPath(`repository-notification-${width}.png`) });
+    await page.mouse.move(0, 0);
+    await notice.screenshot({ path: info.outputPath(`repository-card-${width}.png`) });
     await notice.getByRole('button', { name: '技术详情', exact: true }).click();
     await panel.getByRole('textbox', { name: '搜索变更文件' }).focus();
     await page.mouse.move(0, 0);

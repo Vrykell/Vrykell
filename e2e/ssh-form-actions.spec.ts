@@ -114,6 +114,7 @@ for (const theme of ['dark', 'light'])
     const connect = quick.getByTestId('ssh-connect-btn');
     const quickCancel = quick.getByRole('button', { name: '取消', exact: true });
     await expect(quick.getByTestId('ssh-form-host')).toBeFocused();
+    await expect(quick.getByTestId('ssh-form-host')).toHaveCSS('border-top-width', '1px');
 
     for (const width of [1240, 640]) {
       await page.setViewportSize({ width, height: 800 });

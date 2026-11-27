@@ -7,7 +7,7 @@ const originalWidth = window.innerWidth;
 beforeEach(() => {
   localStorage.clear();
   Object.defineProperty(window, 'innerWidth', { configurable: true, value: 1400 });
-  useWorkspaceNavigation.setState({ collapsed: false, sidebarOverlay: false, area: 'code' });
+  useWorkspaceNavigation.setState({ collapsed: false, sidebarOverlay: false, sidebarWidth: 208, area: 'code' });
   useDockStore.setState({
     leftZone: [],
     rightZone: ['files', 'git', 'command-history', 'chat'],
@@ -15,6 +15,7 @@ beforeEach(() => {
     rightPanels: [],
     panelWidths: {},
     collapsedPanels: [],
+    pendingPanelWidth: null,
   });
 });
 afterEach(() => {
@@ -63,7 +64,7 @@ describe('right auxiliary dock', () => {
     useDockStore.getState().setPanelWidth('chat', -1000);
     expect(useDockStore.getState().rightPanels).toEqual(['chat']);
     expect(useDockStore.getState().collapsedPanels).toEqual(['chat']);
-    expect(JSON.parse(localStorage.getItem('dock-layout-v6')!).rightPanels).toEqual([]);
+    expect(JSON.parse(localStorage.getItem('dock-layout-v6')!)).toMatchObject({ rightPanels: ['chat'], panelWidths: {} });
     useDockStore.getState().setPanelWidth('chat', 100);
     useDockStore.getState().commitPanelWidth('chat');
     expect(useDockStore.getState().rightPanels).toEqual(['chat']);
@@ -72,16 +73,24 @@ describe('right auxiliary dock', () => {
   });
   it('closes a collapsed panel only on release and can reopen it at its retained width', () => {
     useDockStore.getState().openPanel('chat');
+    useDockStore.getState().setPanelWidth('chat', 80);
+    useDockStore.getState().commitPanelWidth('chat');
+    useDockStore.getState().setPanelWidth('chat', -160);
     useDockStore.getState().setPanelWidth('chat', -1000);
+    useDockStore.getState().setPanelWidth('chat', 10);
+    expect(useDockStore.getState().collapsedPanels).toEqual(['chat']);
     useDockStore.getState().commitPanelWidth('chat');
     expect(useDockStore.getState().rightPanels).toEqual([]);
+    expect(JSON.parse(localStorage.getItem('dock-layout-v6')!)).toMatchObject({ rightPanels: [], panelWidths: { chat: 400 } });
     useDockStore.getState().openPanel('chat');
     expect(useDockStore.getState().rightPanels).toEqual(['chat']);
-    expect(useDockStore.getState().panelWidths.chat).toBe(160);
+    expect(useDockStore.getState().panelWidths.chat).toBe(400);
   });
   it('clamps resizing to the full-height sidebar and terminal budget', () => {
     Object.defineProperty(window, 'innerWidth', { value: 1000 });
+    useDockStore.getState().openPanel('chat');
     useDockStore.getState().setPanelWidth('chat', 10000);
+    useDockStore.getState().commitPanelWidth('chat');
     expect(useDockStore.getState().panelWidths.chat).toBe(432);
   });
   it('ignores invalid resize requests', () => {
@@ -105,6 +114,15 @@ describe('right auxiliary dock', () => {
 });
 
 describe('layout normalization', () => {
+  it('opens command history on the left and the assistant on the right for a fresh workspace', () => {
+    expect(snapshot).toMatchObject({
+      leftZone: ['command-history'],
+      leftPanels: ['command-history'],
+      rightZone: ['files', 'chat', 'git'],
+      rightPanels: ['chat'],
+    });
+    expect(useWorkspaceNavigation.getInitialState().sidebarWidth).toBe(288);
+  });
   const seed = {
     layoutVersion: 6,
     leftZone: ['tabs', 'ssh', 'files', 'git'],
@@ -136,8 +154,14 @@ describe('layout normalization', () => {
       normalizeDockLayout({ ...seed, rightZone: ['git', 'git', 'removed', 'settings'], leftZone: ['git', 'chat', 'files'] })?.rightZone,
     ).toEqual(['chat', 'files', 'command-history']);
   });
-  it('sanitizes non-finite and obsolete widths', () => {
-    expect(normalizeDockLayout({ ...seed, panelWidths: { files: 1, chat: Infinity, removed: 200 } })?.panelWidths).toEqual({ files: 160 });
+  it('discards invalid widths and old collapse widths so affected panels reopen at their defaults', () => {
+    expect(
+      normalizeDockLayout({ ...seed, panelWidths: { files: 1, chat: 170, git: 160, 'command-history': Infinity, removed: 200 } })
+        ?.panelWidths,
+    ).toEqual({});
+    expect(normalizeDockLayout({ ...seed, panelWidthVersion: 1, widthPreset: 'compact', panelWidths: { chat: 170 } })?.panelWidths).toEqual(
+      { chat: 170 },
+    );
   });
   it.each([null, [], {}, { ...seed, leftZone: null }, { ...seed, panelWidths: [] }])('rejects malformed layout %j', (value) => {
     expect(normalizeDockLayout(value)).toBeNull();

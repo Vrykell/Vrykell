@@ -374,8 +374,14 @@ test('keeps a localized custom answer attached to its original field and support
     ]);
 });
 
-for (const width of [1240, 760]) {
+for (const [width, theme] of [
+  [1240, 'dark'],
+  [760, 'light'],
+] as const) {
   test(`keeps provider errors and empty replies visible with working retry at ${width}px`, async ({ page }, info) => {
+    await page.addInitScript((theme) => localStorage.setItem('vrykell-theme-mode', theme), theme);
+    await page.reload();
+    await expect(page.locator('html')).toHaveAttribute('data-theme', theme);
     await connect(page);
     await page.setViewportSize({ width, height: 800 });
     const surface = current(page);
@@ -391,13 +397,43 @@ for (const width of [1240, 760]) {
       },
     });
     const first = surface.locator('.chat-exchange').first();
-    await expect(first.getByRole('alert')).toContainText('402: Insufficient Balance');
+    const alert = first.getByRole('alert');
+    await expect(alert).toContainText('402: Insufficient Balance');
     await expect(page.locator('[data-error-notification="true"]')).toHaveCount(0);
-    const disclosure = first.getByRole('button', { expanded: false }).filter({ hasText: /技术/ });
-    await disclosure.click();
-    await expect(first.getByRole('alert')).toContainText('The provider quota is exhausted.');
-    await page.screenshot({ path: info.outputPath(`acp-reply-error-${width}.png`) });
-    await first.getByRole('button', { name: '重试', exact: true }).focus();
+    const retry = alert.getByRole('button', { name: '重试', exact: true });
+    const disclosure = alert.getByRole('button', { name: '技术详情', exact: true });
+    await expect(alert.getByRole('button', { name: '复制技术详情' })).toHaveCount(0);
+    await expect(disclosure).toHaveAttribute('aria-expanded', 'false');
+    const restColor = await disclosure.evaluate((element) => getComputedStyle(element).color);
+    await disclosure.hover();
+    await expect(disclosure).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
+    await expect(disclosure).not.toHaveCSS('color', restColor);
+    await alert.screenshot({ path: info.outputPath(`error-collapsed-${theme}-${width}.png`) });
+    const collapsed = (await alert.boundingBox())!;
+    await page.mouse.move(0, 0);
+    await retry.focus();
+    await page.keyboard.press('Tab');
+    await expect(disclosure).toBeFocused();
+    await expect(disclosure).toHaveCSS('outline-style', 'solid');
+    await disclosure.press('Enter');
+    await expect(disclosure).toHaveAttribute('aria-expanded', 'true');
+    const output = alert.locator('.error-details-output');
+    await expect(output).toContainText('The provider quota is exhausted.');
+    const copy = (await output.getByRole('button', { name: '复制技术详情' }).boundingBox())!;
+    const text = (await output.locator('pre').boundingBox())!;
+    const panel = (await output.boundingBox())!;
+    const card = (await alert.boundingBox())!;
+    const answer = (await first.locator('.ai-block-answer').boundingBox())!;
+    expect(card.x).toBeCloseTo(answer.x, 0);
+    expect(card.width).toBeCloseTo(answer.width, 0);
+    expect(card.width).toBeCloseTo(collapsed.width, 0);
+    expect(panel.x - card.x).toBeCloseTo(card.x + card.width - panel.x - panel.width, 0);
+    expect(copy.x).toBeGreaterThanOrEqual(text.x + text.width);
+    expect(copy.x + copy.width).toBeLessThan(panel.x + panel.width);
+    expect(copy.y).toBeGreaterThan(panel.y);
+    await disclosure.blur();
+    await page.screenshot({ path: info.outputPath(`error-expanded-${theme}-${width}.png`) });
+    await retry.focus();
     await page.keyboard.press('Enter');
     await expect.poll(async () => (await acpCalls(page)).filter((call) => call.startsWith('acp_prompt:')).length).toBe(2);
     await emitAcpSession(page, acpUpdate('sess_e2e', { sessionUpdate: 'usage_update', used: 1, size: 100 }));

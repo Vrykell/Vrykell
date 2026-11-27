@@ -29,30 +29,13 @@ const BLOCK_COUNT = 4;
 const MAX_WAIT_MS = 10_000;
 const DEFAULT_WAIT_MS = 300;
 
-/** Resolves false as soon as the turn is aborted instead of holding the tool open for the full wait. */
-function waitForScreen(ms: number, signal?: AbortSignal): Promise<boolean> {
-  if (signal?.aborted) return Promise.resolve(false);
-  return new Promise((resolve) => {
-    let timer: ReturnType<typeof setTimeout> | null = null;
-    const onAbort = () => {
-      if (timer !== null) clearTimeout(timer);
-      resolve(false);
-    };
-    timer = setTimeout(() => {
-      signal?.removeEventListener('abort', onAbort);
-      resolve(true);
-    }, ms);
-    signal?.addEventListener('abort', onAbort, { once: true });
-  });
-}
-
 /** "Live screen" in the block-list scene = the tails of the most recent command blocks (the main terminal surface is idle there). */
 function blockListContent(paneId: string): string {
   const blocks = useBlockStore.getState().byTab[paneId] ?? [];
   const withOutput = blocks.filter((b) => b.outputText && b.outputText.trim().length > 0);
   const tail = withOutput.slice(-BLOCK_COUNT);
-  if (tail.length === 0) return t('No command blocks have output yet.');
-  return tail.map((b) => `$ ${b.command || t('No command')}\n${b.outputText.slice(-BLOCK_OUTPUT_CAP)}`).join('\n\n');
+  if (tail.length === 0) return '（块列表为空，暂无输出）';
+  return tail.map((b) => `$ ${b.command || '（无命令）'}\n${b.outputText.slice(-BLOCK_OUTPUT_CAP)}`).join('\n\n');
 }
 
 export function buildTerminalTools(ctx: ToolContext) {
@@ -108,10 +91,10 @@ export function buildTerminalTools(ctx: ToolContext) {
           return { ok: false, error };
         }
         if (normalized.length === 0 && !wait_ms) {
-          return { ok: false, error: t('The key sequence is empty. Provide keys to send.') };
+          return { ok: false, error: '按键序列为空，请提供要发送的按键' };
         }
         if (normalized.length > 4096) {
-          return { ok: false, error: t('The key sequence is too long (over 4096 characters). Send it in parts.') };
+          return { ok: false, error: '按键序列过长（>4096 字符），请分段发送' };
         }
         const paneId = ctx.paneId === undefined ? getFocusedTerminalId() : ctx.paneId;
         if (!paneId) return { ok: false, error: t('No execution terminal is connected to this conversation.') };
@@ -123,15 +106,10 @@ export function buildTerminalTools(ctx: ToolContext) {
         } catch (e) {
           const disconnected = terminalDisconnected(paneId, sessionId);
           if (disconnected) return disconnected;
-          return {
-            ok: false,
-            error: t('Could not write to the terminal: {{error}}', { error: e instanceof Error ? e.message : String(e) }),
-          };
+          return { ok: false, error: `写入终端失败: ${e instanceof Error ? e.message : String(e)}` };
         }
         const wait = Math.min(wait_ms ?? DEFAULT_WAIT_MS, MAX_WAIT_MS);
-        if (wait > 0 && !(await waitForScreen(wait, ctx.signal))) {
-          return { ok: false, cancelled: true, error: t('Tool call cancelled.') };
-        }
+        if (wait > 0) await new Promise((r) => setTimeout(r, wait));
         const interrupted = terminalDisconnected(paneId, sessionId);
         if (interrupted) return interrupted;
         return {
@@ -170,10 +148,9 @@ function normalizeKeys(raw: string): { keys: string; error?: string } {
   if (m) {
     return {
       keys,
-      error: t(
-        'Invalid escape sequence "{{escape}}…": use \\uXXXX (for example \\u0018) or \\xNN (for example \\x1b) for control characters, or type the visible characters directly; the tool never sends an unrecognized escape.',
-        { escape: m[0] },
-      ),
+      error:
+        `无效转义序列「${m[0]}…」：控制字符请用 \\uXXXX（如 \\u0018）或 \\xNN（如 \\x1b）表达，` +
+        '或直接写可见字符；工具不会发送无法识别的转义',
     };
   }
   return { keys };

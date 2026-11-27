@@ -1,6 +1,6 @@
 import { expect, test, type Locator, type Page } from '@playwright/test';
 import { setupTauriMock } from './tauri-mock';
-import { gotoSetting } from './settings';
+import { gotoSetting, selectShellProfile } from './settings';
 
 function luminance(color: string) {
   const channels = color
@@ -91,7 +91,8 @@ for (const theme of ['dark', 'light'] as const)
     expect(luminance(hintColors.background)).toBeGreaterThan(luminance(background));
     expect(contrast(hintColors.background, hintColors.text)).toBeGreaterThanOrEqual(4.5);
     await page.screenshot({ path: info.outputPath(`shortcuts-${theme}.png`), animations: 'disabled' });
-    await gotoSetting(page, 'Zsh');
+    await gotoSetting(page, 'Shell 配置文件');
+    await selectShellProfile(page, 'Zsh');
     await expectCards(page.locator('.shell-profile-page .settings-group-panel'), background, '1px');
     await page.screenshot({ path: info.outputPath(`settings-${theme}.png`), animations: 'disabled' });
     await page.getByTestId('workspace-settings').hover();
@@ -127,18 +128,11 @@ for (const theme of ['dark', 'light'] as const)
     await page.screenshot({ path: info.outputPath(`hosts-${theme}.png`), animations: 'disabled' });
 
     await page.getByTestId('workspace-area-ai').click();
-    await expect(page.getByTestId('ai-start-new-conversation')).toBeVisible();
+    const conversation = page.getByTestId('ai-start-page').getByTestId('ai-start-new-conversation');
+    await expect(conversation).toHaveCSS('background-color', await tokenBackground(page, '--primary-button-bg'));
     await page.getByTestId('ai-start-agents').click();
-    const agentRow = page.getByTestId('acp-launcher-Fake ACP');
-    await expect(agentRow).toBeVisible();
-    // The agent list is a picker dialog, so its rows keep the shared floating-row surface.
-    await expect(agentRow).toHaveCSS('border-width', '0px');
-    await expect(agentRow).toHaveCSS('box-shadow', 'none');
-    await expect(agentRow).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
+    await expect(page.getByRole('dialog', { name: '选择智能体' }).getByTestId('acp-launcher-Fake ACP')).toBeVisible();
     await page.keyboard.press('Escape');
-    await expect(agentRow).toHaveCount(0);
-    await page.getByTestId('ai-start-new-conversation').hover();
-    await expect(page.getByTestId('ai-start-new-conversation')).not.toHaveCSS('background-color', background);
     await page.mouse.move(0, 0);
     await page.screenshot({ path: info.outputPath(`ai-start-${theme}.png`), animations: 'disabled' });
     await page.getByTestId('workspace-history').click();

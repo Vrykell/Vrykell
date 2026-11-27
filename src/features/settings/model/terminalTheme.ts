@@ -36,7 +36,7 @@ export interface TerminalThemeConfig extends ThemePresetSelection {
 
 const DEFAULT_CONFIG: TerminalThemeConfig = {
   ...readThemePresets(),
-  desktopTint: true,
+  desktopTint: false,
   opacity: 1,
   backgroundImage: null,
   vars: {},

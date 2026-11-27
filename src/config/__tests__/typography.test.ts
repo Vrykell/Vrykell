@@ -140,7 +140,7 @@ describe('font preferences', () => {
     expect(useTypographyStore.getState().commandHighlighting).toBe(false);
   });
 
-  it('loads saved preferences without retaining the removed viewport title setting', async () => {
+  it('loads saved font preferences without carrying forward the removed viewport title setting', async () => {
     localStorage.setItem(
       'vrykell-typography',
       JSON.stringify({ version: 0, state: { commandTitleCollapsed: true, terminalFontSize: 18 } }),

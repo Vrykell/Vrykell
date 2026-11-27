@@ -189,7 +189,7 @@ it('keeps close buttons independent of document dragging', () => {
   expect(useListReorder.getState().drag).toBeNull();
 });
 
-it('selects a document after a primary click without starting a drag', () => {
+it('selects a document on click after releasing the primary pointer', () => {
   const { tabs, onSelect } = setup();
   fireEvent.pointerDown(tabs[1]!, { pointerId: 1, button: 0, isPrimary: true, clientX: 140, clientY: 14 });
   expect(onSelect).not.toHaveBeenCalled();

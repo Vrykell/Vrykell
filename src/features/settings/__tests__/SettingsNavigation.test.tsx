@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import { afterEach, expect, it } from 'vitest';
 import SettingsNavigation from '../components/SettingsNavigation';
 import { useSettingsNavigation } from '../hooks/useSettingsNavigation';
@@ -40,15 +40,15 @@ it('supports keyboard selection without folding the directory', () => {
   expect(screen.getByRole('complementary', { name: '设置目录' })).toBeVisible();
 });
 
-it('keeps one terminal profiles destination and remembers the selected shell', () => {
-  useSettingsNavigationStore.getState().setSelected('profile:cmd');
+it('lists Shell profiles under Terminal as a single destination', () => {
   render(<Navigation />);
-  const profile = screen.getByRole('button', { name: 'Shell 配置文件' });
-  expect(profile).toHaveAttribute('aria-current', 'page');
+  const terminal = screen.getByText('终端', { exact: true }).parentElement!;
+  const profiles = within(terminal).getByRole('button', { name: 'Shell 配置文件' });
+  expect(within(terminal).getByRole('button', { name: '历史命令' })).toBeVisible();
+  expect(profiles.querySelector('svg rect')).toBeInTheDocument();
   expect(screen.queryByRole('button', { name: 'CMD' })).not.toBeInTheDocument();
-  fireEvent.click(screen.getByRole('button', { name: '语言' }));
-  fireEvent.click(profile);
-  expect(useSettingsNavigationStore.getState().selected).toBe('profile:cmd');
+  fireEvent.click(profiles);
+  expect(profiles).toHaveAttribute('aria-current', 'page');
 });
 
 it('switches hover presentation without changing the selected page or keyboard focus', () => {

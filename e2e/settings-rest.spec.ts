@@ -3,7 +3,7 @@
  */
 import { test, expect } from '@playwright/test';
 import { setupTauriMock, themeConfig } from './tauri-mock';
-import { gotoSetting, fieldOf, rowOf, selectThemeMode } from './settings';
+import { gotoSetting, fieldOf, rowOf, selectShellProfile, selectThemeMode } from './settings';
 
 test.beforeEach(async ({ page }) => {
   await setupTauriMock(page);
@@ -60,7 +60,8 @@ test.describe('Theme file settings page', () => {
 
 test.describe('Opening mode settings page', () => {
   test('Each shell defaults to block mode; switching to classic mode persists', async ({ page }, testInfo) => {
-    await gotoSetting(page, 'Zsh');
+    await gotoSetting(page, 'Shell 配置文件');
+    await selectShellProfile(page, 'Zsh');
     const modes = page.getByRole('radiogroup', { name: '打开方式', exact: true });
     await expect(modes.getByRole('radio', { name: '块模式', exact: true })).toBeChecked();
     await modes.getByRole('radio', { name: '经典模式', exact: true }).click();
@@ -68,13 +69,14 @@ test.describe('Opening mode settings page', () => {
     expect(saved).toContain('"zsh":"classic"');
     await modes.getByRole('radio', { name: '经典模式', exact: true }).press('ArrowRight');
     await expect(modes.getByRole('radio', { name: '块模式', exact: true })).toBeChecked();
-    await gotoSetting(page, 'Bash');
-    await gotoSetting(page, 'Zsh');
+    await selectShellProfile(page, 'Bash');
+    await selectShellProfile(page, 'Zsh');
     await expect(modes.getByRole('radio', { name: '块模式', exact: true })).toBeChecked();
     for (const theme of ['深色', '浅色']) {
       await gotoSetting(page, '主题');
       await selectThemeMode(page, theme);
-      await gotoSetting(page, 'Zsh');
+      await gotoSetting(page, 'Shell 配置文件');
+      await expect(page.getByRole('combobox', { name: 'Shell 配置文件' })).toHaveText('Zsh');
       for (const width of [760, 1240]) {
         await page.setViewportSize({ width, height: 800 });
         await expect(modes.getByRole('radio')).toHaveCount(2);
@@ -82,7 +84,7 @@ test.describe('Opening mode settings page', () => {
         await modes.screenshot({ path: testInfo.outputPath(`opening-mode-${theme}-${width}.png`) });
       }
     }
-    await gotoSetting(page, 'CMD');
+    await selectShellProfile(page, 'CMD');
     await expect(modes).toHaveCount(0);
   });
 
